@@ -490,3 +490,42 @@ def test_cli_accepts_large_scaffold_topology(tmp_path: Path) -> None:
     proc = _run_cli(spec_path, "--dry-run")
 
     assert proc.returncode == 0
+
+
+def test_cli_migrate_profile_writes_inferred_profile(tmp_path: Path) -> None:
+    """``--migrate-profile`` inserts the inferred profile into a legacy spec."""
+    spec_path = _write_spec(tmp_path / "legacy.json", _single_track_spec())
+
+    proc = _run_cli(spec_path, "--migrate-profile")
+    assert proc.returncode == 0, proc.stderr
+    assert "migrated profile='single_pattern_notes'" in proc.stdout
+
+    migrated = json.loads(spec_path.read_text(encoding="utf-8"))
+    assert migrated["profile"] == "single_pattern_notes"
+    # Migrated specs should no longer emit a DeprecationWarning on build.
+    proc2 = _run_cli(spec_path, "--dry-run")
+    assert proc2.returncode == 0, proc2.stderr
+    assert "DeprecationWarning" not in proc2.stderr
+
+
+def test_cli_migrate_profile_is_idempotent(tmp_path: Path) -> None:
+    spec_with_profile = _single_track_spec()
+    spec_with_profile["profile"] = "single_pattern_notes"
+    spec_path = _write_spec(tmp_path / "already.json", spec_with_profile)
+
+    proc = _run_cli(spec_path, "--migrate-profile")
+    assert proc.returncode == 0
+    assert "already has profile='single_pattern_notes'" in proc.stdout
+
+
+def test_cli_rejects_unknown_profile_value(tmp_path: Path) -> None:
+    bad = _single_track_spec()
+    bad["profile"] = "does_not_exist"
+    spec_path = _write_spec(tmp_path / "bad.json", bad)
+
+    proc = _run_cli(spec_path, "--dry-run")
+    assert proc.returncode != 0
+    # Error message comes through stderr (argparse-style) or stdout
+    # depending on runtime; accept either.
+    combined = proc.stdout + proc.stderr
+    assert "profile must be one of" in combined

@@ -142,6 +142,7 @@ If your main goal is "make music, not reverse engineer," this workflow is the sa
 - `tools/inspect_xy.py`: inspect what a file currently contains.
 - `tools/build_xy_from_json.py`: build a file from a JSON edit recipe.
 - `tools/capture_9pat.py`: interactive MIDI harness for multi-pattern device captures.
+- `tools/analysis/`: research scripts and one-off probes. See `tools/analysis/README.md`.
 - `src/one-off-changes-from-default/`: the key fixture files used for learning and testing.
 
 ## House Rules

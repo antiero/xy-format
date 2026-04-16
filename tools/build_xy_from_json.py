@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import json
 from pathlib import Path
 import sys
 
@@ -14,6 +15,7 @@ if str(REPO_ROOT) not in sys.path:
 
 from xy.container import XYProject
 from xy.json_build_spec import build_xy_bytes, load_build_spec
+from xy.profiles import infer_profile
 
 
 def _sha1(data: bytes) -> str:
@@ -61,12 +63,56 @@ def _build_arg_parser() -> argparse.ArgumentParser:
         default=None,
         help="Expected .xy file path for byte-match verification",
     )
+    parser.add_argument(
+        "--migrate-profile",
+        action="store_true",
+        help=(
+            "Infer and write back the 'profile' field if missing, then exit. "
+            "Does not build the output. Use for bulk-migrating legacy specs."
+        ),
+    )
     return parser
+
+
+def _migrate_profile(spec_path: Path) -> int:
+    """Write the inferred profile back into a legacy spec.
+
+    Returns 0 on success, non-zero on error. Prints a single status line.
+    """
+    spec = load_build_spec(spec_path)
+    if spec.profile is not None:
+        print(f"already has profile={spec.profile!r}: {spec_path}")
+        return 0
+    inferred = infer_profile(spec)
+    if inferred is None:
+        print(f"cannot infer profile for {spec_path} — declare it manually")
+        return 1
+    payload = json.loads(spec_path.read_text(encoding="utf-8"))
+    # Preserve key order: place 'profile' immediately after 'mode' for
+    # readability, falling back to end if 'mode' is missing.
+    new_payload = {}
+    inserted = False
+    for key, value in payload.items():
+        new_payload[key] = value
+        if key == "mode" and not inserted:
+            new_payload["profile"] = inferred
+            inserted = True
+    if not inserted:
+        new_payload["profile"] = inferred
+    spec_path.write_text(
+        json.dumps(new_payload, indent=2, ensure_ascii=False) + "\n",
+        encoding="utf-8",
+    )
+    print(f"migrated profile={inferred!r}: {spec_path}")
+    return 0
 
 
 def main() -> int:
     parser = _build_arg_parser()
     args = parser.parse_args()
+
+    if args.migrate_profile:
+        return _migrate_profile(args.spec)
 
     spec = load_build_spec(args.spec)
     out_path = args.output if args.output is not None else spec.output
@@ -122,6 +168,12 @@ def main() -> int:
         print(f"  descriptor_strategy={spec.descriptor_strategy}")
     if spec.header.has_changes():
         print("  header patch applied")
+    if spec.scene_song.has_changes():
+        print("  scene/song patch applied")
+    if spec.scene_assignments:
+        print("  scene assignments applied")
+    if spec.song_arrangement:
+        print(f"  song arrangement applied ({len(spec.song_arrangement)} steps)")
 
     return 0 if match_ok else 2
 

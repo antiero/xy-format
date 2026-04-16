@@ -5,6 +5,15 @@ import sys
 
 import pytest
 
+# Many of the test specs in this file were authored before the ``profile``
+# field existed, and they intentionally exercise the legacy-grandfathered
+# inference path. The profile gate raises a DeprecationWarning in that case;
+# the warning's correctness is covered directly in ``tests/test_profiles.py``.
+# Here we silence it to keep the test output focused on reproduction failures.
+pytestmark = pytest.mark.filterwarnings(
+    "ignore:spec has no 'profile' field:DeprecationWarning"
+)
+
 REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
@@ -15,6 +24,8 @@ from xy.json_build_spec import (
     load_build_spec,
     parse_build_spec,
 )
+from xy.scene_records import read_scene_assignments, read_t16_scene_list
+from xy.scaffold_writer import extract_logical_entries
 
 
 ROOT = REPO_ROOT
@@ -379,6 +390,11 @@ def test_parse_rejects_invalid_mode() -> None:
 
 
 def test_build_rejects_mixed_pattern_counts() -> None:
+    # Mixed pattern counts (T1 one pattern, T3 two patterns) matches neither
+    # single_pattern_notes nor multi_pattern_strict. The profile gate rejects
+    # it with a catalog hint before the builder-specific "mixed pattern
+    # counts" error fires. Declaring an explicit profile surfaces the
+    # profile-level rejection.
     spec = parse_build_spec(
         {
             "version": 1,
@@ -391,8 +407,25 @@ def test_build_rejects_mixed_pattern_counts() -> None:
         },
         base_dir=ROOT,
     )
-    with pytest.raises(ValueError, match="mixed pattern counts"):
+    with pytest.raises(ValueError, match="does not match any registered profile"):
         build_xy_bytes(spec)
+
+    # With an explicit profile, the mismatch is attributed to the profile.
+    spec_with_profile = parse_build_spec(
+        {
+            "version": 1,
+            "mode": "multi_pattern",
+            "profile": "multi_pattern_strict",
+            "template": TEMPLATE_REL,
+            "tracks": [
+                {"track": 1, "patterns": [[{"step": 1, "note": 60}]]},
+                {"track": 3, "patterns": [None, [{"step": 2, "note": 52}]]},
+            ],
+        },
+        base_dir=ROOT,
+    )
+    with pytest.raises(ValueError, match="profile=multi_pattern_strict"):
+        build_xy_bytes(spec_with_profile)
 
 
 def test_parse_defaults_version_and_descriptor_strategy() -> None:
@@ -407,7 +440,167 @@ def test_parse_defaults_version_and_descriptor_strategy() -> None:
 
     assert spec.version == 1
     assert spec.descriptor_strategy == "strict"
+    assert spec.topology_policy == "none"
+    assert spec.scene_song.pretrack_mode == "none"
+    assert spec.scene_song.track16_mode == "none"
+    assert spec.scene_assignments == {}
+    assert spec.song_arrangement == []
     assert spec.output is None
+
+
+def test_parse_scene_assignments_accepts_prefixed_keys() -> None:
+    spec = parse_build_spec(
+        {
+            "version": 1,
+            "mode": "multi_pattern",
+            "template": TEMPLATE_REL,
+            "scene_assignments": {
+                "S1": {f"T{track}": 1 for track in range(1, 9)},
+                "S2": {f"T{track}": 2 for track in range(1, 9)},
+            },
+            "tracks": [_minimal_track_spec(1)],
+        },
+        base_dir=ROOT,
+    )
+
+    assert sorted(spec.scene_assignments) == [1, 2]
+    assert spec.scene_assignments[1][1] == 1
+    assert spec.scene_assignments[2][8] == 2
+
+
+def test_parse_rejects_non_contiguous_scene_assignments() -> None:
+    with pytest.raises(ValueError, match="scene_assignments scene ids must be contiguous"):
+        parse_build_spec(
+            {
+                "version": 1,
+                "mode": "multi_pattern",
+                "template": TEMPLATE_REL,
+                "scene_assignments": {
+                    "S1": {f"T{track}": 1 for track in range(1, 9)},
+                    "S3": {f"T{track}": 1 for track in range(1, 9)},
+                },
+                "tracks": [_minimal_track_spec(1)],
+            },
+            base_dir=ROOT,
+        )
+
+
+def test_parse_rejects_incomplete_scene_track_assignments() -> None:
+    with pytest.raises(ValueError, match="must contain tracks 1..8"):
+        parse_build_spec(
+            {
+                "version": 1,
+                "mode": "multi_pattern",
+                "template": TEMPLATE_REL,
+                "scene_assignments": {
+                    "S1": {f"T{track}": 1 for track in range(1, 8)},
+                },
+                "tracks": [_minimal_track_spec(1)],
+            },
+            base_dir=ROOT,
+        )
+
+
+def test_build_applies_scene_assignments_matrix_template() -> None:
+    template = ROOT / "src" / "unnamed 156.xy"
+    if not template.exists():
+        pytest.skip("unnamed 156 matrix template not available")
+
+    expected = {
+        1: {track: track for track in range(1, 9)},
+        2: {track: track + 1 for track in range(1, 9)},
+    }
+    expected[2][8] = 8
+
+    spec = parse_build_spec(
+        {
+            "version": 1,
+            "mode": "multi_pattern",
+            "template": str(template),
+            "scene_assignments": {
+                f"S{scene}": {f"T{track}": pattern for track, pattern in row.items()}
+                for scene, row in expected.items()
+            },
+            "tracks": [
+                {
+                    "track": 1,
+                    "patterns": [[{"step": 1, "note": 60, "velocity": 100}]],
+                }
+            ],
+        },
+        base_dir=ROOT,
+    )
+
+    raw = build_xy_bytes(spec)
+    project = XYProject.from_bytes(raw)
+    assert read_scene_assignments(project) == expected
+
+
+def test_parse_song_arrangement_accepts_positive_scene_ids() -> None:
+    spec = parse_build_spec(
+        {
+            "version": 1,
+            "mode": "multi_pattern",
+            "template": TEMPLATE_REL,
+            "song_arrangement": [1, 2, 1, 2],
+            "tracks": [_minimal_track_spec(1)],
+        },
+        base_dir=ROOT,
+    )
+    assert spec.song_arrangement == [1, 2, 1, 2]
+
+
+def test_build_rejects_song_arrangement_matrix_template_without_valid_track16_list() -> None:
+    template = ROOT / "src" / "unnamed 156.xy"
+    if not template.exists():
+        pytest.skip("unnamed 156 matrix template not available")
+
+    spec = parse_build_spec(
+        {
+            "version": 1,
+            "mode": "multi_pattern",
+            "template": str(template),
+            "song_arrangement": [1, 2, 1, 2],
+            "tracks": [
+                {
+                    "track": 1,
+                    "patterns": [[{"step": 1, "note": 60, "velocity": 100}]],
+                }
+            ],
+        },
+        base_dir=ROOT,
+    )
+
+    with pytest.raises(ValueError, match="valid existing Track16 scene list"):
+        build_xy_bytes(spec)
+
+
+def test_build_applies_song_arrangement_tag_template() -> None:
+    template = ROOT / "src" / "one-off-changes-from-default" / "07_scene_s3_t4p3.xy"
+    if not template.exists():
+        pytest.skip("tag-record scene template not available")
+
+    spec = parse_build_spec(
+        {
+            "version": 1,
+            "mode": "multi_pattern",
+            "template": str(template),
+            "song_arrangement": [1, 3, 2, 3],
+            "tracks": [
+                {
+                    "track": 3,
+                    "patterns": [[{"step": 1, "note": 48, "velocity": 100}]],
+                }
+            ],
+        },
+        base_dir=ROOT,
+    )
+
+    raw = build_xy_bytes(spec)
+    project = XYProject.from_bytes(raw)
+    count, ids = read_t16_scene_list(project.tracks[15].body)
+    assert count == 4
+    assert ids == [0, 2, 1, 2]
 
 
 def test_parse_resolves_relative_paths_against_base_dir(tmp_path: Path) -> None:
@@ -474,6 +667,48 @@ def test_parse_rejects_invalid_descriptor_strategy() -> None:
                 "mode": "multi_pattern",
                 "template": TEMPLATE_REL,
                 "descriptor_strategy": "unsafe",
+                "tracks": [_minimal_track_spec(1)],
+            },
+            base_dir=ROOT,
+        )
+
+
+def test_parse_rejects_invalid_topology_policy() -> None:
+    with pytest.raises(ValueError, match="topology_policy must be one of"):
+        parse_build_spec(
+            {
+                "version": 1,
+                "mode": "multi_pattern",
+                "template": TEMPLATE_REL,
+                "topology_policy": "unsafe",
+                "tracks": [_minimal_track_spec(1)],
+            },
+            base_dir=ROOT,
+        )
+
+
+def test_parse_rejects_invalid_scene_song_pretrack_mode() -> None:
+    with pytest.raises(ValueError, match="scene_song.pretrack_mode must be one of"):
+        parse_build_spec(
+            {
+                "version": 1,
+                "mode": "multi_pattern",
+                "template": TEMPLATE_REL,
+                "scene_song": {"pretrack_mode": "unsafe"},
+                "tracks": [_minimal_track_spec(1)],
+            },
+            base_dir=ROOT,
+        )
+
+
+def test_parse_rejects_invalid_scene_song_track16_mode() -> None:
+    with pytest.raises(ValueError, match="scene_song.track16_mode must be one of"):
+        parse_build_spec(
+            {
+                "version": 1,
+                "mode": "multi_pattern",
+                "template": TEMPLATE_REL,
+                "scene_song": {"track16_mode": "unsafe"},
                 "tracks": [_minimal_track_spec(1)],
             },
             base_dir=ROOT,
@@ -559,10 +794,13 @@ def test_parse_rejects_note_value_out_of_range() -> None:
 
 
 def test_build_rejects_single_pattern_blank_pattern0() -> None:
+    # A single-pattern blank is not a valid single_pattern_notes spec.
+    # Declaring the profile explicitly surfaces the profile-level message.
     spec = parse_build_spec(
         {
             "version": 1,
             "mode": "multi_pattern",
+            "profile": "single_pattern_notes",
             "template": TEMPLATE_REL,
             "tracks": [
                 {
@@ -573,7 +811,7 @@ def test_build_rejects_single_pattern_blank_pattern0() -> None:
         },
         base_dir=ROOT,
     )
-    with pytest.raises(ValueError, match="single-pattern form requires note data"):
+    with pytest.raises(ValueError, match="empty/null patterns\\[0\\]"):
         build_xy_bytes(spec)
 
 
@@ -620,6 +858,47 @@ def test_scaffold_preserving_j06_blank_round_trips_byte_exact() -> None:
     )
     raw = build_xy_bytes(spec)
     assert raw == (CORPUS_DIR / "j06_all16_p9_blank.xy").read_bytes()
+
+
+def test_topology_policy_bootstrap_t1_t8_p9_can_recreate_j06_from_sparse_blank_spec() -> None:
+    spec = parse_build_spec(
+        {
+            "version": 1,
+            "mode": "multi_pattern",
+            "template": TEMPLATE_REL,
+            "descriptor_strategy": "strict",
+            "topology_policy": "bootstrap_t1_t8_p9",
+            "tracks": [
+                {"track": 3, "patterns": [None] * 5},
+                {"track": 6, "patterns": [None] * 5},
+            ],
+        },
+        base_dir=ROOT,
+    )
+    raw = build_xy_bytes(spec)
+    assert raw == (CORPUS_DIR / "j06_all16_p9_blank.xy").read_bytes()
+
+
+def test_topology_policy_bootstrap_t1_t8_p9_rejects_tracks_outside_t1_t8() -> None:
+    # The bootstrap profile validates tracks up-front, so T9 is rejected at
+    # the profile layer rather than by _apply_bootstrap_t1_t8_p9. Both layers
+    # catch this; the profile layer runs first.
+    spec = parse_build_spec(
+        {
+            "version": 1,
+            "mode": "multi_pattern",
+            "profile": "bootstrap_t1_t8_p9",
+            "template": TEMPLATE_REL,
+            "descriptor_strategy": "strict",
+            "topology_policy": "bootstrap_t1_t8_p9",
+            "tracks": [
+                {"track": 9, "patterns": [None, None]},
+            ],
+        },
+        base_dir=ROOT,
+    )
+    with pytest.raises(ValueError, match="tracks must be in T1..T8"):
+        build_xy_bytes(spec)
 
 
 def test_scaffold_preserving_j06_to_j07_sparsemap_matches_exact_bytes() -> None:
@@ -669,6 +948,37 @@ def test_scaffold_preserving_j06_to_j07_sparsemap_matches_exact_bytes() -> None:
     )
     raw = build_xy_bytes(spec)
     assert raw == (CORPUS_DIR / "j07_all16_p9_sparsemap.xy").read_bytes()
+
+
+def test_scene_song_patch_applies_pretrack_and_track16_structure_modes() -> None:
+    template_path = CORPUS_DIR / "j06_all16_p9_blank.xy"
+    base_project = XYProject.from_bytes(template_path.read_bytes())
+    base_entries = extract_logical_entries(base_project)
+    base_body = next(e.body for e in base_entries if (e.track, e.pattern) == (16, 1))
+
+    spec = parse_build_spec(
+        {
+            "version": 1,
+            "mode": "multi_pattern",
+            "template": str(template_path),
+            "descriptor_strategy": "strict",
+            "tracks": [{"track": t, "patterns": [None] * 9} for t in range(1, 9)],
+            "scene_song": {
+                "pretrack_mode": "song2_scene2_bytes",
+                "track16_mode": "song2_scene2_struct_154",
+            },
+        },
+        base_dir=ROOT,
+    )
+
+    raw = build_xy_bytes(spec)
+    project = XYProject.from_bytes(raw)
+    assert project.pre_track[0x0F:0x12] == bytes.fromhex("010100")
+
+    entries = extract_logical_entries(project)
+    body = next(e.body for e in entries if (e.track, e.pattern) == (16, 1))
+    assert len(body) == len(base_body) + 2
+    assert body[351:357] == bytes.fromhex("020001010000")
 
 
 def test_header_patch_applies_all_supported_fields() -> None:

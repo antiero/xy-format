@@ -22,10 +22,48 @@ This repo now has a JSON-to-`.xy` compile path via:
 - Optional header patch:
   - `tempo_tenths`, `groove_type`, `groove_amount`, `metronome_level`.
 
+## Profiles (required on new specs)
+
+Every spec must declare a `profile` string. The profile names a validated
+build recipe and acts as a safety gate: the compiler validates the spec
+matches the profile before any template mutation. See `xy/profiles.py` for
+the authoritative registry.
+
+| Profile | What it does | Evidence |
+|---|---|---|
+| `header_only` | Header patch (tempo/groove/metronome) only, no track changes. | `xy/container.py` round-trip (206/206 corpus) |
+| `single_pattern_notes` | Append notes to tracks that each hold exactly one pattern. | T004: `unnamed 2`, `unnamed 81`; `output/ode_to_joy*.xy` |
+| `multi_pattern_strict` | Multi-pattern build with device-verified descriptor. Track set must be in the strict lookup (`{T1}`, `{T2}`, `{T1,T2}`, `{T1,T3}`, `{T1,T4}`, `{T1,T2,T3}`, all 8, or single T3/T4/T7) or any T3+-only Scheme A combination. | T005, `docs/format/descriptor_encoding.md` |
+| `bootstrap_t1_t8_p9` | 8-track × 9-pattern strict topology from `unnamed 1`/`j06`. Safe mitigation for sparse-topology crashes. | `docs/issues/sparse_topology_stability.md` |
+| `scene_song_tokens` | Pre-track and Track16 token patches for scene/song control. Scaffold must have matching pre-track shape. | `docs/format/scenes_songs.md` §§4–6 |
+| `scene_assignments` | Scene pattern-map / song arrangement rewrite on a decoded scene-family scaffold (tag-record or matrix). | `docs/format/scenes_songs.md` §§15, 17; `xy/scene_patcher.py` |
+
+### Migrating legacy specs
+
+Specs authored before profiles existed emit a `DeprecationWarning` with the
+inferred profile. Use the migration command to write the inferred value back:
+
+    python tools/build_xy_from_json.py path/to/spec.json --migrate-profile
+
+The command is idempotent (skips specs that already declare a profile) and
+inserts `"profile": "…"` immediately after `"mode"`.
+
+### Rejecting out-of-contract requests
+
+- A spec with a declared `profile` that doesn't match the recipe fails hard
+  with a profile-specific message (e.g. `profile=multi_pattern_strict: track
+  set {T1,T5} is not device-verified`).
+- A spec without a profile that doesn't match any recipe fails with a
+  catalog hint naming all registered profiles.
+- Generalising an existing profile or adding a new one requires (1) corpus
+  evidence, (2) a regression test, and (3) a docs entry — see the block
+  comment at the top of `xy/profiles.py`.
+
 ## Guardrails
 - Spec versioned (`version: 1`).
 - Strong range checks for track/note/timing fields.
 - Output re-parsed through `XYProject` for structural round-trip sanity.
+- Profile gate runs before any template mutation.
 
 ## Near-Term Extensions
 - Add optional event-type override only where backed by preset evidence.
