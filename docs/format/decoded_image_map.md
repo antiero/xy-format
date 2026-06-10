@@ -111,12 +111,82 @@ the note==velocity probe written with its RLE extension byte
 (`3c 3c 00`), which the old "firmware bug" model predicts crashes and
 this model predicts loads.
 
+## Tier-1 Field Sweeps (2026-06-09, corpus-only)
+
+### Step-component slot — FULLY DECODED
+
+16 bytes per step at track+0x3057 + 16×(step−1):
+
+```c
+struct StepComponents {
+    u16 enabled_mask;   // LE bitfield, one bit per component type
+    u8  value[14];      // one config byte per type, same bit order
+};
+```
+
+| bit | component | value example (corpus) |
+|-----|-----------|------------------------|
+| 0 | pulse | 01 = 1 repeat; 00 = max/random (u8/9/59/60) |
+| 1 | hold | 01 = min (u61) |
+| 2 | multiply | 04 = ÷4 (u66) |
+| 3 | velocity | 00 = random (u67) |
+| 4 | ramp up | 08 = 4 steps/3 oct (u68) |
+| 5 | ramp down | 02 = 3 steps/1 oct (u69) |
+| 6 | random | 03 = 4 steps/1 oct (u70) |
+| 7 | portamento | 07 = 70% (u71) |
+| 8 | bend | 01 = up/down shape (u72) |
+| 9 | tonality | 04 = +5th (u73) |
+| 10 | jump | 04 = →step 13 from 9 (u74) |
+| 11 | param | 04 = 4 toggles (u75) |
+| 12 | conditional A | 02 = 1:2 (u76) |
+| 13 | conditional B / trigger | 04 = every 4th (u62); 09 = 1:9 (u77) |
+
+`ff 3f` = all 14 enabled (u63). The legacy "two banks / alloc-byte
+formula / only steps 1&9 work" lore was RLE artifacts plus our own
+encoder bugs.
+
+### P-lock (per-step parameter lock) table — structure decoded
+
+Per-step lock rows at **track+0x2A0**, **84 bytes per step** (×64),
+**u16 cell per parameter column** (42 columns):
+
+```
+cell(step, param) = track + 0x2A0 + 84·(step−1) + 2·param_col
+```
+
+Verified with the device-passed `plock_drum_t2.xy` (alternating
+256/32767 on known steps, uniform 84 stride) and the cc_map captures
+(u124: volume col 0, pan col 41/+82, drum "param 2" col 2/+4; LFO
+dest/param around +50/+52 with a paired default field 0x162F).
+Remaining: complete the param→column table (corpus exercise against
+`docs/format/plocks.md`'s CC list; the old "param_id" byte values were
+raw-space artifacts).
+
+### Engine / preset region
+
+- **Engine ID at track+0x14** (u85: 0x12 Prism → 0x1F Wavetable;
+  matches the known engine-id enum).
+- **Preset path string at track+0x453F** (null-padded; `bass/shoulder`
+  baseline T3; engine swap w/o preset leaves a bare `/` — the source of
+  the "0x2D fallback event type" artifact). The string's end is where
+  the pre-count zero gap begins.
+- Engine parameter cells: 4-byte values from +0x3857 (current values;
+  preset load rewrites them — copy from a corpus donor per preset).
+
+### Sample table (drum/sampler) — structure decoded
+
+**24 slots × 128 bytes at track+0x395F** (= the 24-key drum limit),
+sample path string inside each slot, per-sample params in the remaining
+slot bytes (tune/level/envelope fields not yet itemized). Preset name
+field follows the table. (The "amb kit" sampler corpus referenced in
+older notes is not present in the repo; slot internals can be mapped
+from baseline + kit-change one-offs when needed.)
+
 ## Open
 
-- Full step-component slot byte order (per-type map is partial).
+- P-lock param→column table (complete the mapping; corpus-only).
+- Sample-slot internal fields (tune/level/envelope offsets).
 - UI session fields (+0x3B3F/+0x3CBF/+0x3DBF/+0x423F families) —
   imitate, don't derive.
-- Sample-table region inside drum/sampler structs (decodes to large
-  zero/FF fields; not yet field-mapped).
 - Naive differ misaligns after insertions; an alignment-aware decoded
   diff would clean up note-file attributions.
