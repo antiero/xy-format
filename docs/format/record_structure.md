@@ -112,7 +112,37 @@ exactly n×33 values** (with the tail byte matching n). Edits to a value
 byte between unequal neighbours are safe; edits that create or break an
 equal-pair shift the stream and crash the loader.
 
-## 5. Tools
+## 5. Song Table (file footer, after Track 16)
+
+The file ends with a **14-slot song table** (= the documented 14-song
+limit), located after the last `ff 00 00 … 9b` run at the end of Track
+16's content:
+
+```
+song_slot := [scene_count u8][scene_idx u8 × count (0-based)][loop_word 2B]
+default      01 00 00 01      (1 entry: scene 1, loop on)
+loop_word := 00 01 = loop ON | 01 00 = loop OFF
+```
+
+Device-verified A/B: `unnamed 150 nl` (Song 1 loop off) = `01 00 01 00`;
+`unnamed 150 lp` (loop back on) = byte-identical to baseline.
+Multi-scene example: `unnamed 155` Song 2 = `03 00 01 02 …` = scenes
+1,2,3 chained — matching its documented arrangement. Crash #5's "l01/l02
+Track16 structural transplants" were edits to these slots.
+
+Open: expanded (multi-scene) slots carry one extra trailing byte vs the
+plain `[list][loop_word]` model; exact field still unplaced.
+
+### Pre-track selection bytes 0x0F–0x11 (partial)
+
+- `0x11` = selected song − 1 when a song is explicitly selected
+  (`02_song_select_s2` → `01`, `03 … s3` → `02`); baseline value `0x10`
+  is the never-selected/pattern-focus sentinel.
+- `0x0F` tracks scene-override ordinal (legacy finding, still holds).
+- Other observed values (`00 15 11` in resave probes) belong to the
+  UI focus/selection cluster — not fully decoded.
+
+## 6. Tools
 
 - Decoder: `tools/analysis/pretrack_records.py` — prints scenes as
   `sel[T3=P2,T4=P3] mute[T1] flags=0x1` per record.
@@ -121,7 +151,7 @@ equal-pair shift the stream and crash the loader.
   `find_track_blocks` currently misses clone/overflow blocks and
   scale-changed tracks).
 
-## 6. Open Items
+## 7. Open Items
 
 - `unnamed 154b` / `unnamed 156` carry one extra pre-track byte beyond
   n×33 (song-coupled / matrix-authored branches).
