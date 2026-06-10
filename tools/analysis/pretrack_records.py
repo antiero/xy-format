@@ -1,16 +1,38 @@
 #!/usr/bin/env python3
-"""Pre-track variable-record parser (record-boundary reframe follow-up).
+"""Pre-track scene-record decoder (record-boundary reframe, 2026-06-09).
 
-Model under test (2026-06-09):
+DECODED MODEL (validated 245/246 corpus files; the one failure is
+``bleez34.xy`` — the known device-crashing file, which the firmware also
+rejects):
 
-    pre_track := fixed_header  dir_header(2B: v56 v57)  record*  handle_table(36B)  tail(1B)
-    record    := payload bytes ... [track_tag 0x16..0x1E] 01 00 00
-    separator := 00 (between records, not before the first)
-    tail      := 0xD6 - 0x21 * len(records)
+    pre_track := fixed_header  rle_stream(n * 33 values)  00 00
+                 handle_table(36B)  tail(1B)
 
-The fixed header is anchored by its distinctive last 9 bytes
-``cd cc cc 00 0c 00 00 01 40`` (groove/header constants), which tolerates
-upstream inserts (MIDI config growth at ~0x23, scene ordinal bytes at 0x0F).
+    n    = (0xD6 - tail) / 0x21        ; the loader's record count
+    tail = 0xD6 - 0x21 * n             ; serialized pool-allocator state
+
+Each 33-byte record is a SCENE struct:
+
+    struct Scene {
+        u8 selected_pattern[16];   // 0-based pattern index per track
+        u8 mute[16];               // 0 = unmuted, 2 = muted (T1=idx16 .. T16=idx31)
+        u8 flags;                  // 0x01 normally, 0x00 on blank/placeholder rows
+    };
+
+The first record is the live/current selection state (what older docs
+called the multi-pattern "descriptor"; Schemes A/B, v56/v57, tokens and
+"collapse triggers" are all artifacts of this RLE over selection state).
+Subsequent records are scenes in order.
+
+RLE rule (one continuous stream across all records; runs may span record
+boundaries): after two consecutive equal bytes, an extension count byte
+follows (that many additional repeats). The old "track tag = 0x1E - track"
+formula was the trailing zero-run's extension count.
+
+The fixed header end is anchored by ``cd cc cc 00 0c 00 00 01 40``.
+NOTE: the 4th track-signature byte is the TRACK SCALE (0x03 = 1x default,
+0x05 = 2x, 0x0E = 16x, 0x01 = 1/2x — unnamed 20/21/22), so signature
+matching must wildcard it.
 """
 from __future__ import annotations
 
@@ -19,52 +41,60 @@ import re
 import sys
 from dataclasses import dataclass
 
-# NOTE: the 4th signature byte is the TRACK SCALE (0x03 = default scale 1,
-# 0x05 = scale 2, 0x0E = scale 16, 0x01 = scale 1/2 — unnamed 20/21/22).
 SIG_RE = re.compile(rb"\x00\x00\x01[\x00-\x0f]\xff\x00\xfc\x00", re.S)
 ANCHOR = bytes.fromhex("cdcccc000c00000140")
-TAGS = set(range(0x16, 0x1F))
+RECORD_SIZE = 33
+
+
+def rle_decode(buf: bytes, start: int, n: int) -> tuple[list[int] | None, int]:
+    """Decode ``n`` values; two consecutive equal bytes are followed by an
+    extension count (additional repeats)."""
+    out: list[int] = []
+    i = start
+    while len(out) < n and i < len(buf):
+        v = buf[i]
+        i += 1
+        out.append(v)
+        if len(out) >= 2 and out[-1] == out[-2] and len(out) < n:
+            if i >= len(buf):
+                return None, i
+            out.extend([v] * buf[i])
+            i += 1
+    return (out if len(out) == n else None), i
+
+
+@dataclass
+class SceneRecord:
+    selected_pattern: list[int]  # 16 entries
+    mute: list[int]              # 16 entries
+    flags: int
+
+    @classmethod
+    def from_values(cls, vals: list[int]) -> "SceneRecord":
+        return cls(vals[0:16], vals[16:32], vals[32])
+
+    def describe(self) -> str:
+        sel = ",".join(f"T{t+1}=P{p+1}" for t, p in enumerate(self.selected_pattern) if p)
+        mut = ",".join(f"T{t+1}" for t, m in enumerate(self.mute) if m)
+        bits = []
+        if sel:
+            bits.append(f"sel[{sel}]")
+        if mut:
+            bits.append(f"mute[{mut}]")
+        bits.append(f"flags={self.flags:#x}")
+        return " ".join(bits)
 
 
 @dataclass
 class PretrackParse:
-    path: str
-    fixed_end: int          # offset just past the anchor
-    dir_header: bytes       # 2 bytes (v56 v57 in old terminology)
-    records: list[bytes]    # raw record bytes (payload + tag + 01 00 00)
-    leftover: bytes         # bytes that did not parse as records
-    handle_table: bytes     # 36 bytes
     tail: int
-    tail_pred_records: int  # (0xD6 - tail) / 0x21 if integral else -1
+    n_records: int
+    records: list[SceneRecord]
+    terminator_ok: bool
+    error: str | None = None
 
 
-def split_track_array_records(body: bytes) -> tuple[list[bytes], bytes]:
-    """Split track-array records: each ends ``[tag 0x16..0x1E][01]``."""
-    recs: list[bytes] = []
-    i = 0
-    while i < len(body):
-        k = None
-        for m in range(i, len(body) - 1):
-            if body[m] in TAGS and body[m + 1] == 0x01:
-                k = m
-                break
-        if k is None:
-            break
-        recs.append(body[i : k + 2])
-        i = k + 2
-    return recs, body[i:]
-
-
-def split_pair_list_records(body: bytes) -> list[bytes]:
-    """Song-family records: ``00 00``-separated lists of 2-byte pairs.
-
-    Region shape: ``00 00 (pair pair ... 00 00)*`` where pair = [a][b].
-    """
-    chunks = [c for c in body.split(b"\x00\x00") if c]
-    return chunks
-
-
-def parse_pretrack(path: str, data: bytes) -> PretrackParse | None:
+def parse_pretrack(data: bytes) -> PretrackParse | None:
     m = SIG_RE.search(data)
     if m is None:
         return None
@@ -77,53 +107,48 @@ def parse_pretrack(path: str, data: bytes) -> PretrackParse | None:
     a = pre.rfind(ANCHOR)
     if a < 0:
         return None
-    fixed_end = a + len(ANCHOR)
-
-    ht = pre[-36:]
-    region = pre[fixed_end:-36]
-    dir_header, body = region[:2], region[2:]
-
-    records, leftover = split_track_array_records(region)
-    if not records and leftover.strip(b"\x00"):
-        # song-family pair-list records
-        records = split_pair_list_records(leftover)
-        leftover = b""
+    region = pre[a + len(ANCHOR) : -36]
 
     diff = 0xD6 - tail
-    pred = diff // 0x21 if diff % 0x21 == 0 else -1
-    return PretrackParse(path, fixed_end, dir_header, records, leftover, ht, tail, pred)
+    if diff % 0x21:
+        return PretrackParse(tail, -1, [], False, "tail not on 0x21 grid")
+    n = diff // 0x21
+
+    vals, i = rle_decode(region, 0, n * RECORD_SIZE)
+    if vals is None:
+        return PretrackParse(tail, n, [], False, f"RLE decode failed at region+{i}")
+    records = [
+        SceneRecord.from_values(vals[r * RECORD_SIZE : (r + 1) * RECORD_SIZE])
+        for r in range(n)
+    ]
+    term_ok = region[i:] == b"\x00\x00"
+    err = None if term_ok else f"unexpected trailing bytes: {region[i:].hex(' ')}"
+    return PretrackParse(tail, n, records, term_ok, err)
 
 
 def main(patterns: list[str]) -> int:
     files: list[str] = []
     for pat in patterns:
         files.extend(sorted(glob.glob(pat)))
-    ok = bad = skipped = 0
+    ok = bad = 0
     for f in files:
         data = open(f, "rb").read()
         if data[:4] != bytes.fromhex("ddccbbaa"):
             continue
-        p = parse_pretrack(f, data)
+        p = parse_pretrack(data)
         name = f.split("/")[-1]
         if p is None:
-            print(f"!! {name}: no anchor / no signature")
-            skipped += 1
-            continue
-        match = len(p.records) == p.tail_pred_records and not p.leftover.strip(b"\x00")
-        status = "OK " if match else "BAD"
-        if match:
-            ok += 1
-        else:
+            print(f"!! {name}: no anchor/signature")
             bad += 1
-        recs = " | ".join(r.hex(" ") for r in p.records) or "-"
-        extra = f" leftover={p.leftover.hex(' ')}" if p.leftover else ""
-        ht_used = sum(1 for k in range(0, 36, 3) if p.handle_table[k : k + 3] != b"\xff\x00\x00")
-        print(
-            f"{status} {name:<42} dir={p.dir_header.hex(' ')} tail=0x{p.tail:02x}"
-            f" pred={p.tail_pred_records} recs={len(p.records)} ht_used={ht_used}"
-            f"  [{recs}]{extra}"
-        )
-    print(f"\nok={ok} bad={bad} skipped={skipped}")
+            continue
+        if p.error:
+            print(f"BAD {name:<42} tail=0x{p.tail:02x} n={p.n_records}: {p.error}")
+            bad += 1
+            continue
+        ok += 1
+        desc = "; ".join(r.describe() for r in p.records) or "no records"
+        print(f"OK  {name:<42} tail=0x{p.tail:02x} n={p.n_records}  {desc}")
+    print(f"\nok={ok} bad={bad}")
     return 0
 
 

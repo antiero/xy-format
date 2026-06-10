@@ -214,6 +214,78 @@ A handful of array encodings carry one extra `00` in mid-array positions
 (cf. `j06`'s `06` repeat byte) not yet pinned down. Needs a systematic
 grammar fit across all specimens rather than more eyeballing.
 
+## Part 4 (same day): Pre-Track Record Encoding FULLY DECODED
+
+**Validation: 245/246 corpus files decode byte-exactly. The single failure
+is `bleez34.xy` — the file that crashes the device. Our decoder and the
+firmware now reject the same input.**
+
+### The encoding
+
+```
+pre_track := fixed_header  RLE( n × 33 values )  00 00  handle_table(36B)  tail
+n    = (0xD6 − tail) / 0x21          ; loader's record count (load-bearing!)
+RLE  : two consecutive equal bytes → next byte = extension count
+       (that many additional repeats; one continuous stream, runs may
+        span record boundaries)
+```
+
+### The 33-byte record is the SCENE struct
+
+```c
+struct Scene {
+    u8 selected_pattern[16];  // 0-based pattern index per track
+    u8 mute[16];              // 0 = unmuted, 2 = muted
+    u8 flags;                 // 0x01 normal, 0x00 on blank rows
+};
+```
+
+- Record 0 = the live/current selection state. Records 1..n−1 = scenes.
+- Mute layout verified by the mute-probe ladder: `unnamed 150b` (S1 T1
+  muted) → value 2 at index 16; `unnamed 155b` (S1=T1, S2=T8, S3=T1+T8) →
+  indices 16 / 23 / both. Selection verified by the whole scene corpus
+  (e.g. `07_scene_s3_t4p3` decodes to "S2: T3→P2; S3: T3→P2, T4→P3").
+
+### Everything this dissolves
+
+- **"Descriptor encoding" (Schemes A & B, v56/v57, tokens, short/collapsed
+  forms, the 0x40 family marker, collapse triggers)**: all artifacts of
+  RLE over the current-selection row. `token = 0x1E − track` is the
+  trailing zero-run's extension count (32 − track − 2). "v56/v57" are the
+  first two array values. The "leader-active vs blank" branch mysteries
+  are literally which pattern was selected on each track at save time
+  (`j06` decodes to "all tracks on P9" — the device sat on the last
+  created pattern).
+- **The `00 00` at 0x56 in baseline**: the empty-stream terminator, not a
+  directory header.
+- **Scene-record "families" (tag_records / alt_records / matrix_records /
+  bleez)**: one encoding. The bleez "08 08 sub-record delimiters" are RLE
+  pairs of value 8 (tracks selecting P9); the "0x1F separator" in bleez8
+  is `00 00 1F` = a 33-zero blank record.
+- **Crash mechanics (crashes #8, #12; probes 59–92)**: a byte edit is safe
+  iff the stream still RLE-decodes to exactly n×33 values. Edits that hit
+  a value byte between unequal neighbours work (probes 67–69: the
+  "rec2[3] selector"); edits that create or break an equal-pair shift the
+  stream and desynchronize the loader (`bleez34`'s single-byte crash:
+  decode fails mid-stream at region+30, exactly like the device).
+  The tail byte is the loader's record count — why `f02/g02`-style tail
+  mismatches assert `num_patterns > 0`.
+
+### Tool
+
+`tools/analysis/pretrack_records.py` — decodes any corpus file's pre-track
+into human-readable scene rows (`sel[T3=P2,T4=P3] mute[T1] flags=0x1`).
+
+### Still open (pre-track)
+
+- `unnamed 154b` and `unnamed 156` each carry one extra byte vs n×33
+  (likely an additional field in the song-coupled / matrix-authored
+  branches; both still decode cleanly otherwise).
+- Mute value is 2 (not 1) — other values (solo?) unobserved.
+- Scene-count ordinal at `pre[0x0F]` vs record count (records store only
+  rows; duplicate scenes share rows — file 14's "ordinal=1, 2 records").
+- Song arrangement (scene order per song) lives in Track 16, not here.
+
 ## Suggested Follow-Ups
 
 1. ~~Re-express stats per-record~~ DONE (Part 2): zero unexplained cells.
