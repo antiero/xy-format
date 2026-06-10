@@ -50,6 +50,26 @@ the RAM struct map; then author a file purely from a constructed image
 (`encode_project`) and device-test it — the model's first generative
 test.
 
+### Update (same day, 2): event types never existed; generative test passed offline
+
+1. **Crash #2 resolved — the "event type byte" is an RLE artifact.**
+   There is no type field. The raw 0x1C–0x2D values are the extension
+   counts of the zero gap between the end of the preset-name string and
+   the note count at track+0x456F. "Preset-specific" because presets
+   have different name lengths ("0x25" ends at 'p' in boo*p*; "0x2D
+   fallback" ends at '/' of a stripped path). Verified 24/24
+   (u2/81/91/92/93/113/116/117). Crash #2 = claiming the wrong gap
+   length → count misread 4 bytes early → fixed_vector assert. The
+   inline/fine-tick/pointer event-form taxonomy is the same artifact.
+2. **Image-based authoring is generative-grade offline:**
+   `xy/image_writer.py` reproduces device-saved unnamed 2/81/19/92
+   **byte-identically** from semantic edits alone
+   (`tests/test_image_writer.py`). Non-replicable residue in richer
+   files = UI session bytes (+0x3CBF families), not format semantics.
+3. **Device probe pack ready** (`output/image-probes/`): conservative
+   note file, T3 melody, and the note==velocity probe written with its
+   RLE extension byte — the crisp old-model-vs-new-model discriminator.
+
 ### Update (same day): field-mapping join DONE — first pass
 
 `docs/format/decoded_image_map.md`. Image = global header (3,449 B) +

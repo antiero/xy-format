@@ -78,11 +78,44 @@ FOOTER+0x2/+0xA (u149, u151–153).
 one-off files are pure substitutions of 1–16 bytes at the offsets above;
 files that add notes/patterns grow by exactly 12 / 17,876 bytes.
 
+## The "Event Type" Byte: RESOLVED — it never existed
+
+The legacy event-type taxonomy (raw bytes 0x1C–0x2D; "preset-specific
+factory IDs"; crash #2) is an RLE artifact. In decoded space there is no
+type byte: the note vector is `[count u8]` at **track+0x456F** followed
+by 12-byte records, preceded by a zero gap that runs back to the end of
+the **preset-name string** (~track+0x4547–0x4550). The raw "type byte"
+is that zero-run's extension count: `gap − 2`. Verified 24/24 across
+unnamed 2/81/91/92/93/113/116/117 — e.g. "0x25" = 39-zero gap ending at
+'p' (drum/boo**p**), "0x21" = 35 ending at 'r' (shoulde**r**), and the
+"0x2D engine-swap fallback" = 47-zero gap ending at '/' (a stripped
+preset path). **The type was the length of the preset's filename.**
+Crash #2's mechanism: writing "0x21" on T1 claims a 35-zero gap where
+the struct has 39 → the count lands 4 bytes early → `fixed_vector`
+assert. The legacy event-form taxonomy (inline / fine-tick /
+pointer-tail / hybrid) is likewise just tick/gate values changing the
+RLE shapes.
+
+## Image-Based Authoring (validated)
+
+`xy/image_writer.py` edits the decoded image the way the firmware would
+(set fields, splice vector elements, flip the pristine flag) and
+re-encodes. **Byte-exact replication of device-saved captures:**
+unnamed 2, 81, 19, 92 (`tests/test_image_writer.py`). Files that don't
+replicate from their change-log description alone differ only in UI
+session bytes (e.g. last-touched fields at +0x3CBF) — the file
+remembering the musician's hands, not format semantics.
+
+Device probe pack (untested): `output/image-probes/01..03` — includes
+the note==velocity probe written with its RLE extension byte
+(`3c 3c 00`), which the old "firmware bug" model predicts crashes and
+this model predicts loads.
+
 ## Open
 
-- Event-type byte (raw 0x1C–0x2D) placement/meaning in decoded space.
 - Full step-component slot byte order (per-type map is partial).
-- The 0x4620 `40 1F` pairs and per-bar arrays near the event area.
+- UI session fields (+0x3B3F/+0x3CBF/+0x3DBF/+0x423F families) —
+  imitate, don't derive.
 - Sample-table region inside drum/sampler structs (decodes to large
   zero/FF fields; not yet field-mapped).
 - Naive differ misaligns after insertions; an alignment-aware decoded
