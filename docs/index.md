@@ -49,6 +49,9 @@ Reference material:
 - CC 106 remote key press map: `docs/reference/opxy_cc106_remote_keys.md`
 
 ## Format (Canonical)
+- **Record structure (start here)**: `docs/format/record_structure.md`
+  (record grammar, tail bytes, pre-track scene RLE — supersedes the
+  descriptor/preamble framing in older docs)
 - Header: `docs/format/header.md`
 - Pre-track / pattern directory: `docs/format/pretrack_pattern_directory.md`
 - Scenes and songs: `docs/format/scenes_songs.md`
