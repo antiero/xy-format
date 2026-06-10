@@ -58,3 +58,15 @@ def test_note_limit_enforced():
         p.add_note(1, tick=i * 10, note=60)
     with pytest.raises(ValueError):
         p.add_note(1, tick=2000, note=61)
+
+
+def test_build_arrangement_replicates_j05():
+    from xy.image_writer import build_arrangement
+    out = build_arrangement(BASE, {2: [[], [], []]})
+    assert out == open("src/one-off-changes-from-default/j05_t2_p3_blank.xy", "rb").read()
+
+
+def test_build_arrangement_replicates_j06():
+    from xy.image_writer import build_arrangement
+    out = build_arrangement(BASE, {t: [[]] * 9 for t in range(1, 9)})
+    assert out == open("src/one-off-changes-from-default/j06_all16_p9_blank.xy", "rb").read()

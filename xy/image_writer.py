@@ -100,3 +100,107 @@ class ImageProject:
 
     def save(self, path: str) -> None:
         open(path, "wb").write(self.to_bytes())
+
+
+# --- arrangement assembly (multi-pattern / scenes / songs) ----------------
+#
+# Decoded-image facts used here (docs/format/decoded_image_map.md):
+#   scenes array: 33-byte slots at GLOBAL+0x95 (slot 0 = live selection;
+#       sel[16] + mute[16] + flags); GLOBAL+0x6 = scene_count - 1
+#   clones: a track with N patterns serializes leader struct (17,876 B,
+#       count byte = N) followed by N-1 clone structs = pattern_struct[1:]
+#   footer: 14 song slots [scene_count][scene_ids...][loop_off][00],
+#       default 01 00 00 00
+# Validated byte-exact against j05/j06 (tests/test_image_writer.py).
+
+SCENE_SLOT0 = 0x95
+SCENE_SLOT_SIZE = 33
+GLOBAL_SCENE_COUNT = 0x6
+FOOTER_SLOTS = 14
+STRIDE = 17876
+
+
+def _pattern_struct(base_struct: bytes, notes: list[dict]) -> bytes:
+    """Build one pattern struct from the track's baseline struct."""
+    st = bytearray(base_struct)
+    if not notes:
+        return bytes(st)
+    max_step = max(n["step"] for n in notes)
+    bars = min(4, max(1, (max_step + 15) // 16))
+    st[OFF_BARS] = bars << 4
+    st[OFF_PRISTINE : OFF_PRISTINE + 2] = b"\x00\x00"
+    cpos = OFF_NOTE_COUNT
+    recs = bytearray()
+    for n in notes:
+        if len(recs) // NOTE_SIZE >= 120:
+            raise ValueError("pattern note limit exceeded")
+        tick = (n["step"] - 1) * STEP_TICKS + n.get("tick_offset", 0)
+        gate = n.get("gate_ticks", 240)
+        recs += tick.to_bytes(4, "little") + gate.to_bytes(4, "little")
+        recs += bytes([n["note"] & 0x7F, n.get("velocity", 100) & 0x7F, 0, 0])
+    st[cpos] = len(recs) // NOTE_SIZE
+    st[cpos + 1 : cpos + 1] = recs
+    return bytes(st)
+
+
+def build_arrangement(
+    base_path: str,
+    track_patterns: dict[int, list[list[dict]]],
+    *,
+    scenes: list[dict[int, int]] | None = None,
+    song_chain: list[int] | None = None,
+    song_loop: bool = True,
+) -> bytes:
+    """Assemble a project image from scratch.
+
+    track_patterns: 1-based track -> list of patterns, each a list of note
+        dicts {step, note, velocity?, tick_offset?, gate_ticks?}.
+    scenes: optional scene rows; scene k maps 1-based track -> 0-based
+        pattern index (scene slots 1..n; slot 0 stays the live selection).
+    song_chain: optional list of 0-based scene ids for Song 1.
+    """
+    header, base = decode_project(open(base_path, "rb").read())
+    starts = [m.start() - 3 for m in SIG_RE.finditer(base)]
+    g = bytearray(base[: starts[0]])
+
+    # live selection (slot 0): device sits on the last created pattern
+    sel_written = False
+    for t, pats in track_patterns.items():
+        if len(pats) > 1:
+            g[SCENE_SLOT0 + t - 1] = len(pats) - 1
+            sel_written = True
+    if sel_written:
+        g[SCENE_SLOT0 + 32] = 1  # flags
+
+    if scenes:
+        g[GLOBAL_SCENE_COUNT] = len(scenes) - 1
+        for k, row in enumerate(scenes, start=1):
+            slot = SCENE_SLOT0 + k * SCENE_SLOT_SIZE
+            if any(row.values()):
+                for t, pat in row.items():
+                    g[slot + t - 1] = pat
+                g[slot + 32] = 1
+
+    parts = [bytes(g)]
+    for t in range(1, 17):
+        s = starts[t - 1]
+        tail = base[s + STRIDE :] if t == 16 else b""
+        base_struct = base[s : s + STRIDE]
+        pats = track_patterns.get(t)
+        if not pats:
+            parts.append(base_struct + tail)
+            continue
+        structs = [_pattern_struct(base_struct, p) for p in pats]
+        leader = bytearray(structs[0])
+        leader[0] = len(pats)
+        parts.append(bytes(leader) + b"".join(st[1:] for st in structs[1:]) + tail)
+    image = bytearray(b"".join(parts))
+
+    if song_chain:
+        footer_start = len(image) - FOOTER_SLOTS * 4
+        slot = bytes([len(song_chain)]) + bytes(song_chain) + bytes(
+            [0 if song_loop else 1, 0]
+        )
+        image[footer_start : footer_start + 4] = slot
+
+    return encode_project(header, bytes(image))
