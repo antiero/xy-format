@@ -50,6 +50,22 @@ the RAM struct map; then author a file purely from a constructed image
 (`encode_project`) and device-test it — the model's first generative
 test.
 
+### Update (same day): field-mapping join DONE — first pass
+
+`docs/format/decoded_image_map.md`. Image = global header (3,449 B) +
+16 × 17,876 B track structs + 53 B song-table footer, exact. Global:
+tempo/groove/click/song @0x0–0x7, per-track MIDI array @0x55–0x64,
+master EQ @0x68/0x6C/0x70. Track-relative: bars +0x01, scale +0x06,
+**pristine flag u16 @+0x11 (8→0, sticky — the old "type 05/07 + 08 00
+padding" mystery)**, M-page config +0x1C–0x25, step components =
+16 B/step slots @+0x3057 with one byte per component type, engine params
+@+0x3857 (4-byte values), envelopes/filter/mod-routing @+0x38xx–0x393B,
+note events near struct end as `[count u8]` + 12-byte
+`{u32 tick; u32 gate; u8 note; u8 vel; u8 flags[2]}`. T15/T16 = FX1/FX2.
+Remaining gaps: event-type byte placement, sample tables, full component
+slot order. Crash #1's padding rule is now understood; crash #2 (event
+types) remains the main open mystery.
+
 ---
 
 ## 2026-06-09 — The serialization-model reframe

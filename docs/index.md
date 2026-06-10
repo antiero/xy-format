@@ -51,8 +51,9 @@ Reference material:
 
 ## Format (Canonical)
 - **Record structure (start here)**: `docs/format/record_structure.md`
-  (record grammar, tail bytes, pre-track scene RLE — supersedes the
-  descriptor/preamble framing in older docs)
+  (serialization model, record grammar, tail bytes, pre-track scene RLE —
+  supersedes the descriptor/preamble framing in older docs)
+- **Decoded image map (RAM struct fields)**: `docs/format/decoded_image_map.md`
 - Header: `docs/format/header.md`
 - Pre-track / pattern directory: `docs/format/pretrack_pattern_directory.md`
 - Scenes and songs: `docs/format/scenes_songs.md`
