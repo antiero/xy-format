@@ -66,6 +66,7 @@ Reference material:
 - Multi-pattern block rotation: `docs/format/multi_pattern_block_rotation.md`
 
 ## Engineering
+- **Authoring `.xy` files (canonical writer guide)**: `docs/engineering/authoring.md`
 - Architecture notes: `docs/engineering/architecture.md`
 - Writer alignment (`0x05`/`0x07`): `docs/engineering/writer_alignment_and_type05_type07.md`
 - Track 1 writer prototype: `docs/engineering/writer_track1.md`

@@ -50,6 +50,29 @@ the RAM struct map; then author a file purely from a constructed image
 (`encode_project`) and device-test it — the model's first generative
 test.
 
+### Update (same day, 6): drum-voice params decoded; docs + writers brought current
+
+- **Drum sampler per-voice slot decoded** from a device capture
+  (`cap_drum_params.xy`) + the OP-XY drum-knob manual: 24 voices ×
+  128 B at track+0x3957. Fields: tune (+0x00, root note ±48), play mode
+  (+0x03), direction (+0x07), sample start (+0x68), sample end (+0x70),
+  gain (+0x7c); pan/fade at +0x05/+0x06 (provisional). `set_drum_voice()`
+  added; tune reproduces the capture byte-exact. This was the last region
+  needing the device.
+- **Documentation pass**: `docs/engineering/authoring.md` (canonical
+  writer guide), `architecture.md` rewritten for the RLE model, stale
+  writer docs bannered superseded, AGENTS.md strategic sections updated.
+- **Writers brought current**: `image_writer`/`rle` established as the
+  canonical stack; legacy modules (`writer`, `scaffold_writer`,
+  `scene_patcher`, etc.) marked superseded-but-retained. The velocity
+  nudge in `note_events.py` annotated as a destructive legacy workaround
+  for a disproven bug (image-authoring escapes correctly instead).
+
+The format is now decoded end-to-end (container, all subsystems, drum
+voices), authorable from first principles, and device-verified across
+every axis. Remaining work is product (midi_to_xy v2) and minor optional
+lookups — no open format mysteries.
+
 ### Update (same day, 5): Tier-2 device probes — 4/4, sparse issue closed
 
 User-verified on hardware (corpus-lab recorded):

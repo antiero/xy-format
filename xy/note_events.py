@@ -130,8 +130,14 @@ def build_event(
             buf.extend(DEFAULT_GATE)
 
         # --- note & velocity ---
-        # Firmware bug: crashes when note byte == velocity byte.
-        # Nudge velocity by +1 to avoid the collision (imperceptible).
+        # NOTE: the historical "note==velocity firmware crash" is DISPROVEN
+        # (device-verified 2026-06-09). It was never a firmware bug — equal
+        # adjacent bytes are an unescaped RLE pair, and this legacy writer
+        # emits raw bytes without the `[n][n][00]` escape. The nudge below
+        # is a destructive workaround (it alters velocity); it is kept only
+        # so this legacy path stays load-safe. The canonical writer
+        # (xy/image_writer.py + xy/rle.py) escapes correctly and needs no
+        # nudge. See docs/engineering/authoring.md.
         note_byte = note.note & 0x7F
         vel_byte = note.velocity & 0x7F
         if vel_byte == note_byte:

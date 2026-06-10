@@ -1,3 +1,8 @@
+> **SUPERSEDED (2026-06-09).** This describes the pre-RLE writer model.
+> The format is RLE-compressed C structs; author via the decoded image.
+> See `docs/engineering/authoring.md` and `docs/format/decoded_image_map.md`.
+> Retained for historical context.
+
 # Writer Alignment and Type 0x05/0x07
 
 ## Problem Summary

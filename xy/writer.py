@@ -1,3 +1,10 @@
+"""LEGACY (pre-RLE model) — superseded by xy/image_writer.py.
+
+This module patches raw .xy bytes via the old mental model
+(scaffolds/preamble/descriptor rules). It still produces valid
+output for its validated scopes, but new authoring should use the
+decoded-image path. See docs/engineering/authoring.md.
+"""
 from __future__ import annotations
 
 import struct
