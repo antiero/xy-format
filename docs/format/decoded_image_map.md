@@ -209,9 +209,11 @@ reproduces the device file except UI-session bytes.
 
 ## Open
 
-- Sample-slot internal fields (tune/level/envelope offsets) — no
-  sample-edit captures exist in the corpus; needs one device capture
-  session (edit one sample's tune/level on a kit, save, diff).
+- Sample-slot internal fields (per-drum-voice tune/level/envelope) —
+  not in the corpus and **not needed for authoring**: `set_preset`
+  copies the whole sample table (paths + per-sample defaults) when a kit
+  is assigned. Only relevant if we ever expose per-drum-voice tweaking;
+  one device capture (edit one sample's tune, save, diff) would map it.
 - UI session fields (+0x3B3F/+0x3CBF/+0x3DBF/+0x423F families) —
   imitate, don't derive.
 - Naive differ misaligns after insertions; an alignment-aware decoded

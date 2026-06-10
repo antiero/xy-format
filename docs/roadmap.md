@@ -21,8 +21,9 @@ Field-semantics sweeps in decoded space (`tools/analysis/decoded_diff.py`
 3. **Engine/preset region**: engine ID field, preset path string
    location, param-block layout — from the engine-change one-offs
    (34, 85, 91, 94, 113, 116, 117, 122).
-4. **Sample tables**: drum/sampler per-key sample entries — primary
-   source: the amb-kit corpus (25 sampler one-offs).
+4. **Sample tables** (optional): per-drum-voice tune/level fields are
+   not in the corpus, but `set_preset` already copies the whole table,
+   so this is only for exposing per-voice tweaks — not a blocker.
 
 ## Tier 2 — Enum-value probes (cheap device looks, only as needed)
 
