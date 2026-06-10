@@ -50,6 +50,26 @@ the RAM struct map; then author a file purely from a constructed image
 (`encode_project`) and device-test it — the model's first generative
 test.
 
+### Update (same day, 3): DEVICE VALIDATION — 3/3 probes pass
+
+User-verified on hardware (2026-06-09, corpus-lab recorded):
+
+1. `01_a_img_c4_step5.xy` — image-authored note file: loads, plays
+   exactly as specified.
+2. `02_b_img_notevel_60_60.xy` — **note==velocity written as an escaped
+   RLE pair (`3c 3c 00`): loads AND plays velocity 60 (MIDI-monitor
+   verified).** The old model predicted a crash here. This is the
+   model's first *novel prediction* confirmed on hardware — the
+   "note==vel firmware bug" is conclusively disproven (it was always
+   our unescaped pair), and the velocity-nudge workaround is obsolete.
+3. `03_c_img_t3_melody.xy` — multi-note/varied gates: correct.
+
+Status promotion: **the format is understood generatively.** Files
+authored from first principles (decoded-image edits, no scaffolds) are
+accepted and interpreted correctly by the device. The reading model
+(245/246 round-trip), the replication model (byte-exact reproduction of
+device captures), and now the device itself all agree.
+
 ### Update (same day, 2): event types never existed; generative test passed offline
 
 1. **Crash #2 resolved — the "event type byte" is an RLE artifact.**
