@@ -25,6 +25,7 @@ device-validated.
 | Step components | `xy/step_components.py` | `ImageProject.set_step_component` |
 | JSON intent export | `xy/project_to_json.py` | `xy/json_build_spec.py` + profiles |
 | Preset reference inference | `xy/project_inspection.py` | `ImageProject.set_preset` (donor copy) |
+| Track preset path @ `+0x453F` | `xy/preset_path_inspection.py` | gap — donor `set_preset` only |
 | Drum sample path read | `xy/drum_sample_inspection.py` | indirect via `set_preset`; no per-slot path API |
 | Human report | `tools/inspect_xy.py` | — |
 
@@ -98,7 +99,9 @@ Field offsets: `docs/format/decoded_image_map.md`.
 - [x] Filter knobs @ `+0x3897` — decoded map
 - [x] Preset identity **write** via donor region copy — `ImageProject.set_preset`, `tests/test_image_writer.py`
 - [x] Preset reference **read** (heuristic) per active pattern — `xy/project_inspection.py`, `tests/test_project_inspection.py`
-- [~] Preset path structural decode @ ~`+0x453F` — known for authoring; not exported in `project_to_json` yet
+- [x] Preset path structural **read** @ track `+0x453F` — `xy/preset_path_inspection.py`,
+  `tests/test_preset_path_structural.py`, `src/app-preset-probes/2026-06-preset-path/`
+- [~] Preset path **write** @ `+0x453F` — not exported in `project_to_json` yet
 - [~] Play mode poly/mono/legato current value — partial
 - [~] Portamento amount/type, bend range — partial
 - [~] Preset volume / engine volume current value — partial
@@ -167,7 +170,7 @@ Field offsets: `docs/format/decoded_image_map.md`.
 - [x] Profile-gated JSON build — `xy/profiles.py`, `tests/test_profiles.py`
 - [x] Corpus index/lab — `tools/corpus_lab.py`
 - [x] Round-trip verify — `tools/roundtrip_xy.py`
-- [x] Inspector CLI with preset + drum sample sections — `tools/inspect_xy.py`
+- [x] Inspector CLI with track preset paths, pattern presets, drum samples — `tools/inspect_xy.py`
 
 ## 15. Outside project `.xy`
 

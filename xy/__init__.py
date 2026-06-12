@@ -54,3 +54,9 @@ from .drum_sample_inspection import (  # noqa: F401
     inspect_drum_samples,
     inspect_drum_samples_bytes,
 )
+from .preset_path_inspection import (  # noqa: F401
+    ProjectPresetPaths,
+    TrackPresetPath,
+    inspect_preset_paths,
+    inspect_preset_paths_bytes,
+)

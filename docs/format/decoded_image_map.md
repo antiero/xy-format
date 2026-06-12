@@ -191,10 +191,13 @@ matching the capture notes. The old raw-space "param_id" bytes and
 
 - **Engine ID at track+0x14** (u85: 0x12 Prism → 0x1F Wavetable;
   matches the known engine-id enum).
-- **Preset path string at track+0x453F** (null-padded; `bass/shoulder`
-  baseline T3; engine swap w/o preset leaves a bare `/` — the source of
-  the "0x2D fallback event type" artifact). The string's end is where
-  the pre-count zero gap begins.
+- **Preset path string at track+0x453F** (null-padded, max 64 B; short
+  `category/preset-name` form). P1-B fixtures (`e0`…`e5`):
+  `drum/boop` (new-project default), `drum/pp`, `drum/nt-aeroplane`,
+  `bass/nt-106 bass`, `wind/nt-accord`; engine swap w/o preset → `/`.
+  Older corpus: `bass/shoulder` baseline T3. Read API:
+  `xy/preset_path_inspection.py`. The string's end is where the pre-count
+  zero gap begins.
 - Engine parameter cells: 4-byte values from +0x3857 (current values;
   preset load rewrites them — copy from a corpus donor per preset).
 

@@ -31,6 +31,7 @@ import re
 
 from xy.drum_sample_inspection import inspect_drum_samples_bytes  # noqa: E402
 from xy.note_reader import read_event as _unified_read_event  # noqa: E402
+from xy.preset_path_inspection import inspect_preset_paths_bytes  # noqa: E402
 from xy.project_inspection import inspect_project_bytes  # noqa: E402
 from xy.structs import (  # noqa: E402
     SENTINEL_BYTES,
@@ -1700,6 +1701,25 @@ def generate_report(path: Path, data: bytes) -> str:
         active_preset_refs = project_inspection.active_preset_refs
     except Exception:
         active_preset_refs = ()
+
+    try:
+        preset_paths = inspect_preset_paths_bytes(data)
+    except Exception:
+        preset_paths = None
+
+    if preset_paths and preset_paths.tracks:
+        shown = [
+            row
+            for row in preset_paths.tracks
+            if row.track <= 8 and row.path and row.path != "/"
+        ]
+        if shown:
+            lines.append("[Track Preset Paths]")
+            for row in shown:
+                lines.append(
+                    f"  T{row.track:02d}: {row.path}  engine=0x{row.engine_id:02X}"
+                )
+            lines.append("")
 
     if active_preset_refs:
         lines.append("[Pattern Presets]")

@@ -5,6 +5,8 @@
 ## Current Coverage
 - Header summary.
 - Pattern directory/pre-track observations.
+- Structural track preset paths @ `+0x453F` (`xy/preset_path_inspection.py`) —
+  short `category/name` strings; works on blank patterns.
 - Active track/pattern preset-reference inference when project bodies expose
   preset folder or fragmented preset-name strings (`xy/project_inspection.py`).
 - Drum-engine track sample paths (24-voice table via `xy/drum_sample_inspection.py`).

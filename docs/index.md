@@ -94,6 +94,7 @@ Reference material:
 - Drum sample path inspection: `docs/logs/2026-06-12_drum_sample_path_inspection.md`
 - Round 0 `nt-z-fx` sample paths: `docs/logs/2026-06-12_round0_nt-z-fx_sample_paths.md`
 - Drum pan/fade inspection: `docs/logs/2026-06-12_drum_pan_fade_inspection.md`
+- Preset path structural (P1-B): `docs/logs/2026-06-12_preset_path_structural.md`
 - Variable-length + writer root cause: `docs/logs/2025-02-11_variable_length_and_writer_root_cause.md`
 - Firmware package notes: `docs/logs/2025-02-14_firmware_package_notes.md`
 - Multi-pattern breakthrough: `docs/logs/2026-02-12_multipattern_breakthrough.md`
