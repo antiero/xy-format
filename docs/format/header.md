@@ -1,6 +1,12 @@
 # Header
 
-## Canonical Offsets (Current)
+> **Decoded RAM image (authoring):** tempo @ `0x00`, groove @ `0x03`,
+> click @ `0x04` — see [`decoded_image_map.md`](decoded_image_map.md) and
+> `xy/image_writer.py`. Offsets below (`0x08` tempo, etc.) are from an
+> **older header scan** and may not match the flat decoded image.
+> Coverage overview: [`image_coverage_map.md`](image_coverage_map.md).
+
+## Canonical Offsets (legacy scan — verify before use)
 - `0x08-0x09` (`u16 LE`): tempo in tenths of BPM.
 - `0x0A` (`u8`): observed padding/unused (`0x00` in baseline captures).
 - `0x0B` (`u8`): groove type enum (`0x00` straight, `0x08` dis-funk, `0x03` bombora).

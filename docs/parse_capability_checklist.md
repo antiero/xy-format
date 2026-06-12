@@ -31,6 +31,7 @@ device-validated.
 
 Detailed guide cross-reference: `docs/format/opxy_user_guide_save_audit.md`.
 Field offsets: `docs/format/decoded_image_map.md`.
+**Byte-region overview:** `docs/format/image_coverage_map.md`.
 
 ---
 
@@ -49,7 +50,8 @@ Field offsets: `docs/format/decoded_image_map.md`.
 - [x] Metronome click volume — `set_click_volume`
 - [~] Metronome on/off — partial — `opxy_user_guide_save_audit.md` § Tempo
 - [x] Per-track MIDI channel (T1–T16) — `set_midi_channel`, global `0x55–0x64`
-- [x] Master EQ low/mid/high — `set_master_eq`, global `0x68/0x6C/0x70`
+- [x] Master EQ low/mid/high — device-validated min/default/max — `read_master_eq`,
+  global `0x68/0x6C/0x70`, P2-F `eq0`–`eq6`
 - [~] Active song/scene selection — global `0x06–0x07` touched; semantics incomplete — `opxy_user_guide_save_audit.md` § Arrange
 - [ ] Project transpose — gap
 - [ ] Time signature enum — gap
@@ -135,7 +137,7 @@ Field offsets: `docs/format/decoded_image_map.md`.
 ## 10. Scenes, songs, arrangement
 
 - [x] Scene slots: pattern sel[16] + mute[16] + flags — `build_arrangement`, `docs/format/scenes_songs.md`
-- [x] Scene mute (device value 2) — validated — `tests/test_image_writer.py`
+- [x] Scene mute (device value 2) — device-validated scene 1 slot 0 — `tests/test_scene_track_mute_inspection.py`, `read_scene_muted_tracks`
 - [x] Song footer chain + loop word — `build_arrangement`
 - [x] Multi-pattern clone assembly — `build_arrangement`
 - [~] 14 song slots vs guide “9 songs” — partial reconciliation — `opxy_user_guide_save_audit.md`
@@ -147,13 +149,13 @@ Field offsets: `docs/format/decoded_image_map.md`.
 
 ## 11. Mix, saturator, master
 
-- [x] Master EQ — see §2
+- [x] Master EQ — `xy/master_eq_inspection.py`, P2-F
 - [x] Track static volume/pan/send FX1/FX2 **read** @ `+0x38FE`/`+0x38FA`/`+0x38B2`/`+0x38B6`
   — `xy/mixer_static_inspection.py`, P2-A f0–f24 (T1–T8 confirmed)
 - [x] Master perc/melody/compressor/master **read** @ global `+0x88`/`+0x8C`/`+0x90`/`+0x94`
   — same module
-- [ ] Saturator — gap
-- [ ] Master compressor / output level — gap
+- [x] Master saturator gain/clip/tone/mix — `read_master_saturator`, global
+  `0x78`/`0x7C`/`0x80`/`0x84`, P2-G `sat0`–`sat8`
 
 ## 12. Auxiliary tracks (T9–T16)
 
@@ -190,7 +192,8 @@ Field offsets: `docs/format/decoded_image_map.md`.
 ## How to close a gap
 
 1. Capture one-variable device diff → add fixture under `src/`.
-2. Promote offset/rule to `docs/format/decoded_image_map.md`.
+2. Promote offset/rule to `docs/format/decoded_image_map.md` and
+   `docs/format/image_coverage_map.md`.
 3. Add read path (`inspect_xy` / `project_to_json`) and/or write path (`ImageProject`).
 4. Check the box here and link the test file.
 5. Update `docs/format/opxy_user_guide_save_audit.md` if guide-visible.

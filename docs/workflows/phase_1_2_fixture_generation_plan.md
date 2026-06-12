@@ -24,7 +24,8 @@
 1. Copy `.xy` → `src/app-*-probes/<pack>/`
 2. Add/update `README.md` + `docs/logs/YYYY-MM-DD_<topic>.md`
 3. Add `tests/test_*.py` assertions
-4. Update `parse_capability_checklist.md` + `decoded_image_map.md` if offsets pinned
+4. Update `parse_capability_checklist.md` + `decoded_image_map.md` +
+   `image_coverage_map.md` if offsets pinned
 5. Run `pytest` on new tests
 
 ---
@@ -41,6 +42,9 @@
 | P2-B | One-shot sampler slots | `2026-06-sampler-oneshot/` | Yes | 10 |
 | P2-C | Multisampler zones | `2026-06-sampler-multi/` | Yes | 8 |
 | P2-D | Scene-stored track volumes | `2026-06-scene-volumes/` | Yes | 6 |
+| P2-E | Scene-stored track mutes | `2026-06-track-mutes/` | Partial | 4 + 4 |
+| P2-F | Master EQ bass/mid/treble | `2026-06-eq/` | Yes | 7 |
+| P2-G | Master saturator | `2026-06-saturator/` | Yes | 9 |
 | P3-A | Auxiliary tracks T9–T16 | `2026-06-aux-tracks/` | Yes | 16 |
 | P3-B | Players (arp / maestro / hold) | `2026-06-players/` | Yes | 9 |
 | M1 | Drum sample paths | (done) | — | — |
@@ -252,6 +256,98 @@ carried unintentionally.
 
 **Analysis:** diff scene struct regions (`docs/format/scenes_songs.md`); look for
 16× track volume bytes per scene slot.
+
+---
+
+### P2-E — Scene-stored track mutes
+
+| | |
+| --- | --- |
+| **Pack** | `user_probes/2026-06-track-mutes/` → `src/app-scene-probes/2026-06-track-mutes/` |
+| **Goal** | Device-validate per-scene mute bytes (separate from volumes) |
+| **Setup** | Scene 1: single-scene project; Scene 2+: two-scene `s0b`-style baseline |
+
+**Naming:** `mute<N>-<t1>-<t2>-<t3>-<t4>.xy` — scene **N**, muted tracks
+**1–8**; `#` = unused name slot.
+
+#### Scene 1 (single-scene)
+
+| On-device | PC filename | Procedure |
+| --- | --- | --- |
+| `mute-#-#-#-#` | `mute-#-#-#-#.xy` | No mutes → baseline |
+| `mute-1-3-6-7` | `mute-1-3-6-7.xy` | Re-open baseline → mute T1,T3,T6,T7 |
+| `mute-2-7-8-#` | `mute-2-7-8-#.xy` | Re-open baseline → mute T2,T7,T8 |
+| `mute-3-4-5-6` | `mute-3-4-5-6.xy` | Re-open baseline → mute T3–T6 |
+
+**Status:** captured ✅
+
+#### Scene 2+ (two-scene baseline)
+
+| On-device | PC filename | Procedure |
+| --- | --- | --- |
+| `mute2base` | `mute2-#-#-#-#.xy` | 2 scenes, distinct patterns, no mutes |
+| `mute2-1-3-#` | `mute2-1-3-#.xy` | Re-open mute2base → **Scene 2** → mute T1,T3 |
+| `mute2-4-5-6-#` | `mute2-4-5-6-#.xy` | Scene 2 → mute T4,T5,T6 |
+| `mute1-2-8-#` | `mute1-2-8-#.xy` | Scene **1** control → mute T2,T8 only |
+
+**Critical:** Re-open `mute2base` before each scene-2 variant (same rule as P2-D).
+
+**Analysis:** mute bytes at `slot + 16 + (track−1)`; value `0x02` = muted.
+Scene 1 on single-scene project → **slot 0**. Scene 2+ slot index TBD.
+
+**Status:** todo ⬜
+
+---
+
+### P2-F — Master EQ (bass / mid / treble)
+
+| | |
+| --- | --- |
+| **Pack** | `user_probes/2026-06-eq/` → `src/app-mixer-probes/2026-06-eq/` |
+| **Goal** | Device-validate global master EQ bytes |
+| **Setup** | Fresh project; Master → EQ; one band per file |
+
+| On-device | PC filename | Procedure |
+| --- | --- | --- |
+| `eq0` | `eq0-baseline.xy` | Fresh project, default EQ |
+| `eq1` | `eq1-bass-min.xy` | Re-open eq0 → bass min |
+| `eq2` | `eq2-bass-max.xy` | Re-open eq0 → bass max |
+| `eq3` | `eq3-mid-min.xy` | Re-open eq0 → mid min |
+| `eq4` | `eq4-mid-max.xy` | Re-open eq0 → mid max |
+| `eq5` | `eq5-treble-min.xy` | Re-open eq0 → treble min |
+| `eq6` | `eq6-treble-max.xy` | Re-open eq0 → treble max |
+
+**Analysis:** level byte @ `0x68` / `0x6C` / `0x70` (field start); default
+`0x40`, min `0x00`, max `0x7F`. Max also sets `0xFF` on prior field tail bytes.
+
+**Status:** captured ✅
+
+---
+
+### P2-G — Master saturator (gain / clip / tone / mix)
+
+| | |
+| --- | --- |
+| **Pack** | `user_probes/2026-06-saturator/` → `src/app-mixer-probes/2026-06-saturator/` |
+| **Goal** | Device-validate global saturator bytes |
+| **Setup** | Fresh project; Master → Saturator; one knob per file |
+
+| On-device | PC filename | Procedure |
+| --- | --- | --- |
+| `sat0` | `sat0-baseline.xy` | Fresh project |
+| `sat1` | `sat1-gain-min.xy` | Re-open sat0 → gain min |
+| `sat2` | `sat2-gain-max.xy` | gain max |
+| `sat3` | `sat3-clip-min.xy` | clip min |
+| `sat4` | `sat4-clip-max.xy` | clip max |
+| `sat5` | `sat5-tone-min.xy` | tone min |
+| `sat6` | `sat6-tone-max.xy` | tone max |
+| `sat7` | `sat7-mix-min.xy` | mix min (= baseline) |
+| `sat8` | `sat8-mix-max.xy` | mix max |
+
+**Analysis:** u32 groups @ `0x75`/`0x79`/`0x7D`/`0x81`; level bytes
+`0x78`/`0x7C`/`0x80`/`0x84` (mixer-style `u32+3`).
+
+**Status:** captured ✅
 
 ---
 

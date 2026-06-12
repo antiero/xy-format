@@ -48,6 +48,7 @@ flowchart LR
 | [`engineering/known_good_test_plan.md`](engineering/known_good_test_plan.md) | Ranked corpus regression backlog (T001–T028) |
 | [`format/opxy_user_guide_save_audit.md`](format/opxy_user_guide_save_audit.md) | User-guide feature → decode status |
 | [`format/decoded_image_map.md`](format/decoded_image_map.md) | RAM offset reference |
+| [`format/image_coverage_map.md`](format/image_coverage_map.md) | Mapped vs unmapped regions at a glance |
 | `user_probes/` (in `opxy_mtp_manager`) | Raw device captures + operator READMEs |
 
 **Workflow for closing any gap:** capture → fixture → map → read and/or write API
@@ -86,22 +87,29 @@ Goal: **reliably answer “what does this project contain?”** without manual h
 | Item | Module / fixtures |
 | --- | --- |
 | Preset reference inference (per active pattern) | `xy/project_inspection.py`, `src/app-preset-probes/` |
-| Drum sample paths (24 voices) | `xy/drum_sample_inspection.py`, `src/app-sample-probes/` |
-| Inspector sections | `tools/inspect_xy.py` — `[Pattern Presets]`, `[Drum Samples]` |
+| Structural preset path @ `+0x453F` | `xy/preset_path_inspection.py`, P1-B |
+| Drum sample paths (24 voices) | `xy/drum_sample_inspection.py`, M1 |
+| Drum pan / fade | `xy/drum_sample_inspection.py`, M3 |
+| Static mixer + master buses | `xy/mixer_static_inspection.py`, P2-A |
+| Scene-stored volumes (bytes; playback **~**) | `xy/scene_volume_inspection.py`, P2-D |
+| Scene track mutes (scene 1) | `read_scene_muted_tracks`, P2-E partial |
+| Master EQ | `xy/master_eq_inspection.py`, P2-F |
+| Master saturator | `xy/master_saturator_inspection.py`, P2-G |
+| Inspector sections | `tools/inspect_xy.py` — presets, drum samples, preset paths |
 | Parse capability checklist | `docs/parse_capability_checklist.md` |
+| Image coverage map | `docs/format/image_coverage_map.md` |
 | Drum path format doc (3 families) | `docs/format/drum_sample_paths.md` |
 
 ### Remaining (read)
 
 | Priority | Item | Depends on |
 | --- | --- | --- |
-| P1 | Export preset refs + drum paths in `project_to_json` | Phase 1 writers optional |
-| P1 | Structural preset path @ track `+0x453F` (not just heuristic fragments) | Corpus or probe |
-| P2 | Static mixer values (vol/pan/send) beyond p-lock columns | Captures |
-| P2 | One-shot / multisampler slot decode | Engine probes |
-| P2 | Scene-stored track volumes | Scene captures |
-| P3 | Auxiliary tracks T9–T16 semantics | Dedicated probes |
-| P3 | Players (arpeggio / maestro / hold) | Dedicated probes |
+| P1 | Export preset refs + drum paths in `project_to_json` | Golden fixtures (P1-A) |
+| P2 | Scene 2+ mutes (slot index) | P2-E `mute2-*` captures |
+| P2 | EQ blend @ `global+0x74` | One-variable probe |
+| P2 | One-shot / multisampler slot decode | P2-B / P2-C |
+| P3 | Auxiliary tracks T9–T16 semantics | P3-A |
+| P3 | Players (arpeggio / maestro / hold) | P3-B |
 
 **Exit criteria:** every **guide-visible** project field is either `[x]` read in
 the checklist or explicitly deferred with rationale.
@@ -114,16 +122,29 @@ Goal: **one-variable captures** from your OP-XY that drive decode and tests.
 Operator captures live in `opxy_mtp_manager/reference_material/user_probes/`;
 promoted fixtures copy into `xy-format-fork/src/app-*-probes/`.
 
-### Mission queue
+### Probe pack queue
 
-| # | Topic | Status | Fixtures | Next step |
-| --- | --- | --- | --- | --- |
-| **1** | Drum sample paths | ✅ Done | `c1-*`, `c0-*` (archive) | Upstream PR optional |
-| **2** | Preset on T5–P9 | ⏸ Skipped | — | Revisit if app needs per-pattern preset on upper tracks |
-| **3** | Drum pan vs fade (`+0x05/+0x06`) | 🔄 **You** | `d0-baseline`, `d1-v03-pan`, `d2-v03-fade` | Analyze when captured → map bytes → `set_drum_voice` pan/fade |
-| **4** | App-required A-series | 📦 Fixtures in repo | `a1–a4` t1–t4 × p1–p9 | Deepen preset inference tests; investigate P8/P9 kick silence |
-| **5** | Phase B engine sweep | 📦 Partial | `b1-t1eng*` | Map engine/preset bytes; note bar-removal artifact in README |
-| **6** | Pad → voice map (non-`pp` kits) | ⬜ Not started | — | One kit, three pads, same procedure as Mission 1 |
+Aligned with [`phase_1_2_fixture_generation_plan.md`](workflows/phase_1_2_fixture_generation_plan.md).
+Operator READMEs: `user_probes/` · promoted fixtures: `src/app-*-probes/`.
+
+| ID | Topic | Status | Pack |
+| --- | --- | --- | --- |
+| M1 | Drum sample paths | ✅ | `app-sample-probes/2026-06-sample-paths/` |
+| M3 | Drum pan / fade | ✅ | `user_probes/2026-06-drum-pan-fade/` |
+| P1-B | Preset path `@+0x453F` | ✅ | `app-preset-probes/2026-06-preset-path/` |
+| P2-A | Static mixer vol/pan/send + master buses | ✅ | `app-mixer-probes/2026-06-static/` |
+| P2-D | Scene-stored volumes | ✅ bytes / **~** playback | `app-scene-probes/2026-06-volumes/` |
+| P2-E | Scene track mutes | 🔄 partial | scene 1 ✅ · scene 2+ todo |
+| P2-F | Master EQ | ✅ | `app-mixer-probes/2026-06-eq/` |
+| P2-G | Master saturator | ✅ | `app-mixer-probes/2026-06-saturator/` |
+| P2-B | One-shot sampler slots | ⬜ | `2026-06-sampler-oneshot/` |
+| P2-C | Multisampler zones | ⬜ | `2026-06-sampler-multi/` |
+| P3-A | Aux tracks T9–T16 | ⬜ | `2026-06-aux-tracks/` |
+| P3-B | Players (arp / maestro / hold) | ⬜ | `2026-06-players/` |
+| M2 | Preset on T5–P9 | ⏸ optional | defer unless app needs it |
+| M4 | A-series deepen | 📦 analysis | existing `app-preset-probes/` |
+| M5 | Phase B engine sweep | 📦 partial | `2026-06-phase-b/` |
+| M6 | Pad → voice map | ⬜ | `2026-06-pad-voice-map/` |
 
 ### Probe naming convention
 
@@ -144,11 +165,12 @@ Reading is ahead of writing for the newest inspection work.
 | Priority | Write API | Read status | Blocker |
 | --- | --- | --- | --- |
 | P0 | `set_drum_voice_path(track, voice, path)` | ✅ three path families decoded | Implement + device roundtrip |
-| P0 | Drum pan / fade @ `+0x05/+0x06` | ~ provisional | Mission 3 captures |
-| P1 | Preset path string @ `+0x453F` (not full donor copy) | ~ partial | Offset + encoding rules |
-| P1 | Per-pattern preset assignment (multi-pattern) | ~ heuristic read | A-series analysis |
-| P2 | One-shot / multisampler slot fields | gap | Slot map |
-| P2 | Static mixer params | partial | Offset map |
+| P0 | Drum pan / fade | ✅ read (`+0x06` pan, fade on preceding `+0x7C`) | `set_drum_voice` fade; pan write tested |
+| P1 | Preset path string @ `+0x453F` (not full donor copy) | ✅ read | Write API still gap |
+| P1 | Per-pattern preset assignment (multi-pattern) | ~ heuristic read | A-series / M2 |
+| P2 | One-shot / multisampler slot fields | gap | P2-B / P2-C |
+| P2 | Static mixer params | ✅ read | Dedicated write helpers open |
+| P2 | Master EQ / saturator | ✅ read | Max-encoding tail bytes on write |
 | P3 | Full instrument param surface (M1–M4, mod matrix) | partial | Corpus sweeps |
 
 **Note:** `set_preset(donor)` already copies drum tables and paths wholesale —
@@ -264,7 +286,7 @@ for features you care about.
 - Close or archive superseded issues (`pointer_tail`, `preamble_state_machine`, …)
 - Banner/delete retired writer modules once midi_to_xy v2 lands
 - Keep `state_of_understanding.md` append-only for breakthroughs
-- Bump checklist + this roadmap when phases complete
+- Bump checklist, coverage map, and this roadmap when phases complete
 
 ---
 
@@ -272,13 +294,14 @@ for features you care about.
 
 For **you + this repo right now**:
 
-1. Finish **Mission 3** (pan/fade) → merge analysis → writer + checklist
-2. Open **upstream PR** for drum sample inspection (or combine with #2)
-3. Scaffold **Phase 4** with drum-tune roundtrip (quick win)
-4. Implement **`set_drum_voice_path`** + device test (highest-value write gap)
-5. Wire **`opxy_mtp_manager`** to inspection APIs
-6. Chip **Phase 5** Wave A while using probes for Phase 7
-7. **midi_to_xy v2** when edit surface is broad enough
+1. **P2-E** scene 2+ mutes (`mute2-*`) → close slot-index hypothesis
+2. **EQ blend** probe @ `0x74` (optional; guide-visible)
+3. **P2-B / P2-C** sampler probes, or **P3-A** aux tracks
+4. Scaffold **Phase 4** roundtrip (drum tune or static mixer — read APIs exist)
+5. Implement **`set_drum_voice_path`** + device test (highest-value write gap)
+6. **P1-A** `project_to_json` golden export
+7. Open **upstream PR** for inspection stack; wire **`opxy_mtp_manager`**
+8. Chip **Phase 5** Wave A; **midi_to_xy v2** when edit surface is broad enough
 
 ---
 
@@ -291,6 +314,8 @@ For **you + this repo right now**:
 | 2026-06-09 | App preset probe inspection + 76 fixtures; checklist; PR #2 |
 | 2026-06-12 | Drum sample path read API; 3 path families; round 0 + round 1 fixtures |
 | 2026-06-12 | Merged preset + drum inspection to `main` (`swekkiekekkie/xy-format`) |
+| 2026-06-12 | M3 drum pan/fade; P1-B preset path; P2-A static mixer; P2-D scene volumes |
+| 2026-06-12 | P2-E scene mutes (scene 1); P2-F EQ; P2-G saturator; `image_coverage_map.md` |
 
 ---
 

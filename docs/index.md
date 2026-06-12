@@ -56,7 +56,9 @@ Reference material:
 - **Record structure (start here)**: `docs/format/record_structure.md`
   (serialization model, record grammar, tail bytes, pre-track scene RLE —
   supersedes the descriptor/preamble framing in older docs)
-- **Decoded image map (RAM struct fields)**: `docs/format/decoded_image_map.md`
+- **Image coverage map (mapped vs unmapped at a glance)**:
+  `docs/format/image_coverage_map.md`
+- **Decoded image map (RAM struct field pins)**: `docs/format/decoded_image_map.md`
 - OP-XY user guide save audit: `docs/format/opxy_user_guide_save_audit.md`
 - Header: `docs/format/header.md`
 - Pre-track / pattern directory: `docs/format/pretrack_pattern_directory.md`

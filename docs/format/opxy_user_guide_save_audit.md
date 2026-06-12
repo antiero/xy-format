@@ -1,5 +1,7 @@
 # OP-XY User Guide Save Audit
 
+> Byte-region status at a glance: [`image_coverage_map.md`](image_coverage_map.md)
+
 > Review date: 2026-06-10. Source: Teenage Engineering OP-XY user guide
 > v1.1.0, online guide
 > (`https://teenage.engineering/guides/op-xy`) and printable PDF
@@ -173,7 +175,7 @@ Guide refs: section 16.1 p.66; section 16.2 p.66; section 16.3 p.67; section 16.
 | Pattern switching/copy/create | Up to nine pattern structs per track. | Decoded: adding a pattern inserts a 17,876-byte pattern struct; leader count byte gives pattern count. |
 | Scene pattern selections | Pattern choice for each track in each scene. | Decoded in current RLE-image model as 33-byte scene slots: `selected_pattern[16] + mute[16] + flags`. Legacy pretrack token docs are superseded for canonical writing. |
 | Scene mutes | Per-track mute state per scene. | Decoded: mute bytes in scene slot; device-confirmed nonzero boolean, writer uses value `2`. |
-| Scene volumes | Guide explicitly says scenes store track volumes. | Gap. Current scene slot model has selections/mutes/flags only; if scene volumes are real in v1.1.0, their storage has not been identified. |
+| Scene volumes | Guide explicitly says scenes store track volumes. | **Partial (P2-D).** Bytes on track struct `+0x38FE` (and master `global+0x94`) differ per scene; storage routing `T+S−1` on two-scene captures. Playback on 1.1.4 heard global mix — semantics open. |
 | Song arrangement | Scene chain per song. | Decoded: footer song table slots `[scene_count][scene_ids...][loop_word]`. |
 | Song loop | Loop on/off per song. | Decoded: loop word in footer, device-validated. |
 | Number of songs | Guide says 9 songs. | Partial/mismatch. Footer has 14 four-byte slots in decoded image; need reconcile which slots are user-visible vs reserved/other state. |
@@ -185,13 +187,13 @@ Guide refs: section 17.1 p.70; section 17.2 p.71; section 17.3 p.72; section 17.
 
 | Function | What should save | Current decode |
 |---|---|---|
-| Track volume | Per-track level. | Partial. P-lock column 0 is volume and CC7 mapping is known; current static level offset/scale is not clearly promoted. |
-| Track pan | Per-track pan. | Partial. P-lock column 41 is pan and CC10 mapping is known; current static pan offset/scale is not clearly promoted. |
-| Track mute | Per-track mute/live mix state. | Partial. Scene mute is decoded; CC9 did not record as p-lock. Static mixer mute location is not promoted. |
-| Sends | Ext/tape/FX I/FX II sends. | Partial. P-lock columns known; current static send values are not fully mapped. |
-| Master EQ | Low/mid/high. | Decoded globally at `0x68`, `0x6C`, `0x70`. |
-| Saturator | Low/mid/high/blend or related color controls. | Gap. No stable offsets promoted. |
-| Master compressor/output | Compressor amount and master/output level. | Gap/partial. No canonical field map. |
+| Track volume | Per-track level. | **Decoded (P2-A).** Static byte @ `track+0x38FE` (u32 @ `+0x38FB`); p-lock col 0 / CC7 also. |
+| Track pan | Per-track pan. | **Decoded (P2-A).** Static byte @ `track+0x38FA`; p-lock col 41 / CC10 also. |
+| Track mute | Per-track mute/live mix state. | **Partial.** Scene mute in 33-byte slots (P2-E); CC9 not p-lock. Live mixer mute not separate from scene mute. |
+| Sends | Ext/tape/FX I/FX II sends. | **Partial (P2-A).** Static FX1/FX2 @ `+0x38B2`/`+0x38B6`; tape/ext p-lock cols known. |
+| Master EQ | Low/mid/high. | **Device-validated (P2-F).** Global `0x68`/`0x6C`/`0x70`; blend @ `0x74` unprobed. |
+| Saturator | Gain/clip/tone/mix. | **Device-validated (P2-G).** Global `0x78`/`0x7C`/`0x80`/`0x84`. |
+| Master compressor/output | Compressor amount and master/output level. | **Decoded (P2-A/P2-D).** Compressor @ `global+0x90`; master vol @ `global+0x94`; perc/melody @ `+0x88`/`+0x8C`. |
 
 ### Sample Mode
 
@@ -202,7 +204,7 @@ Guide refs: section 18.1 p.77-78; section 18.2 p.79-82; section 18.3 p.83-84; se
 | Sample folder | External WAV/AIFF files and folders. | Outside `.xy` except project sample-path references. |
 | One-shot synth sampler | Sample path, start, loop start/end, end, direction, tune, loop crossfade, gain, loop type. | Gap/partial. Sampler table structure is known at a high level, but one-shot slot internals are not itemized. |
 | Drum sampler sample assignment | 24 key slots with path strings. | Decoded: 24 x 128-byte slots at track `+0x3957`; sample path at slot `+0x08`. |
-| Drum sampler edit controls | Tune, start, end, play mode, direction, pan, fade, gain. | Mostly decoded: tune `+0x00`, play mode `+0x03`, direction `+0x07`, start `+0x68`, end `+0x70`, gain `+0x7C`. Pan/fade at `+0x05/+0x06` are provisional and which-is-which still needs confirmation. |
+| Drum sampler edit controls | Tune, start, end, play mode, direction, pan, fade, gain. | **Decoded:** tune `+0x00`, play mode `+0x03`, direction `+0x07`, pan `+0x06` (M3 ±100), start `+0x68`, end `+0x70`, gain/fade `+0x7C` (fade on preceding slot for pad voices, M3). |
 | Drum clear/copy/paste/select multiple | Assignment/table operations. | Operation over decoded slot table; multi-select UI state itself is not relevant unless saved as UI state. |
 | Drum slicing | Slice mode, slice boundaries, generated choke/mute-group assignments. | Gap/partial. Result likely writes drum slots, but transient/even/tap slice metadata and generated assignment rules are not decoded. |
 | Multisampler zones | Up to 24 zones, key assignment, sample path, zone fill-down behavior. | Gap/partial. The 24-slot table model likely applies, but multisampler zone boundaries/root-key fields are not decoded. |

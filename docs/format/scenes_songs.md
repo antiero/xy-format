@@ -1,5 +1,11 @@
 # Scenes and Songs
 
+> **Flat decoded image (canonical for read/write):** 33-byte scene slots @
+> `GLOBAL+0x95 + slot×33` (`sel[16] + mute[16] + flags`). See
+> [`record_structure.md`](record_structure.md) §4, [`image_coverage_map.md`](image_coverage_map.md),
+> P2-D volumes, P2-E mutes. Sections below on RLE insertions and Track 16
+> tail bytes are **supplemental** (older probe narrative).
+
 ## Scope
 This document captures stable format findings for scene/song state from
 `unnamed 149/150/151/152/154/155` and follow-up `b/nl/lp` probes.

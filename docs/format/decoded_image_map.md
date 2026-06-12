@@ -6,16 +6,20 @@
 > from a corpus-wide join of decoded diffs × the one-off change log
 > (2026-06-09). Offsets are for baseline `unnamed 1.xy`
 > (decoded size 289,521 bytes) unless marked track-relative.
+>
+> **Coverage overview (mapped vs unmapped):**
+> [`image_coverage_map.md`](image_coverage_map.md)
 
 ## Image Layout
 
 ```
-0x00000          global header            (3,449 bytes)
+0x00000          global header            (3,449 bytes; ends before T1 @ 0x0D79)
 0x00D79 + k*0x45D4   track struct k=0..15 (17,876 bytes each)
-end − 53         footer: song table       (53 bytes)
+end − footer     song table               (53 B in older notes; **56 B** in `unnamed 1.xy`)
 ```
 
-`3,449 + 16×17,876 + 53 = 289,521` exactly. Adding a pattern inserts one
+`3,449 + 16×17,876 + 56 = 289,521` on baseline (`unnamed 1.xy`). Older
+docs used 53-byte footer — see [`image_coverage_map.md`](image_coverage_map.md) §3. Adding a pattern inserts one
 more 17,876-byte struct (clones in raw space were full copies because the
 struct *is* the pattern). Track structs grow only via count-prefixed
 vectors (notes: +12 bytes each).
@@ -30,7 +34,11 @@ vectors (notes: +12 bytes each).
 | 0x06 | song/scene count-ish (songs: u13; scenes: 152/153 touch 0x06–0x07) | u13, u152 |
 | 0x07 | selected song/scene ordinal | u149, u151 |
 | 0x55–0x64 | per-track MIDI channel array, 1 byte/track (T1=0x55 … T16=0x64) | u41, u54 |
-| 0x68 / 0x6C / 0x70 | master EQ low / mid / high (4-byte fields) | u14, u15, u16 |
+| 0x64–0x67 | global prefix u32 (byte @ 0x64 default `0xFF`; purpose open) | P2-F `eq2` tail |
+| 0x68 / 0x6C / 0x70 | **master EQ** bass / mid / treble u32 (level byte @ field start; default `0x40`, max `0x7F`) | u14–u16, P2-F `eq0`–`eq6` |
+| 0x74–0x77 | likely **EQ blend** u32 (byte @ 0x74 default `0x40`) | unprobed |
+| 0x75 / 0x79 / 0x7D / 0x81 | **saturator** gain / clip / tone / mix u32 | P2-G `sat0`–`sat8` |
+| 0x78 / 0x7C / 0x80 / 0x84 | saturator level bytes (`u32+3`; gain/clip default `0x19`, tone `0x40`, mix `0x00`) | P2-G |
 | 0x85–0x88 | **master percussion** volume u32 (byte @ 0x88) | P2-A `f10`/`f11` |
 | 0x89–0x8C | **master melody** volume u32 (byte @ 0x8C) | P2-A `f12`/`f13` |
 | 0x8D–0x90 | **master compressor** u32 (byte @ 0x90; default `0x0C`) | P2-A `f14`/`f15` |
@@ -211,12 +219,9 @@ matching the capture notes. The old raw-space "param_id" bytes and
 
 ### Sample table (drum/sampler) — structure decoded
 
-**24 slots × 128 bytes at track+0x395F** (= the 24-key drum limit),
-sample path string inside each slot, per-sample params in the remaining
-slot bytes (tune/level/envelope fields not yet itemized). Preset name
-field follows the table. (The "amb kit" sampler corpus referenced in
-older notes is not present in the repo; slot internals can be mapped
-from baseline + kit-change one-offs when needed.)
+Preset name field follows the drum table. (The "amb kit" sampler corpus
+referenced in older notes is not present in the repo; slot internals can
+be mapped from baseline + kit-change one-offs when needed.)
 
 ### Drum sampler table — per-voice parameter slot (device-decoded)
 
