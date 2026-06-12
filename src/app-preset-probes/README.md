@@ -1,27 +1,15 @@
 # App preset probe fixtures
 
-Device-authored `.xy` captures used to validate read-only project preset
-inspection (`xy/project_inspection.py`, `tests/test_project_inspection.py`).
+Device-authored `.xy` captures for `xy/project_inspection.py`.
 
-## Families
+## Packs
 
-### `2026-06-app-required/` (36 files)
+| Pack | ID | Status |
+| --- | --- | --- |
+| [`2026-06-app-required/`](2026-06-app-required/) | M4 base | ✅ 36 files |
+| [`2026-06-phase-b/`](2026-06-phase-b/) | M5 base | ✅ 40 files |
+| [`2026-06-preset-path/`](2026-06-preset-path/) | P1-B | ⬜ Pending |
+| [`2026-06-preset-t5-p9/`](2026-06-preset-t5-p9/) | M2 | ⏸ Deferred |
 
-Tracks 1–4 with nine active patterns each. Patterns P1–P9 use drum preset
-folders `pp` through `xx` (one note on step 1 per pattern). Firmware 1.1.4.
-
-Capture procedure: see `docs/logs/2026-06-09_app_preset_probe_inspection.md`.
-
-### `2026-06-phase-b/` (40 files)
-
-Engine sweep on track 1: Axis, Dissolve, Drum, EPiano, Hardsync,
-Multisampler, Organ, Prism, Sampler, Simple, Wavetable — each with a
-known factory preset and one or more bars of notes.
-
-Bar-length variants exist for several engines; tests use the canonical
-one-bar (or noted) filenames listed in `tests/test_project_inspection.py`.
-
-## Related captures
-
-Companion drum preset folders (`pp` … `xx`) and extended capture notes live
-in the OP-XY MTP Manager repo under `reference_material/user_probes/`.
+Tests: `tests/test_project_inspection.py`  
+Log: `docs/logs/2026-06-09_app_preset_probe_inspection.md`
