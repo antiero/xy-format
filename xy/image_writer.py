@@ -255,12 +255,18 @@ class ImageProject:
         play_mode: int | None = None,
         direction: int | None = None,
         pan: int | None = None,
+        fade: int | None = None,
         start: int | None = None,
         end: int | None = None,
         gain: int | None = None,
     ) -> None:
         """Set per-voice drum parameters (voice = 0..23). `tune` is in
-        semitones (−48..+48). Device-decoded from `cap_drum_params.xy`."""
+        semitones (−48..+48). Device-decoded from `cap_drum_params.xy`.
+
+        ``fade`` (0..99) is the pad loop-crossfade UI; it is stored on the
+        **preceding** voice slot's +0x7C u32 (e.g. pad voice 23 → slot 22)."""
+        from .drum_sample_inspection import drum_fade_storage_voice, encode_drum_fade_ui
+
         s = self.track_start(track) + self.DRUM_TABLE + voice * self.DRUM_SLOT
         if tune is not None:
             self.image[s + self.DRUM_TUNE] = (0x3C + tune) & 0xFF
@@ -270,6 +276,15 @@ class ImageProject:
             self.image[s + self.DRUM_DIRECTION] = 1 if direction else 0
         if pan is not None:
             self.image[s + self.DRUM_PAN] = pan & 0xFF
+        if fade is not None:
+            storage = drum_fade_storage_voice(voice)
+            if storage < 0:
+                raise ValueError(f"fade storage voice for drum voice {voice} is invalid")
+            gain_s = self.track_start(track) + self.DRUM_TABLE + storage * self.DRUM_SLOT
+            encoded = encode_drum_fade_ui(fade)
+            self.image[gain_s + self.DRUM_GAIN : gain_s + self.DRUM_GAIN + 4] = encoded.to_bytes(
+                4, "little"
+            )
         if start is not None:
             self.image[s + self.DRUM_START : s + self.DRUM_START + 4] = start.to_bytes(4, "little")
         if end is not None:

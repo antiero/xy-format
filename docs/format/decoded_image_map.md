@@ -226,7 +226,7 @@ order (v0 kick a … v23 chi).
 | +0x03 | **play mode** | u8: 1=key, 2=oneshot, 3=mute group, 4=loop |
 | +0x05 | *(unused in M3 probes)* | stays 0 when pan/fade edited on v23 |
 | +0x06 | **pan** | signed byte, device ±100 (`d1`/`d2` captures) |
-| +0x7C | **gain / loop-crossfade (fade)** | u32; M3 fade UI on v23 wrote v22 `+0x7C` — see `docs/logs/2026-06-12_drum_pan_fade_inspection.md` |
+| +0x7C | **gain / loop-crossfade (fade)** | u32; pad fade UI on v23 → **v22** `+0x7C`; encode `ui×0x0147AF00`, max `0x7FFFFFFF`; decode `(u32>>8)//0x0147AF` — M3 log |
 | +0x07 | **sample direction** | u8: 0=forward, 1=backward |
 | +0x08 | sample path string | null-padded |
 | +0x68 | **sample start** | u32, default 0 |

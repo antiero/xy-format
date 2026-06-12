@@ -21,6 +21,34 @@ DRUM_PAN_OFFSET = 0x06
 DRUM_GAIN_OFFSET = 0x7C
 DRUM_VOICE_COUNT = 24
 ENGINE_ID_OFFSET = 0x14
+# Loop-crossfade UI 0..99 → u32 at preceding voice slot +0x7C (M3 probes).
+DRUM_FADE_STEP = 0x0147AF00
+DRUM_FADE_HI_SCALE = DRUM_FADE_STEP >> 8  # 0x0147AF
+DRUM_FADE_U32_MAX = 0x7FFFFFFF
+DRUM_FADE_UI_MAX = 99
+
+
+def encode_drum_fade_ui(ui: int) -> int:
+    """Encode drum pad loop-crossfade UI (0..99) to device u32 @ slot+0x7C."""
+    if ui <= 0:
+        return 0
+    if ui >= DRUM_FADE_UI_MAX:
+        return DRUM_FADE_U32_MAX
+    return ui * DRUM_FADE_STEP
+
+
+def decode_drum_fade_u32(u32: int) -> int:
+    """Decode loop-crossfade u32 back to UI 0..99."""
+    if u32 <= 0:
+        return 0
+    if u32 >= DRUM_FADE_U32_MAX:
+        return DRUM_FADE_UI_MAX
+    return (u32 >> 8) // DRUM_FADE_HI_SCALE
+
+
+def drum_fade_storage_voice(edited_voice: int) -> int:
+    """Pad fade edited on *edited_voice* is stored on the previous slot (v23→v22)."""
+    return edited_voice - 1
 
 
 @dataclass(frozen=True)
@@ -32,6 +60,11 @@ class DrumVoiceSample:
     play_mode: int
     pan: int  # signed byte @ slot+0x06 (device ±100)
     slot_gain_u32: int  # u32 @ slot+0x7C (gain / loop-crossfade field)
+
+    @property
+    def fade_ui(self) -> int:
+        """Loop-crossfade UI decoded from this slot's +0x7C u32."""
+        return decode_drum_fade_u32(self.slot_gain_u32)
 
 
 @dataclass(frozen=True)

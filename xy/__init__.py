@@ -48,9 +48,14 @@ from .project_inspection import (  # noqa: F401
     inspect_project_bytes,
 )
 from .drum_sample_inspection import (  # noqa: F401
+    DRUM_FADE_STEP,
+    DRUM_FADE_UI_MAX,
     DrumTrackSamples,
     DrumVoiceSample,
     ProjectDrumSamples,
+    decode_drum_fade_u32,
+    drum_fade_storage_voice,
+    encode_drum_fade_ui,
     inspect_drum_samples,
     inspect_drum_samples_bytes,
 )

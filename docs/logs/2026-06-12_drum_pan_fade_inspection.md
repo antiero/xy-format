@@ -22,28 +22,45 @@ Only voice 23 slot `+0x06` changes vs baseline. Slot `+0x05` stays 0.
 
 ## Fade / loop-crossfade (decoded)
 
-Fade UI edits on the **same pad (v23)** did **not** change bytes in the voice 23
-slot. Each fade capture differs from baseline in **four bytes** at image
-`0x524C..0x524F` = track `+0x44D3` = **voice 22 slot `+0x7C`** (u32).
+Fade UI on pad **voice 23** is stored on **voice 22** slot **`+0x7C`** (u32).
+Image offset `0x524C..0x524F` on these captures.
 
-| File | UI fade | u32 @ v22 `+0x7C` |
+### Encoding (fine-grained sweep `d3-v23-fade-01` … `14`, `44`…`47`)
+
+```text
+ui 0   → u32 0
+ui 1..98 → u32 = ui × 0x0147AF00
+ui 99  → u32 0x7FFFFFFF
+```
+
+Decode (works for all captures, including legacy byte0=`0xFF`):
+
+```text
+ui = (u32 >> 8) // 0x0147AF     # clamp 0 and 99 at ends
+```
+
+Fine sweep writes **3 bytes** at `+0x524D..+0x524F` (byte at `+0x524C` stays 0).
+Earlier `d3-v23-fade-27/63/99` captures wrote **4 bytes** with `+0x524C = 0xFF`;
+decode still returns the correct UI.
+
+### Sample values
+
+| UI | u32 (fine sweep) | bytes @ `0x524C` (fine) |
 | --- | --- | --- |
-| `d3-v23-fade-99.xy` | 99 (max) | `0x7FFFFFFF` |
-| `d3-v23-fade-27.xy` | 27 | `0x23D6C7FF` |
-| `d3-v23-fade-63.xy` | 63 | `0x51EB63FF` |
+| 1 | `0x0147AF00` | `00 af 47 01` |
+| 14 | `0x11EB9200` | `00 92 eb 11` |
+| 44 | `0x38521400` | `00 14 52 38` |
+| 99 | `0x7FFFFFFF` | `00 ff ff 7f` |
 
-Encoding vs UI value is **not** a simple linear map yet. The field shares the
-documented gain / loop-crossfade u32 offset (`+0x7C`) but the **voice index
-pairing** (UI on v23 → storage on v22) needs more probes before write API.
+## API
 
-## API updates
-
-- `DrumVoiceSample.pan` — signed read @ `+0x06`
-- `DrumVoiceSample.slot_gain_u32` — u32 @ `+0x7C`
-- `set_drum_voice(..., pan=)` — write @ `+0x06`
+- `DrumVoiceSample.fade_ui` — decode from slot `+0x7C` on **storage** voice (22 for pad 23)
+- `encode_drum_fade_ui` / `decode_drum_fade_u32`
+- `set_drum_voice(..., fade=)` — writes preceding voice `+0x7C`
+- `set_drum_voice(..., pan=)` — writes same voice `+0x06`
 - Tests: `tests/test_drum_pan_fade_inspection.py`
 
 ## Open
 
-- Fade write path and voice-index rule (v23 UI → v22 `+0x7C`?).
+- Whether voice−1 storage rule holds for all pads / kits (only validated v23→v22).
 - Whether `+0x05` is used on other kits / engines.
