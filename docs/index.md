@@ -65,6 +65,7 @@ Reference material:
 - P-locks: `docs/format/plocks.md`
 - Mod routing: `docs/format/mod_routing.md`
 - Multi-pattern block rotation: `docs/format/multi_pattern_block_rotation.md`
+- Drum sampler sample paths: `docs/format/drum_sample_paths.md`
 
 ## Engineering
 - **Authoring `.xy` files (canonical writer guide)**: `docs/engineering/authoring.md`
@@ -86,6 +87,7 @@ Reference material:
 
 ## Logs
 - Drum sample path inspection: `docs/logs/2026-06-12_drum_sample_path_inspection.md`
+- Round 0 `nt-z-fx` sample paths: `docs/logs/2026-06-12_round0_nt-z-fx_sample_paths.md`
 - Variable-length + writer root cause: `docs/logs/2025-02-11_variable_length_and_writer_root_cause.md`
 - Firmware package notes: `docs/logs/2025-02-14_firmware_package_notes.md`
 - Multi-pattern breakthrough: `docs/logs/2026-02-12_multipattern_breakthrough.md`

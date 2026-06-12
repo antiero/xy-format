@@ -68,15 +68,45 @@ slot path at `+0x08`**.
 - `tools/inspect_xy.py` — `[Drum Samples]` section.
 - Tests: `tests/test_drum_sample_inspection.py`.
 
-## Round 0 (superseded)
+## Round 0 — fully decoded (`nt-z-fx` user preset samples)
 
-Earlier captures using `nt-z-fx` user presets and `unnamed-…` samples.
-Archived in user_probes `archive-round0-nt-z-fx/`. Round 1 replaced them with
-named built-in `perc/chi *` samples for verifiability.
+Archived under `archive-round0-nt-z-fx/`. **Not lost — documented and tested.**
+
+When pads were pointed at samples inside the **user FX preset `nt-z-fx`**
+(while track kit stayed `pp`), the slot path became:
+
+```text
+/fat32/presets/fx/nt-z-fx.preset/unnamed-a2-3.wav
+```
+
+`nt-z-fx` is the **preset bundle name in the path**; category is `fx`, not
+`drum`. Track kit string remains `drum/pp`.
+
+| File | Voice | Path |
+|------|-------|------|
+| `c0-baseline-pp.xy` | — | all `…/drum/pp.preset/…` |
+| `c0-pad01-lowf-v23-nt-z-fx-a2-3.xy` | 23 (low F) | `…/fx/nt-z-fx.preset/unnamed-a2-3.wav` |
+| `c0-pad02-v00-nt-z-fx-a3-3.xy` | 0 | `…/fx/nt-z-fx.preset/unnamed-a3-3.wav` |
+| `c0-pad03-v01-nt-z-fx-b2-4.xy` | 1 | `…/fx/nt-z-fx.preset/unnamed-b2-4.wav` |
+
+Full analysis: `docs/logs/2026-06-12_round0_nt-z-fx_sample_paths.md`  
+Canonical format doc: `docs/format/drum_sample_paths.md`  
+Tests: `tests/test_drum_sample_inspection_round0.py`
+
+Round 1 replaced round 0 as the **primary** probe set because `chi *` names are
+easier to verify on hardware; round 0 remains the evidence for user-preset-
+nested paths.
+
+## Three path families (summary)
+
+| Family | When | Example |
+|--------|------|---------|
+| A — kit nested | Default on loaded drum kit | `…/drum/pp.preset/unnamed-f#2-31.wav` |
+| B — user preset nested | Pad sample from user preset bank | `…/fx/nt-z-fx.preset/unnamed-a2-3.wav` |
+| C — library relative | Pad sample from built-in browser | `content/samples/perc/chi box.wav` |
 
 ## Open questions
 
 - Sampler / multisampler non-drum path layout.
-- Whether user `.preset` drum kits always use `/fat32/presets/drum/<kit>.preset/…`
-  or can emit `content/samples/…` for some slots.
 - Full pad-grid → voice-index map for kits other than `pp`.
+- Non-`unnamed` sample ids inside user preset bundles.
