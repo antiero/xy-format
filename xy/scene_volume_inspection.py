@@ -5,6 +5,9 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from .image_writer import GLOBAL_SCENE_COUNT, ImageProject, SCENE_SLOT0, SCENE_SLOT_SIZE
+
+SCENE_MUTE_OFFSET = 16  # within 33-byte scene slot
+SCENE_MUTE_VALUE = 2  # device-confirmed muted byte (nonzero)
 from .rle import decode_project
 
 TRACK_MIX_VOL_U32_OFFSET = 0x38FB
@@ -117,7 +120,23 @@ def read_scene_track_volume(
     )
 
 
-def read_scene_slot_pattern_sel(project: ImageProject, scene: int) -> tuple[int, ...]:
-    """Pattern index (0-based) per track for a scene slot (0 = live)."""
-    slot = SCENE_SLOT0 + scene * SCENE_SLOT_SIZE
+def read_scene_slot_pattern_sel(project: ImageProject, scene_slot: int) -> tuple[int, ...]:
+    """Pattern index (0-based) per track for a scene slot (0 = live / scene 1 on single-scene)."""
+    slot = SCENE_SLOT0 + scene_slot * SCENE_SLOT_SIZE
     return tuple(project.image[slot + t] for t in range(16))
+
+
+def read_scene_slot_mute_bytes(project: ImageProject, scene_slot: int) -> tuple[int, ...]:
+    """Raw mute bytes for 16 tracks in a scene slot (0 = unmuted, 2 = muted)."""
+    slot = SCENE_SLOT0 + scene_slot * SCENE_SLOT_SIZE
+    base = slot + SCENE_MUTE_OFFSET
+    return tuple(project.image[base + t] for t in range(16))
+
+
+def read_scene_muted_tracks(project: ImageProject, scene_slot: int) -> tuple[int, ...]:
+    """1-based track numbers muted in ``scene_slot``."""
+    return tuple(
+        t + 1
+        for t, value in enumerate(read_scene_slot_mute_bytes(project, scene_slot))
+        if value != 0
+    )
