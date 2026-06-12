@@ -2,13 +2,17 @@ from pathlib import Path
 
 import pytest
 
+from xy.image_writer import ImageProject, STRIDE
 from xy.mixer_static_inspection import (
     MIX_VOL_U32_MAX,
     PAN_BYTE_CENTER,
+    TRACK_MIX_PAN_BYTE_OFFSET,
+    TRACK_SEND_FX1_BYTE_OFFSET,
+    TRACK_SEND_FX2_BYTE_OFFSET,
     inspect_static_mixer_bytes,
 )
 from xy.rle import decode_project
-from xy.scene_volume_inspection import encode_mix_vol_byte
+from xy.scene_volume_inspection import TRACK_MIX_VOL_BYTE_OFFSET
 
 ROOT = Path(__file__).resolve().parents[1]
 PROBES = ROOT / "src" / "app-mixer-probes" / "2026-06-static"
@@ -82,3 +86,68 @@ def test_send_mins_are_unchanged_from_baseline() -> None:
     assert mixer.tracks[0].send_fx1.byte == 0
     mixer = inspect_static_mixer_bytes((PROBES / "f9-t1-send-fx2-min.xy").read_bytes())
     assert mixer.tracks[0].send_fx2.byte == 0
+
+
+@pytest.mark.parametrize(
+    "filename,field,track,expected",
+    [
+        ("f16-master-master-vol-0.xy", "master", 0, 0x00),
+        ("f17-master-master-vol-100.xy", "master", 0, 0x7F),
+        ("f18-t2-vol-min.xy", "volume", 2, 0x00),
+        ("f19-t3-vol-max.xy", "volume", 3, 0x7F),
+        ("f20-t4-pan-left.xy", "pan", 4, 0x00),
+        ("f21-t5-pan-right.xy", "pan", 5, 0x7F),
+        ("f22-t6-send-fx1-max.xy", "send_fx1", 6, 0x7F),
+        ("f23-t7-send-fx1-min.xy", "send_fx1", 7, 0x00),
+        ("f24-t8-send-fx2-max.xy", "send_fx2", 8, 0x7F),
+    ],
+)
+def test_f16_f24_cross_track_and_master_fields(
+    filename: str, field: str, track: int, expected: int
+) -> None:
+    mixer = inspect_static_mixer_bytes((PROBES / filename).read_bytes())
+    if field == "master":
+        assert mixer.master.master.byte == expected
+    else:
+        assert getattr(mixer.tracks[track - 1], field).byte == expected
+
+
+def test_f19_t3_vol_max_uses_full_u32_pattern() -> None:
+    mixer = inspect_static_mixer_bytes((PROBES / "f19-t3-vol-max.xy").read_bytes())
+    assert mixer.tracks[2].volume.u32 == MIX_VOL_U32_MAX
+
+
+def _session_noise_offsets(project: ImageProject) -> set[int]:
+    noise: set[int] = set()
+    for track in range(9, 17):
+        base = project.track_start(track)
+        noise.add(base + 0x38F2)
+        noise.add(base + 0x38F6)
+    return noise
+
+
+@pytest.mark.parametrize(
+    "filename,track,field_offset",
+    [
+        ("f18-t2-vol-min.xy", 2, TRACK_MIX_VOL_BYTE_OFFSET),
+        ("f20-t4-pan-left.xy", 4, TRACK_MIX_PAN_BYTE_OFFSET),
+        ("f22-t6-send-fx1-max.xy", 6, TRACK_SEND_FX1_BYTE_OFFSET),
+        ("f24-t8-send-fx2-max.xy", 8, TRACK_SEND_FX2_BYTE_OFFSET),
+    ],
+)
+def test_cross_track_edits_are_isolated_on_target_struct(
+    base_img: bytes, filename: str, track: int, field_offset: int
+) -> None:
+    path = PROBES / filename
+    var_img = decode_project(path.read_bytes())[1]
+    project = ImageProject.from_file(str(BASELINE))
+    target = project.track_start(track)
+    allowed = set(range(target + field_offset - 3, target + field_offset + 1))
+    allowed.add(target + 0x11)  # pristine u16
+    allowed |= _session_noise_offsets(project)
+    outside = [
+        i
+        for i in range(len(base_img))
+        if base_img[i] != var_img[i] and i not in allowed
+    ]
+    assert not outside

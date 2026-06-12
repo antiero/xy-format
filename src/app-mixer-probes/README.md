@@ -1,6 +1,6 @@
 # App mixer probe fixtures
 
-> **Status:** partial (f0–f15 captured; f16–f24 pending)
+> **Status:** captured (pack `2026-06-static`)
 
 Device-authored `.xy` captures for static mixer field decode (vol/pan/send).
 
@@ -8,6 +8,6 @@ Device-authored `.xy` captures for static mixer field decode (vol/pan/send).
 
 | Pack | ID | Status |
 | --- | --- | --- |
-| [`2026-06-static/`](2026-06-static/) | P2-A | **partial** |
+| [`2026-06-static/`](2026-06-static/) | P2-A | **captured** |
 
 Operator captures: `opxy_mtp_manager/reference_material/user_probes/2026-06-mixer-static/`
