@@ -54,6 +54,9 @@ flowchart LR
 → test → checklist → log. See checklist § “How to close a gap” and § “Device
 roundtrip workflow”.
 
+**Fixture recipes (Phase 1 & 2):**
+[`docs/workflows/phase_1_2_fixture_generation_plan.md`](workflows/phase_1_2_fixture_generation_plan.md)
+
 ---
 
 ## Phase 0 — Foundation ✅ (complete)

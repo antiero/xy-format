@@ -9,6 +9,7 @@
 - Human explainer: `docs/human-explainer.md`
 
 ## Workflows
+- **Phase 1 & 2 fixture generation plan: `docs/workflows/phase_1_2_fixture_generation_plan.md`**
 - Device test naming: `docs/workflows/device_test_naming.md`
 - Inspector sweep: `docs/workflows/inspector_sweep.md`
 - Crash capture protocol: `docs/workflows/crash_capture.md`
