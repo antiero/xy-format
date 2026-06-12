@@ -39,3 +39,11 @@ from .plocks import (  # noqa: F401
     rewrite_standard_values_for_param_groups,
     t1_first_param_id,
 )
+from .project_inspection import (  # noqa: F401
+    PatternInspection,
+    PresetReference,
+    ProjectInspection,
+    TrackInspection,
+    inspect_project,
+    inspect_project_bytes,
+)

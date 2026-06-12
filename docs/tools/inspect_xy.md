@@ -5,6 +5,8 @@
 ## Current Coverage
 - Header summary.
 - Pattern directory/pre-track observations.
+- Active track/pattern preset-reference inference when project bodies expose
+  preset folder or fragmented preset-name strings (`xy/project_inspection.py`).
 - Per-track scan and event summaries.
 - EQ/global snippets.
 

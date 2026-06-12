@@ -24,6 +24,7 @@ state.
 
 Primary repo references:
 
+- `docs/parse_capability_checklist.md` for a checkbox overview with code paths.
 - `docs/format/decoded_image_map.md` for canonical decoded-image offsets.
 - `docs/format/record_structure.md` for RLE/container and scene/song structs.
 - `docs/engineering/authoring.md` for fields currently writeable through

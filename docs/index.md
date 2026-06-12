@@ -3,6 +3,7 @@
 ## Start Here
 - Operating guide: `AGENTS.md`
 - **State of understanding (dated ledger of what we believe/doubt): `docs/state_of_understanding.md`**
+- **Parse & author capability checklist: `docs/parse_capability_checklist.md`**
 - Roadmap: `docs/roadmap.md`
 - Human explainer: `docs/human-explainer.md`
 
@@ -85,6 +86,7 @@ Reference material:
 - Sparse topology stability issue: `docs/issues/sparse_topology_stability.md`
 
 ## Logs
+- App preset probe inspection: `docs/logs/2026-06-09_app_preset_probe_inspection.md`
 - Variable-length + writer root cause: `docs/logs/2025-02-11_variable_length_and_writer_root_cause.md`
 - Firmware package notes: `docs/logs/2025-02-14_firmware_package_notes.md`
 - Multi-pattern breakthrough: `docs/logs/2026-02-12_multipattern_breakthrough.md`

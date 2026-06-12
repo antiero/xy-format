@@ -30,6 +30,7 @@ if str(REPO_ROOT) not in sys.path:
 import re
 
 from xy.note_reader import read_event as _unified_read_event  # noqa: E402
+from xy.project_inspection import inspect_project_bytes  # noqa: E402
 from xy.structs import (  # noqa: E402
     SENTINEL_BYTES,
     STEP_TICKS,
@@ -1692,6 +1693,28 @@ def generate_report(path: Path, data: bytes) -> str:
                 f"    Slot 0x{slot.slot:04X} @0x{slot.offset:04X} → tag=0x{tag:02X}  raw={slot.raw.hex()}"
             )
     lines.append("")
+
+    try:
+        project_inspection = inspect_project_bytes(data)
+        active_preset_refs = project_inspection.active_preset_refs
+    except Exception:
+        active_preset_refs = ()
+
+    if active_preset_refs:
+        lines.append("[Pattern Presets]")
+        for track_index, pattern, ref in active_preset_refs:
+            engine = (
+                f"0x{pattern.engine_id:02X}"
+                + (f" ({pattern.engine_name})" if pattern.engine_name else "")
+                if pattern.engine_id is not None
+                else "unknown"
+            )
+            lines.append(
+                f"  T{track_index:02d} P{pattern.pattern}: {ref.folder}  "
+                f"kind={ref.kind}  confidence={ref.confidence}  hits={ref.hit_count}  "
+                f"engine={engine}"
+            )
+        lines.append("")
 
     lines.append("[Tracks]")
     for track in tracks:
