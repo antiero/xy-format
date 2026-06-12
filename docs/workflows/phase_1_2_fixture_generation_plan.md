@@ -436,14 +436,19 @@ Mission **M6** (different kit).
 
 ```text
 user_probes/2026-06-<topic>/
-  README.md                 # operator procedure + results table
+  README.md                 # capture procedure (permanent) + results (filled later)
   projects/                 # optional: raw MTP names
   <pc-renamed>.xy
 
 xy-format-fork/src/app-<domain>-probes/2026-06-<topic>/
-  README.md                 # copy + link to log
+  README.md                 # fixture index + link to log + operator README
   *.xy
 ```
+
+**Reproducibility:** never delete or replace the operator capture procedure in
+`user_probes/…/README.md` when analysis completes — only append/fill **Results**
+and link the log. Fixture-pack READMEs summarize decode; generation plans live
+in `user_probes`.
 
 ---
 

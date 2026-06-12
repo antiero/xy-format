@@ -2,6 +2,9 @@
 
 > **Status:** captured
 
+**Capture procedure:**
+[`user_probes/2026-06-scene-volumes/README.md`](../../../../user_probes/2026-06-scene-volumes/README.md)
+
 8 files. Use **s0b** series as canonical (distinct scene patterns).
 
 | File | Finding |
