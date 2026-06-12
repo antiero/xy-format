@@ -17,6 +17,8 @@ DRUM_ENGINE_ID = 0x03
 DRUM_TABLE_OFFSET = 0x3957
 DRUM_SLOT_SIZE = 0x80
 DRUM_PATH_OFFSET = 0x08
+DRUM_PAN_OFFSET = 0x06
+DRUM_GAIN_OFFSET = 0x7C
 DRUM_VOICE_COUNT = 24
 ENGINE_ID_OFFSET = 0x14
 
@@ -28,6 +30,8 @@ class DrumVoiceSample:
     tune: int
     key_assignment: int
     play_mode: int
+    pan: int  # signed byte @ slot+0x06 (device ±100)
+    slot_gain_u32: int  # u32 @ slot+0x7C (gain / loop-crossfade field)
 
 
 @dataclass(frozen=True)
@@ -82,9 +86,17 @@ def _read_voice_table(project: ImageProject, track: int) -> tuple[DrumVoiceSampl
                 tune=slot[0],
                 key_assignment=slot[2],
                 play_mode=slot[3],
+                pan=_signed_byte(slot[DRUM_PAN_OFFSET]),
+                slot_gain_u32=int.from_bytes(
+                    slot[DRUM_GAIN_OFFSET : DRUM_GAIN_OFFSET + 4], "little"
+                ),
             )
         )
     return tuple(voices)
+
+
+def _signed_byte(value: int) -> int:
+    return value if value < 128 else value - 256
 
 
 def _read_path(slot: bytes) -> str:

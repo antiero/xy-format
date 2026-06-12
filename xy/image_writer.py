@@ -243,8 +243,8 @@ class ImageProject:
     DRUM_DIRECTION = 0x07  # u8: 0=forward, 1=backward
     DRUM_START = 0x68      # u32 sample start, default 0
     DRUM_END = 0x70        # u32 sample end, default 0xFFFFFFFF
-    DRUM_GAIN = 0x7C       # u32 sample gain, default 0 (max 0x7FFFFFFF)
-    # +0x05/+0x06 hold pan / loop-crossfade (provisional); not exposed yet.
+    DRUM_PAN = 0x06        # signed byte pan (−100..+100 observed on device)
+    DRUM_GAIN = 0x7C       # u32 sample gain / loop-crossfade, default 0 (max 0x7FFFFFFF)
 
     def set_drum_voice(
         self,
@@ -254,6 +254,7 @@ class ImageProject:
         tune: int | None = None,
         play_mode: int | None = None,
         direction: int | None = None,
+        pan: int | None = None,
         start: int | None = None,
         end: int | None = None,
         gain: int | None = None,
@@ -267,6 +268,8 @@ class ImageProject:
             self.image[s + self.DRUM_PLAY_MODE] = play_mode
         if direction is not None:
             self.image[s + self.DRUM_DIRECTION] = 1 if direction else 0
+        if pan is not None:
+            self.image[s + self.DRUM_PAN] = pan & 0xFF
         if start is not None:
             self.image[s + self.DRUM_START : s + self.DRUM_START + 4] = start.to_bytes(4, "little")
         if end is not None:

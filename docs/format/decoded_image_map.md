@@ -221,7 +221,9 @@ order (v0 kick a … v23 chi).
 | +0x00 | **tune** | u8 root note, default 0x3c, **±48 semitones** |
 | +0x02 | key assignment | u8 (MIDI key this voice triggers) |
 | +0x03 | **play mode** | u8: 1=key, 2=oneshot, 3=mute group, 4=loop |
-| +0x05 / +0x06 | **pan / loop-crossfade (fade)** | signed bytes (which-is-which provisional) |
+| +0x05 | *(unused in M3 probes)* | stays 0 when pan/fade edited on v23 |
+| +0x06 | **pan** | signed byte, device ±100 (`d1`/`d2` captures) |
+| +0x7C | **gain / loop-crossfade (fade)** | u32; M3 fade UI on v23 wrote v22 `+0x7C` — see `docs/logs/2026-06-12_drum_pan_fade_inspection.md` |
 | +0x07 | **sample direction** | u8: 0=forward, 1=backward |
 | +0x08 | sample path string | null-padded |
 | +0x68 | **sample start** | u32, default 0 |

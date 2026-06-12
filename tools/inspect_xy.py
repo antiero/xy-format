@@ -1729,7 +1729,8 @@ def generate_report(path: Path, data: bytes) -> str:
             for voice in drum_track.assigned_paths:
                 lines.append(
                     f"    v{voice.voice:02d}: {voice.path}  "
-                    f"tune={voice.tune} key={voice.key_assignment} mode={voice.play_mode}"
+                    f"tune={voice.tune} key={voice.key_assignment} mode={voice.play_mode} "
+                    f"pan={voice.pan}"
                 )
         lines.append("")
 

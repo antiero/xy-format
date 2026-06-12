@@ -117,7 +117,9 @@ Field offsets: `docs/format/decoded_image_map.md`.
 - [~] Sample path **write** — only as part of donor `set_preset` region copy; no
   `set_drum_voice_path()` yet — `docs/format/drum_sample_paths.md`
 - [x] Tune, play mode, direction, start, end, gain — `set_drum_voice` (tune device-validated)
-- [~] Pan/fade @ `+0x05/+0x06` — provisional; Mission 3 probes pending
+- [x] Pan read/write @ slot `+0x06` — device ±100, `tests/test_drum_pan_fade_inspection.py`
+- [~] Fade / loop-crossfade u32 @ slot `+0x7C` — read via `slot_gain_u32`; fade UI
+  on v23 stored on v22 in M3 captures; write API open
 - [ ] Drum slicing metadata / choke groups — gap
 
 ## 9. One-shot / multisampler slots
