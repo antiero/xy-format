@@ -148,7 +148,10 @@ Field offsets: `docs/format/decoded_image_map.md`.
 ## 11. Mix, saturator, master
 
 - [x] Master EQ — see §2
-- [~] Track volume/pan/sends as **static** mixer values — p-lock columns known; static offsets partial
+- [x] Track static volume/pan/send FX1/FX2 **read** @ `+0x38FE`/`+0x38FA`/`+0x38B2`/`+0x38B6`
+  — `xy/mixer_static_inspection.py`, P2-A f0–f15 (f16–f24 pending)
+- [x] Master perc/melody/compressor **read** @ global `+0x88`/`+0x8C`/`+0x90` — same module
+- [~] Master master volume endpoints — f16/f17 pending
 - [ ] Saturator — gap
 - [ ] Master compressor / output level — gap
 

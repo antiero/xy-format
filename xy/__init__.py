@@ -59,6 +59,14 @@ from .drum_sample_inspection import (  # noqa: F401
     inspect_drum_samples,
     inspect_drum_samples_bytes,
 )
+from .mixer_static_inspection import (  # noqa: F401
+    MasterStaticMixer,
+    MixField,
+    ProjectStaticMixer,
+    TrackStaticMixer,
+    inspect_static_mixer,
+    inspect_static_mixer_bytes,
+)
 from .scene_volume_inspection import (  # noqa: F401
     SceneVolumeInspection,
     TrackMixVolume,
