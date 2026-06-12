@@ -7,6 +7,8 @@ from xy.sampler_sample_inspection import (
     LOOP_TYPE_INFINITE,
     LOOP_TYPE_OFF,
     LOOP_TYPE_UNTIL_RELEASE,
+    SAMPLER_TUNE_CENTER_BYTE,
+    SAMPLER_TUNE_NEGATIVE_BYTE,
     SamplerSampleEdit,
     TRACK_LOOP_CROSSFADE_U8,
     TRACK_LOOP_END_U16,
@@ -19,6 +21,8 @@ from xy.sampler_sample_inspection import (
     SLOT_LOOP_TYPE,
     SLOT_TUNE,
     SLOT_TUNE_AUX,
+    decode_sampler_tune_tenths,
+    encode_sampler_tune_tenths,
     inspect_sampler_samples_bytes,
     read_sampler_sample_edit,
 )
@@ -137,3 +141,54 @@ def test_inspect_sampler_samples_bytes_finds_track() -> None:
     inspection = inspect_sampler_samples_bytes(BASELINE.read_bytes())
     assert len(inspection.tracks) == 1
     assert inspection.tracks[0].path.endswith(".wav") or "wav" in inspection.tracks[0].path
+
+
+@pytest.mark.parametrize(
+    "filename,tenths,tune_byte,tune_aux",
+    [
+        ("g-tune-0.xy", 0, SAMPLER_TUNE_CENTER_BYTE, 0),
+        ("g-tune-1.xy", 1, SAMPLER_TUNE_CENTER_BYTE, 10),
+        ("g-tune-2.xy", 2, SAMPLER_TUNE_CENTER_BYTE, 20),
+        ("g-tune-3.xy", 3, SAMPLER_TUNE_CENTER_BYTE, 30),
+        ("g-tune-4.xy", 4, SAMPLER_TUNE_CENTER_BYTE, 40),
+        ("g-tune-neg1.xy", -1, SAMPLER_TUNE_NEGATIVE_BYTE, 90),
+        ("g-tune-neg2.xy", -2, SAMPLER_TUNE_NEGATIVE_BYTE, 80),
+        ("g-tune-neg3.xy", -3, SAMPLER_TUNE_NEGATIVE_BYTE, 70),
+        ("g-tune-neg4.xy", -4, SAMPLER_TUNE_NEGATIVE_BYTE, 60),
+        ("g-tune-neg5.xy", -5, SAMPLER_TUNE_NEGATIVE_BYTE, 50),
+    ],
+)
+def test_tune_sweep_probes(
+    filename: str, tenths: int, tune_byte: int, tune_aux: int
+) -> None:
+    sample = read_sampler_sample_edit(ImageProject.from_file(str(PROBES / filename)))
+    assert sample.tune_byte == tune_byte
+    assert sample.tune_aux_byte == tune_aux
+    assert sample.tune_tenths == tenths
+    assert sample.tune_ui == pytest.approx(tenths / 10.0)
+
+
+@pytest.mark.parametrize("tenths", [0, 1, 4, -1, -5])
+def test_tune_encode_decode_roundtrip(tenths: int) -> None:
+    encoded = encode_sampler_tune_tenths(tenths)
+    assert decode_sampler_tune_tenths(*encoded) == tenths
+
+
+@pytest.mark.parametrize(
+    "filename,allowed_rel",
+    [
+        ("g-tune-1.xy", {VOICE_TABLE_OFFSET + SLOT_TUNE_AUX}),
+        (
+            "g-tune-neg1.xy",
+            {VOICE_TABLE_OFFSET + SLOT_TUNE, VOICE_TABLE_OFFSET + SLOT_TUNE_AUX},
+        ),
+    ],
+)
+def test_tune_probe_diffs_are_isolated(filename: str, allowed_rel: set[int]) -> None:
+    tune_base = PROBES / "g-tune-0.xy"
+    project = ImageProject.from_file(str(tune_base))
+    track_base = project.track_start(1)
+    _, base = decode_project(tune_base.read_bytes())
+    _, var = decode_project((PROBES / filename).read_bytes())
+    rel = {i - track_base for i in _track_region_diffs(base, var, track_base)}
+    assert rel == allowed_rel, rel

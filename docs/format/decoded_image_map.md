@@ -259,7 +259,8 @@ Sampler are **not** at drum `slot+0x68`/`+0x70`; they precede the table:
 | `+0x394B` | loop start u16 LE | `g5` |
 | `+0x394F` | loop end u16 LE | `g6` |
 | `+0x3956` | loop crossfade u8 | `g11` (`96` ≈ 75% UI) |
-| `+0x3957` | tune u8 | `g1`/`g2` (+ aux @ `+0x395B` on max) |
+| `+0x3957` | tune u8 | `0x3C` + aux=`N×10` (≥0); `0x3D` + aux=`100−N×10` (<0); `g-tune-*` |
+| `+0x395B` | tune aux u8 | paired with `+0x3957`; see tune table in P2-B log |
 | `+0x395A` | loop type u8 | `0x80` infinite · `0x40` off · `0x00` until-release |
 | `+0x395C` | gain u8 | `g8`/`g9` |
 | `+0x395E` | direction u8 | `g7` |

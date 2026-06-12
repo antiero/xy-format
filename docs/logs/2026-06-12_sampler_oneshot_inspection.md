@@ -30,8 +30,16 @@ Preset used: **`nt-acidic`** (`8faux8/nt-acidic`).
 | `+0x395E` | direction | u8 | `g7` → `1` backward |
 | `+0x395F`… | sample path | string @ slot+`0x08` | `g0` |
 
-**Tune UI** spans about −195.0…+60.9 (tenths) per operator notes; storage uses
-`slot+0` and `slot+4` on max — full UI decode still open.
+**Tune** (`g-tune-*` sweep, re-open `g-tune-0` baseline):
+
+| UI | `+0x3957` | `+0x395B` |
+| --- | --- | --- |
+| `+0.00` … `+N×0.10` | `0x3C` | `N×10` |
+| `-N×0.10` | `0x3D` | `100−N×10` |
+| min (`g1`) | `0xFF` | `0` |
+| max (`g2`) | `0x00` | `0x5A` (`609` tenths) |
+
+`decode_sampler_tune_tenths()` / `.tune_ui` on `SamplerSampleEdit`.
 
 **Loop type** is separate from loop start/end (shift+light-grey encoder). When
 loop end equals sample end, behaviour matches “loop off” on device.
@@ -40,7 +48,9 @@ loop end equals sample end, behaviour matches “loop off” on device.
 
 `xy/sampler_sample_inspection.py`:
 
-- `read_sampler_sample_edit(project, track=1)`
+- `read_sampler_sample_edit(project, track=1)` — `.tune_ui` / `.tune_tenths`
+- `decode_sampler_tune_tenths(tune_byte, tune_aux_byte)`
+- `encode_sampler_tune_tenths(tenths)`
 - `inspect_sampler_samples(project)` / `inspect_sampler_samples_bytes(data)`
 
 ## Related

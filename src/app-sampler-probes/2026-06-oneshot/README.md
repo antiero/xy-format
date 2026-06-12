@@ -5,7 +5,8 @@
 **Capture procedure:**
 [`user_probes/2026-06-sampler-oneshot/README.md`](../../../../user_probes/2026-06-sampler-oneshot/README.md)
 
-15 files on device (`g0.xy`…`g14.xy`). Preset: **`nt-acidic`**.
+25 files: `g0`…`g14` + tune sweep `g-tune-0`…`g-tune-4`, `g-tune-neg1`…`g-tune-neg5`.
+Preset: **`nt-acidic`**.
 
 | File | Field changed |
 | --- | --- |

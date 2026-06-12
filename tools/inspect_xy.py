@@ -1771,7 +1771,8 @@ def generate_report(path: Path, data: bytes) -> str:
                 f"crossfade={sample.loop_crossfade} ({sample.loop_crossfade_percent}%)"
             )
             lines.append(
-                f"    tune={sample.tune_byte} aux={sample.tune_aux_byte} "
+                f"    tune={sample.tune_ui:+.2f} (raw 0x{sample.tune_byte:02X}/"
+                f"0x{sample.tune_aux_byte:02X}) "
                 f"gain={sample.gain} dir={sample.direction_label} "
                 f"loop_type={sample.loop_type}"
             )

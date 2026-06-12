@@ -117,6 +117,8 @@ from .sampler_sample_inspection import (  # noqa: F401
     LOOP_TYPE_UNTIL_RELEASE,
     ProjectSamplerSamples,
     SamplerSampleEdit,
+    decode_sampler_tune_tenths,
+    encode_sampler_tune_tenths,
     inspect_sampler_samples,
     inspect_sampler_samples_bytes,
     read_sampler_sample_edit,

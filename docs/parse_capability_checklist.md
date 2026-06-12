@@ -131,8 +131,8 @@ Field offsets: `docs/format/decoded_image_map.md`.
 ## 9. One-shot / multisampler slots
 
 - [~] High-level sample table structure — partial — `docs/format/track_blocks.md`
-- [x] One-shot loop/crossfade/tune/gain/direction per slot — P2-B `g0`–`g14`,
-  `xy/sampler_sample_inspection.py` (header @ `+0x3943`, not drum `+0x68`) — gap
+- [x] One-shot loop/crossfade/tune/gain/direction per slot — P2-B `g0`–`g14` +
+  `g-tune-*`, `decode_sampler_tune_tenths`, `.tune_ui` (header @ `+0x3943`) — gap
 - [ ] Multisampler zone boundaries / root key — gap
 
 ## 10. Scenes, songs, arrangement

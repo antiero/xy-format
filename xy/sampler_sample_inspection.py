@@ -41,6 +41,15 @@ LOOP_TYPE_INFINITE = 0x80
 LOOP_TYPE_OFF = 0x40
 LOOP_TYPE_UNTIL_RELEASE = 0x00
 
+# Tune encoding (`g-tune-*` sweep + `g1`/`g2` extremes, firmware 1.1.4)
+SAMPLER_TUNE_CENTER_BYTE = 0x3C
+SAMPLER_TUNE_NEGATIVE_BYTE = 0x3D  # center + 1 (`g-tune-neg*`)
+SAMPLER_TUNE_MIN_BYTE = 0xFF
+SAMPLER_TUNE_MAX_LO_BYTE = 0x00
+SAMPLER_TUNE_MAX_AUX_BYTE = 0x5A
+SAMPLER_TUNE_MIN_TENTHS = -1950
+SAMPLER_TUNE_MAX_TENTHS = 609
+
 
 @dataclass(frozen=True)
 class SamplerSampleEdit:
@@ -79,6 +88,16 @@ class SamplerSampleEdit:
     def direction_label(self) -> str:
         return "backward" if self.direction else "forward"
 
+    @property
+    def tune_tenths(self) -> int:
+        """Tune offset from +0.00 in UI tenths (``1`` → +0.10 on device)."""
+        return decode_sampler_tune_tenths(self.tune_byte, self.tune_aux_byte)
+
+    @property
+    def tune_ui(self) -> float:
+        """Tune as shown on device (e.g. ``+0.40``, ``-0.50``)."""
+        return self.tune_tenths / 10.0
+
 
 @dataclass(frozen=True)
 class ProjectSamplerSamples:
@@ -87,6 +106,42 @@ class ProjectSamplerSamples:
 
 def _u16_le(img: bytes, offset: int) -> int:
     return img[offset] | (img[offset + 1] << 8)
+
+
+def decode_sampler_tune_tenths(tune_byte: int, tune_aux_byte: int) -> int:
+    """Decode sampler tune bytes to tenths offset from ``+0.00``.
+
+    Validated on ``g-tune-0``…``g-tune-4`` and ``g-tune-neg1``…``g-tune-neg5``:
+    positive → ``tune_byte=0x3C``, ``aux = tenths × 10``; negative →
+    ``tune_byte=0x3D``, ``aux = 100 − |tenths| × 10``. Extremes: ``g1`` min
+  ``0xFF``; ``g2`` max ``0x00`` / ``aux=0x5A``.
+    """
+    if tune_byte == SAMPLER_TUNE_MIN_BYTE:
+        return SAMPLER_TUNE_MIN_TENTHS
+    if tune_byte == SAMPLER_TUNE_MAX_LO_BYTE and tune_aux_byte == SAMPLER_TUNE_MAX_AUX_BYTE:
+        return SAMPLER_TUNE_MAX_TENTHS
+    if tune_byte == SAMPLER_TUNE_CENTER_BYTE:
+        return tune_aux_byte // 10
+    if tune_byte == SAMPLER_TUNE_NEGATIVE_BYTE:
+        return -((100 - tune_aux_byte) // 10)
+    raise ValueError(
+        f"unknown sampler tune encoding: tune_byte=0x{tune_byte:02X} aux=0x{tune_aux_byte:02X}"
+    )
+
+
+def encode_sampler_tune_tenths(tenths: int) -> tuple[int, int]:
+    """Encode tenths offset to ``(tune_byte, tune_aux_byte)``."""
+    if tenths == SAMPLER_TUNE_MIN_TENTHS:
+        return (SAMPLER_TUNE_MIN_BYTE, 0)
+    if tenths == SAMPLER_TUNE_MAX_TENTHS:
+        return (SAMPLER_TUNE_MAX_LO_BYTE, SAMPLER_TUNE_MAX_AUX_BYTE)
+    if tenths == 0:
+        return (SAMPLER_TUNE_CENTER_BYTE, 0)
+    if tenths > 0:
+        return (SAMPLER_TUNE_CENTER_BYTE, tenths * 10)
+    if tenths < 0:
+        return (SAMPLER_TUNE_NEGATIVE_BYTE, 100 + tenths * 10)
+    raise ValueError("unreachable")
 
 
 def _read_path(slot: bytes) -> str:
