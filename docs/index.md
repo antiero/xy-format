@@ -85,6 +85,7 @@ Reference material:
 - Sparse topology stability issue: `docs/issues/sparse_topology_stability.md`
 
 ## Logs
+- Drum sample path inspection: `docs/logs/2026-06-12_drum_sample_path_inspection.md`
 - Variable-length + writer root cause: `docs/logs/2025-02-11_variable_length_and_writer_root_cause.md`
 - Firmware package notes: `docs/logs/2025-02-14_firmware_package_notes.md`
 - Multi-pattern breakthrough: `docs/logs/2026-02-12_multipattern_breakthrough.md`

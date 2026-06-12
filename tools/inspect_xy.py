@@ -29,6 +29,7 @@ if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 import re
 
+from xy.drum_sample_inspection import inspect_drum_samples_bytes  # noqa: E402
 from xy.note_reader import read_event as _unified_read_event  # noqa: E402
 from xy.structs import (  # noqa: E402
     SENTINEL_BYTES,
@@ -1692,6 +1693,22 @@ def generate_report(path: Path, data: bytes) -> str:
                 f"    Slot 0x{slot.slot:04X} @0x{slot.offset:04X} → tag=0x{tag:02X}  raw={slot.raw.hex()}"
             )
     lines.append("")
+
+    try:
+        drum_samples = inspect_drum_samples_bytes(data)
+    except Exception:
+        drum_samples = None
+
+    if drum_samples and drum_samples.tracks:
+        lines.append("[Drum Samples]")
+        for drum_track in drum_samples.tracks:
+            lines.append(f"  Track {drum_track.track} (engine 0x{drum_track.engine_id:02X})")
+            for voice in drum_track.assigned_paths:
+                lines.append(
+                    f"    v{voice.voice:02d}: {voice.path}  "
+                    f"tune={voice.tune} key={voice.key_assignment} mode={voice.play_mode}"
+                )
+        lines.append("")
 
     lines.append("[Tracks]")
     for track in tracks:

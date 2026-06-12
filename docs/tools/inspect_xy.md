@@ -5,6 +5,7 @@
 ## Current Coverage
 - Header summary.
 - Pattern directory/pre-track observations.
+- Drum-engine track sample paths (24-voice table via `xy/drum_sample_inspection.py`).
 - Per-track scan and event summaries.
 - EQ/global snippets.
 

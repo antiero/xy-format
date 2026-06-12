@@ -39,3 +39,10 @@ from .plocks import (  # noqa: F401
     rewrite_standard_values_for_param_groups,
     t1_first_param_id,
 )
+from .drum_sample_inspection import (  # noqa: F401
+    DrumTrackSamples,
+    DrumVoiceSample,
+    ProjectDrumSamples,
+    inspect_drum_samples,
+    inspect_drum_samples_bytes,
+)
