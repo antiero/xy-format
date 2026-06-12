@@ -4,8 +4,8 @@
 > and Phase 2 (device probe) todo in [`docs/roadmap.md`](../roadmap.md).
 >
 > **Conventions:** [`device_test_naming.md`](device_test_naming.md) · raw captures
-> in `opxy_mtp_manager/reference_material/user_probes/` · promoted copies in
-> `xy-format-fork/src/app-*-probes/` · analysis logs in `docs/logs/`.
+> may live in an external operator workspace · promoted copies in
+> `src/app-*-probes/` · analysis logs in `docs/logs/`.
 
 ## Global rules (every capture)
 
@@ -106,7 +106,7 @@
 3. Test: `tests/test_project_to_json_inspection_export.py` — byte-stable JSON
    compare (or semantic diff).
 
-**Deliverables:** 5–8 `.expected.json` + manifest; no `user_probes/` folder.
+**Deliverables:** 5–8 `.expected.json` + manifest; fixtures live under `src/app-*-probes/`.
 
 ---
 
@@ -114,7 +114,7 @@
 
 | | |
 | --- | --- |
-| **Pack** | `user_probes/2026-06-preset-path/` → `src/app-preset-probes/2026-06-preset-path/` |
+| **Pack** | `src/app-preset-probes/2026-06-preset-path/` |
 | **Goal** | Pin exact null-padded string at `+0x453F` vs heuristic `0xF7` fragments |
 | **Track** | T1 only, pattern P1, no notes |
 
@@ -152,7 +152,7 @@
 
 | | |
 | --- | --- |
-| **Pack** | `user_probes/2026-06-mixer-static/` → `src/app-mixer-probes/2026-06-static/` |
+| **Pack** | `src/app-mixer-probes/2026-06-static/` |
 | **Goal** | Find **current-value** bytes (not p-lock table) for T1 mix knobs |
 | **Prereq** | Initialized project; T1 with any engine; **no p-locks** |
 
@@ -187,7 +187,7 @@ aren’t the only storage (compare to `unnamed 14/16` corpus if needed).
 
 | | |
 | --- | --- |
-| **Pack** | `user_probes/2026-06-sampler-oneshot/` → `src/app-sampler-probes/2026-06-oneshot/` |
+| **Pack** | `src/app-sampler-probes/2026-06-oneshot/` |
 | **Engine** | T1 = **Sampler** (`0x02`); preset **`nt-acidic`** |
 | **Goal** | Map path, start, loop, end, direction, tune, gain, loop type, crossfade |
 
@@ -202,7 +202,7 @@ Log: `docs/logs/2026-06-12_sampler_oneshot_inspection.md`. **Status:** captured 
 
 | | |
 | --- | --- |
-| **Pack** | `user_probes/2026-06-sampler-multi/` → `src/app-sampler-probes/2026-06-multisampler/` |
+| **Pack** | `src/app-sampler-probes/2026-06-multisampler/` |
 | **Engine** | T1 = **Multisampler** (engine 6); factory **`bandpasser`** OK |
 | **Goal** | Zone boundaries, root key, second zone sample path |
 
@@ -226,7 +226,7 @@ first; document limitation in README.
 
 | | |
 | --- | --- |
-| **Pack** | `user_probes/2026-06-scene-volumes/` → `src/app-scene-probes/2026-06-volumes/` |
+| **Pack** | `src/app-scene-probes/2026-06-volumes/` |
 | **Goal** | Prove guide claim: scenes store per-track volumes separate from pattern |
 | **Setup** | 2 scenes, 1 pattern, T1 audible |
 
@@ -251,7 +251,7 @@ carried unintentionally.
 
 | | |
 | --- | --- |
-| **Pack** | `user_probes/2026-06-track-mutes/` → `src/app-scene-probes/2026-06-track-mutes/` |
+| **Pack** | `src/app-scene-probes/2026-06-track-mutes/` |
 | **Goal** | Device-validate per-scene mute bytes (separate from volumes) |
 | **Setup** | Scene 1: single-scene project; Scene 2+: two-scene `s0b`-style baseline |
 
@@ -271,7 +271,7 @@ carried unintentionally.
 
 #### Scene 2+ (8-scene / 8-pattern T1 baseline)
 
-Operator procedure: `user_probes/2026-06-track-mutes/README.md` § Scene 2+.
+Operator procedure: `src/app-scene-probes/2026-06-track-mutes/README.md` § Scene 2+.
 
 | On-device | PC filename | Scene | Muted tracks |
 | --- | --- | --- | --- |
@@ -296,7 +296,7 @@ match mixer-view storage. Log: `docs/logs/2026-06-12_scene_track_mute_inspection
 
 | | |
 | --- | --- |
-| **Pack** | `user_probes/2026-06-eq/` → `src/app-mixer-probes/2026-06-eq/` |
+| **Pack** | `src/app-mixer-probes/2026-06-eq/` |
 | **Goal** | Device-validate global master EQ bytes |
 | **Setup** | Fresh project; Master → EQ; one band per file |
 
@@ -324,7 +324,7 @@ Blend min = byte-identical to baseline; blend max = all three bands `0x7F`.
 
 | | |
 | --- | --- |
-| **Pack** | `user_probes/2026-06-saturator/` → `src/app-mixer-probes/2026-06-saturator/` |
+| **Pack** | `src/app-mixer-probes/2026-06-saturator/` |
 | **Goal** | Device-validate global saturator bytes |
 | **Setup** | Fresh project; Master → Saturator; one knob per file |
 
@@ -351,7 +351,7 @@ Blend min = byte-identical to baseline; blend max = all three bands `0x7F`.
 
 | | |
 | --- | --- |
-| **Pack** | `user_probes/2026-06-aux-tracks/` → `src/app-aux-probes/2026-06-t9-t16/` |
+| **Pack** | `src/app-aux-probes/2026-06-t9-t16/` |
 | **Goal** | One capture per aux track with **identifiable** knob moves |
 | **Pattern** | Single pattern P1; one bar; optional one note on aux track if it sequences |
 
@@ -380,7 +380,7 @@ Blend min = byte-identical to baseline; blend max = all three bands `0x7F`.
 
 | | |
 | --- | --- |
-| **Pack** | `user_probes/2026-06-players/` → `src/app-player-probes/2026-06/` |
+| **Pack** | `src/app-player-probes/2026-06/` |
 | **Engine** | T1 = Simple or EPiano (easy to hear) |
 | **Goal** | Player enable byte + param block per player type |
 
@@ -404,7 +404,7 @@ Blend min = byte-identical to baseline; blend max = all three bands `0x7F`.
 
 ### M1 — Drum sample paths ✅
 
-See `user_probes/2026-06-sample-paths/README.md`. No further captures unless
+See `src/app-sample-probes/2026-06-sample-paths/README.md`. No further captures unless
 Mission **M6** (different kit).
 
 ---
@@ -414,7 +414,7 @@ Mission **M6** (different kit).
 | | |
 | --- | --- |
 | **When** | App needs per-pattern preset on tracks 5–8 |
-| **Pack** | `user_probes/2026-06-preset-t5-p9/` |
+| **Pack** | `src/app-*-probes/2026-06-preset-t5-p9/` (planned) |
 | **Clone of** | A-series but tracks **5–8**, patterns P1–P9 |
 
 **Procedure:** Mirror `2026-06-app-required` using presets `pp`…`xx` on **T5** first
@@ -434,7 +434,7 @@ Mission **M6** (different kit).
 
 | | |
 | --- | --- |
-| **Pack** | `user_probes/2026-06-drum-pan-fade/` → `src/app-sample-probes/2026-06-drum-pan-fade/` |
+| **Pack** | `src/app-sample-probes/2026-06-drum-pan-fade/` |
 | **Kit** | T1 drum **`pp`** (same as Mission 1) |
 | **Voice** | **v03** (pad 4 on `pp` map — confirm on keyboard: G#3 area) OR pick pad you can find reliably; **use same voice in all files** |
 
@@ -471,7 +471,7 @@ Mission **M6** (different kit).
 2. Diff `a1-t1-p7.xy` vs `a1-t1-p8.xy` vs `a1-t1-p9.xy` — drum paths, preset
    strings, event counts.
 3. Compare on-device preset folders `ww.preset` / `xx.preset` patch.json under
-   `user_probes/2026-06-app-required/presets/`.
+   companion preset folders alongside app-required fixtures.
 
 **Optional new captures** (if diff inconclusive):
 
@@ -510,7 +510,7 @@ Mission **M6** (different kit).
 
 | | |
 | --- | --- |
-| **Pack** | `user_probes/2026-06-pad-voice-map/` → `src/app-sample-probes/2026-06-pad-voice-map/` |
+| **Pack** | `src/app-sample-probes/2026-06-pad-voice-map/` |
 | **Clone of** | Mission 1 procedure, different kit |
 
 | On-device | PC filename | Kit | Pad change |
@@ -527,20 +527,15 @@ Mission **M6** (different kit).
 ## Folder layout template
 
 ```text
-user_probes/2026-06-<topic>/
-  README.md                 # capture procedure (permanent) + results (filled later)
-  projects/                 # optional: raw MTP names
+src/app-<domain>-probes/2026-06-<topic>/
+  README.md                 # capture procedure + decode summary + log link
+  projects/                 # optional: raw MTP names before rename
   <pc-renamed>.xy
-
-xy-format-fork/src/app-<domain>-probes/2026-06-<topic>/
-  README.md                 # fixture index + link to log + operator README
-  *.xy
 ```
 
-**Reproducibility:** never delete or replace the operator capture procedure in
-`user_probes/…/README.md` when analysis completes — only append/fill **Results**
-and link the log. Fixture-pack READMEs summarize decode; generation plans live
-in `user_probes`.
+**Reproducibility:** keep capture procedures in each fixture-pack README;
+when analysis completes, append **Results** and link the dated log under
+`docs/logs/`. Generation recipes for open packs live in this file.
 
 ---
 
@@ -566,4 +561,4 @@ in `user_probes`.
 - Roadmap: [`docs/roadmap.md`](../roadmap.md)
 - Checklist: [`docs/parse_capability_checklist.md`](../parse_capability_checklist.md)
 - User guide gaps (priorities): [`docs/format/opxy_user_guide_save_audit.md`](../format/opxy_user_guide_save_audit.md) § Remaining gaps
-- User probe hub: `opxy_mtp_manager/reference_material/user_probes/README.md`
+- Fixture pack READMEs: `src/app-*-probes/*/README.md`
