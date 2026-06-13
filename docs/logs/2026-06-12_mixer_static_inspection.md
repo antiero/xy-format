@@ -11,6 +11,12 @@ Most mix knobs use a **4-byte LE u32** with the **high byte** (`u32_start+3`)
 holding the level (`0x00` min … default … `0x7F` max). Max often sets the
 preceding three bytes to `0xFF` (`u32 = 0x7FFFFFFF`).
 
+Follow-up exact u32 pin (2026-06-13): track mix fields use full-lane min/max
+(`0x00000000` / `0x7FFFFFFF`). Master group fields also max to
+`0x7FFFFFFF`, but their min captures preserve a nonzero tail:
+`0x00A3D70A` (visible byte `0x00`). Tests assert the full u32 lanes so byte-level
+normalization does not get flattened to only the UI byte.
+
 ## Per-track mix (same offsets on every track struct)
 
 | Control | u32 @ | byte @ | T1 default | min | max |

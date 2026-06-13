@@ -4,7 +4,9 @@ import pytest
 
 from xy.image_writer import ImageProject, STRIDE
 from xy.mixer_static_inspection import (
-    MIX_VOL_U32_MAX,
+    MASTER_GROUP_MIN_U32,
+    MIX_U32_MAX,
+    MIX_U32_MIN,
     PAN_BYTE_CENTER,
     TRACK_MIX_PAN_BYTE_OFFSET,
     TRACK_SEND_FX1_BYTE_OFFSET,
@@ -70,7 +72,47 @@ def test_t1_and_master_fields(filename: str, field: str, expected: int) -> None:
 
 def test_t1_vol_max_uses_full_u32_pattern() -> None:
     mixer = inspect_static_mixer_bytes((PROBES / "f2-t1-vol-max.xy").read_bytes())
-    assert mixer.tracks[0].volume.u32 == MIX_VOL_U32_MAX
+    assert mixer.tracks[0].volume.u32 == MIX_U32_MAX
+
+
+@pytest.mark.parametrize(
+    "filename,field,expected_u32",
+    [
+        ("f1-t1-vol-min.xy", "volume", MIX_U32_MIN),
+        ("f2-t1-vol-max.xy", "volume", MIX_U32_MAX),
+        ("f3-t1-pan-hard-left.xy", "pan", MIX_U32_MIN),
+        ("f4-t1-pan-hard-right.xy", "pan", MIX_U32_MAX),
+        ("f6-t1-send-fx1-max.xy", "send_fx1", MIX_U32_MAX),
+        ("f7-t1-send-fx1-min.xy", "send_fx1", MIX_U32_MIN),
+        ("f8-t1-send-fx2-max.xy", "send_fx2", MIX_U32_MAX),
+        ("f9-t1-send-fx2-min.xy", "send_fx2", MIX_U32_MIN),
+    ],
+)
+def test_t1_mix_fields_use_full_u32_min_max_lanes(
+    filename: str, field: str, expected_u32: int
+) -> None:
+    mixer = inspect_static_mixer_bytes((PROBES / filename).read_bytes())
+    assert getattr(mixer.tracks[0], field).u32 == expected_u32
+
+
+@pytest.mark.parametrize(
+    "filename,field,expected_u32",
+    [
+        ("f10-master-perc-vol-0.xy", "percussion", MASTER_GROUP_MIN_U32),
+        ("f11-master-perc-vol-100.xy", "percussion", MIX_U32_MAX),
+        ("f12-master-melody-vol-0.xy", "melody", MASTER_GROUP_MIN_U32),
+        ("f13-master-melody-vol-100.xy", "melody", MIX_U32_MAX),
+        ("f14-master-compressor-min.xy", "compressor", MASTER_GROUP_MIN_U32),
+        ("f15-master-compressor-max.xy", "compressor", MIX_U32_MAX),
+        ("f16-master-master-vol-0.xy", "master", MASTER_GROUP_MIN_U32),
+        ("f17-master-master-vol-100.xy", "master", MIX_U32_MAX),
+    ],
+)
+def test_master_group_fields_preserve_min_tail_pattern(
+    filename: str, field: str, expected_u32: int
+) -> None:
+    mixer = inspect_static_mixer_bytes((PROBES / filename).read_bytes())
+    assert getattr(mixer.master, field).u32 == expected_u32
 
 
 def test_pan_center_matches_baseline(base_img: bytes) -> None:
@@ -114,7 +156,7 @@ def test_f16_f24_cross_track_and_master_fields(
 
 def test_f19_t3_vol_max_uses_full_u32_pattern() -> None:
     mixer = inspect_static_mixer_bytes((PROBES / "f19-t3-vol-max.xy").read_bytes())
-    assert mixer.tracks[2].volume.u32 == MIX_VOL_U32_MAX
+    assert mixer.tracks[2].volume.u32 == MIX_U32_MAX
 
 
 def _session_noise_offsets(project: ImageProject) -> set[int]:
