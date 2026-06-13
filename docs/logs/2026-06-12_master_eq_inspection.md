@@ -34,6 +34,18 @@ upper 3 bytes of the **preceding** 4-byte field to `0xFF`:
 The field @ `0x64` (default `0xFF`) is **not** saturator gain — P2-G placed
 saturator @ `0x75–0x84`. Bass max tail bytes are spill into the `0x64` u32.
 
+Follow-up exact u32 pin (2026-06-13):
+
+| Capture | prefix `0x64` | bass `0x68` | mid `0x6C` | treble `0x70` | `0x74` |
+| --- | --- | --- | --- | --- | --- |
+| `eq0` default | `0x000000FF` | `0x00000040` | `0x00000040` | `0x00000040` | `0x99999A40` |
+| band min | unchanged | target `0x00000000` | target `0x00000000` | target `0x00000000` | unchanged |
+| band max | previous field tail `0xFFFFFF..` | target `0x0000007F` | target `0x0000007F` | target `0x0000007F` | unchanged |
+| `eq8` power max | `0xFFFFFFFF` | `0xFFFFFF7F` | `0xFFFFFF7F` | `0x0000007F` | unchanged |
+
+`tests/test_master_eq_inspection.py` now asserts these full lanes so EQ parsing
+does not collapse the spill behavior to only three visible UI bytes.
+
 ## Corpus cross-check
 
 `src/one-off-changes-from-default/unnamed 14.xy` (bass min) matches:

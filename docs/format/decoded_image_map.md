@@ -34,9 +34,9 @@ vectors (notes: +12 bytes each).
 | 0x06 | song/scene count-ish (songs: u13; scenes: 152/153 touch 0x06–0x07) | u13, u152 |
 | 0x07 | selected song/scene ordinal | u149, u151 |
 | 0x55–0x64 | per-track MIDI channel array, 1 byte/track (T1=0x55 … T16=0x64) | u41, u54 |
-| 0x64–0x67 | global prefix u32 (byte @ 0x64 default `0xFF`; purpose open) | P2-F `eq2` tail |
-| 0x68 / 0x6C / 0x70 | **master EQ** bass / mid / treble u32 (level byte @ field start; default `0x40`, max `0x7F`) | u14–u16, P2-F `eq0`–`eq6` |
-| 0x74–0x77 | u32 @ 0x74 default `0x40` — **not** the 4th EQ UI knob; power control rewrites band bytes only (`eq7`/`eq8`) | P2-F |
+| 0x64–0x67 | global prefix u32 (default `0x000000FF`; EQ max spill can set `0xFFFFFFFF`; purpose open) | P2-F `eq2`/`eq8` tail |
+| 0x68 / 0x6C / 0x70 | **master EQ** bass / mid / treble u32 (level byte @ field start; default `0x00000040`, min `0x00000000`, max target `0x0000007F`; previous-field spill can make earlier maxed bands `0xFFFFFF7F`) | u14–u16, P2-F `eq0`–`eq8` |
+| 0x74–0x77 | u32 @ 0x74 default `0x99999A40` — **not** the 4th EQ UI knob; power control rewrites band bytes only (`eq7`/`eq8`) | P2-F |
 | 0x75 / 0x79 / 0x7D / 0x81 | **saturator** gain / clip / tone / mix u32 | P2-G `sat0`–`sat8` |
 | 0x78 / 0x7C / 0x80 / 0x84 | saturator level bytes (`u32+3`; gain/clip default `0x19`, tone `0x40`, mix `0x00`) | P2-G |
 | 0x85–0x88 | **master percussion** volume u32 (byte @ 0x88) | P2-A `f10`/`f11` |
@@ -237,6 +237,7 @@ order (v0 kick a … v23 chi).
 | +0x07 | **sample direction** | u8: 0=forward, 1=backward |
 | +0x08 | sample path string | null-padded |
 | +0x68 | **sample start** | u32, default 0 |
+| +0x6C | **sample loop start** | u32 candidate; `cap_drum_params` voice 10 = `0x00001011` |
 | +0x70 | **sample end** | u32, default 0xFFFFFFFF (per-sample length) |
 | +0x7c | **sample gain** | u32, default 0, max 0x7FFFFFFF |
 
@@ -244,9 +245,12 @@ Clean single-param voices pin it: clap moved only +0x68 (start), ride
 only +0x70 (end), shaker/ch-b moved +0x00 (tune ±48), ht +0x03
 (play mode), lc +0x07 (direction), cow +0x7c (gain max). The +0x68/+0x70
 pair co-moving on several voices is a loop/fade side-effect, not start vs
-end. `ImageProject.set_drum_voice()` writes tune/play_mode/direction/
-start/end/gain (validated: tune reproduces the capture byte-exact). Read API:
-`xy/drum_sample_inspection.py` (`DrumVoiceSample`, `inspect_drum_samples`).
+end. Voice 10 also pins the intervening `+0x6C` lane as a likely loop-start
+u32 (`0x1011`), though a clean loop-start-only capture is still pending.
+`ImageProject.set_drum_voice()` writes tune/play_mode/direction/
+start/loop_start/end/gain (validated: tune reproduces the capture byte-exact).
+Read API: `xy/drum_sample_inspection.py` (`DrumVoiceSample`,
+`inspect_drum_samples`).
 
 ### One-shot Sampler (`0x02`) — sample-edit header (P2-B)
 

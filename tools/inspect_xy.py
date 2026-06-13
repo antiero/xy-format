@@ -1898,6 +1898,11 @@ def generate_report(path: Path, data: bytes) -> str:
             f"  low={master_eq.low.byte} mid={master_eq.mid.byte} "
             f"high={master_eq.high.byte}"
         )
+        lines.append(
+            f"  raw_u32 low=0x{master_eq.low.u32:08X} "
+            f"mid=0x{master_eq.mid.u32:08X} "
+            f"high=0x{master_eq.high.u32:08X}"
+        )
         lines.append("")
 
     try:

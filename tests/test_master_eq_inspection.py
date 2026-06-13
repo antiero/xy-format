@@ -7,11 +7,20 @@ from xy.master_eq_inspection import (
     EQ_BYTE_DEFAULT,
     EQ_BYTE_MAX,
     EQ_BYTE_MIN,
+    EQ_U32_DEFAULT,
+    EQ_U32_MAX,
+    EQ_U32_MAX_WITH_TAIL,
+    EQ_U32_MIN,
+    GLOBAL_EQ_BLEND_U32_OFFSET,
     GLOBAL_EQ_HIGH_U32_OFFSET,
     GLOBAL_EQ_LOW_U32_OFFSET,
     GLOBAL_EQ_MID_U32_OFFSET,
+    GLOBAL_PREFIX_DEFAULT_U32,
+    GLOBAL_PREFIX_SPILL_U32_MAX,
+    EQ_BLEND_DEFAULT_U32,
     inspect_master_eq,
     read_master_eq,
+    read_master_eq_blend,
 )
 from xy.rle import decode_project
 
@@ -38,6 +47,20 @@ def test_master_eq_levels(filename: str, low: int, mid: int, high: int) -> None:
     assert eq.low.byte == low
     assert eq.mid.byte == mid
     assert eq.high.byte == high
+
+
+def test_baseline_eq_full_u32_lanes() -> None:
+    project = ImageProject.from_file(str(BASELINE))
+    eq = read_master_eq(project)
+    assert eq.low.u32 == EQ_U32_DEFAULT
+    assert eq.mid.u32 == EQ_U32_DEFAULT
+    assert eq.high.u32 == EQ_U32_DEFAULT
+    assert read_master_eq_blend(project).u32 == EQ_BLEND_DEFAULT_U32
+    _, img = decode_project(BASELINE.read_bytes())
+    assert int.from_bytes(
+        img[GLOBAL_EQ_BLEND_U32_OFFSET : GLOBAL_EQ_BLEND_U32_OFFSET + 4], "little"
+    ) == EQ_BLEND_DEFAULT_U32
+    assert int.from_bytes(img[0x64:0x68], "little") == GLOBAL_PREFIX_DEFAULT_U32
 
 
 def test_min_probes_touch_only_level_byte() -> None:
@@ -72,6 +95,38 @@ def test_max_probes_set_level_and_prior_field_tail() -> None:
             filename
         ]
         assert band.byte == EQ_BYTE_MAX
+        assert band.u32 == EQ_U32_MAX
+
+
+@pytest.mark.parametrize(
+    "filename,low_u32,mid_u32,high_u32,prefix_u32",
+    [
+        ("eq1-bass-min.xy", EQ_U32_MIN, EQ_U32_DEFAULT, EQ_U32_DEFAULT, GLOBAL_PREFIX_DEFAULT_U32),
+        ("eq2-bass-max.xy", EQ_U32_MAX, EQ_U32_DEFAULT, EQ_U32_DEFAULT, GLOBAL_PREFIX_SPILL_U32_MAX),
+        ("eq3-mid-min.xy", EQ_U32_DEFAULT, EQ_U32_MIN, EQ_U32_DEFAULT, GLOBAL_PREFIX_DEFAULT_U32),
+        ("eq4-mid-max.xy", 0xFFFFFF40, EQ_U32_MAX, EQ_U32_DEFAULT, GLOBAL_PREFIX_DEFAULT_U32),
+        ("eq5-treble-min.xy", EQ_U32_DEFAULT, EQ_U32_DEFAULT, EQ_U32_MIN, GLOBAL_PREFIX_DEFAULT_U32),
+        ("eq6-treble-max.xy", EQ_U32_DEFAULT, 0xFFFFFF40, EQ_U32_MAX, GLOBAL_PREFIX_DEFAULT_U32),
+        (
+            "eq8-blend-max.xy",
+            EQ_U32_MAX_WITH_TAIL,
+            EQ_U32_MAX_WITH_TAIL,
+            EQ_U32_MAX,
+            GLOBAL_PREFIX_SPILL_U32_MAX,
+        ),
+    ],
+)
+def test_eq_full_u32_lanes(
+    filename: str, low_u32: int, mid_u32: int, high_u32: int, prefix_u32: int
+) -> None:
+    project = ImageProject.from_file(str(PROBES / filename))
+    eq = read_master_eq(project)
+    assert eq.low.u32 == low_u32
+    assert eq.mid.u32 == mid_u32
+    assert eq.high.u32 == high_u32
+    assert read_master_eq_blend(project).u32 == EQ_BLEND_DEFAULT_U32
+    _, img = decode_project((PROBES / filename).read_bytes())
+    assert int.from_bytes(img[0x64:0x68], "little") == prefix_u32
 
 
 def test_blend_min_matches_baseline() -> None:
