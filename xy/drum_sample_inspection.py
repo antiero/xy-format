@@ -22,6 +22,7 @@ DRUM_PAN_OFFSET = 0x06
 DRUM_DIRECTION_OFFSET = 0x07
 DRUM_PATH_OFFSET = 0x08
 DRUM_START_OFFSET = 0x68
+DRUM_LOOP_START_OFFSET = 0x6C
 DRUM_END_OFFSET = 0x70
 DRUM_GAIN_OFFSET = 0x7C
 DRUM_VOICE_COUNT = 24
@@ -72,6 +73,7 @@ class DrumVoiceSample:
     direction: int  # 0=forward, 1=backward @ slot+0x07
     pan: int  # signed byte @ slot+0x06 (device ±100)
     start: int  # u32 @ slot+0x68
+    loop_start: int  # u32 @ slot+0x6C (candidate loop-start lane)
     end: int  # u32 @ slot+0x70
     slot_gain_u32: int  # u32 @ slot+0x7C (gain knob; also fade storage for next pad)
     loop_fade_ui: int  # loop-crossfade for this pad (decoded from preceding slot +0x7C)
@@ -166,6 +168,10 @@ def _read_voice_table(project: ImageProject, track: int) -> tuple[DrumVoiceSampl
                 pan=_signed_byte(slot[DRUM_PAN_OFFSET]),
                 start=int.from_bytes(
                     slot[DRUM_START_OFFSET : DRUM_START_OFFSET + 4], "little"
+                ),
+                loop_start=int.from_bytes(
+                    slot[DRUM_LOOP_START_OFFSET : DRUM_LOOP_START_OFFSET + 4],
+                    "little",
                 ),
                 end=int.from_bytes(slot[DRUM_END_OFFSET : DRUM_END_OFFSET + 4], "little"),
                 slot_gain_u32=slot_gain_u32,

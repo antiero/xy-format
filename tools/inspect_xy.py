@@ -1771,7 +1771,8 @@ def generate_report(path: Path, data: bytes) -> str:
                     f"    v{voice.voice:02d}: {voice.path}  "
                     f"tune={voice.tune_semitones:+d} key={voice.key_assignment} "
                     f"mode={voice.play_mode} dir={voice.direction_label} pan={voice.pan} "
-                    f"start={voice.start} end=0x{voice.end:08X} {gain_s} {fade_s}"
+                    f"start={voice.start} loop_start={voice.loop_start} "
+                    f"end=0x{voice.end:08X} {gain_s} {fade_s}"
                 )
         lines.append("")
 
@@ -1783,6 +1784,10 @@ def generate_report(path: Path, data: bytes) -> str:
     if sampler_samples and sampler_samples.tracks:
         lines.append("[Sampler Sample]")
         for sample in sampler_samples.tracks:
+            try:
+                tune_s = f"{sample.tune_ui:+.2f}"
+            except ValueError:
+                tune_s = "unknown"
             lines.append(f"  Track {sample.track} (engine 0x{sample.engine_id:02X})")
             lines.append(f"    path: {sample.path}")
             lines.append(
@@ -1791,7 +1796,7 @@ def generate_report(path: Path, data: bytes) -> str:
                 f"crossfade={sample.loop_crossfade} ({sample.loop_crossfade_percent}%)"
             )
             lines.append(
-                f"    tune={sample.tune_ui:+.2f} (raw 0x{sample.tune_byte:02X}/"
+                f"    tune={tune_s} (raw 0x{sample.tune_byte:02X}/"
                 f"0x{sample.tune_aux_byte:02X}) "
                 f"gain={sample.gain} dir={sample.direction_label} "
                 f"loop_type={sample.loop_type}"
@@ -2038,6 +2043,9 @@ def generate_report(path: Path, data: bytes) -> str:
 
 
 def main(argv: Sequence[str] | None = None) -> int:
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(encoding="utf-8")
+
     parser = argparse.ArgumentParser(
         description="Inspect a single OP-XY project file."
     )

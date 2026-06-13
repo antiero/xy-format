@@ -1,5 +1,6 @@
 from pathlib import Path
 
+from tools.inspect_xy import generate_report
 from xy.project_inspection import inspect_project_bytes
 
 
@@ -66,3 +67,13 @@ def test_active_preset_refs_flatten_active_patterns_only() -> None:
     assert [(track, pattern.pattern) for track, pattern, _ref in flattened] == [
         (2, pattern) for pattern in range(1, 10)
     ]
+
+
+def test_inspector_report_handles_unknown_sampler_tune_encoding() -> None:
+    path = APP_REQUIRED / "a1-t1-p9.xy"
+
+    report = generate_report(path, path.read_bytes())
+
+    assert "[Pattern Presets]" in report
+    assert "[Sampler Sample]" in report
+    assert "tune=unknown (raw 0x30/0x00)" in report

@@ -242,6 +242,7 @@ class ImageProject:
     DRUM_PLAY_MODE = 0x03  # u8: 1=key, 2=oneshot, 3=mute group, 4=loop
     DRUM_DIRECTION = 0x07  # u8: 0=forward, 1=backward
     DRUM_START = 0x68      # u32 sample start, default 0
+    DRUM_LOOP_START = 0x6C  # u32 candidate sample loop-start lane, default 0
     DRUM_END = 0x70        # u32 sample end, default 0xFFFFFFFF
     DRUM_PAN = 0x06        # signed byte pan (−100..+100 observed on device)
     DRUM_GAIN = 0x7C       # u32 sample gain / loop-crossfade, default 0 (max 0x7FFFFFFF)
@@ -257,6 +258,7 @@ class ImageProject:
         pan: int | None = None,
         fade: int | None = None,
         start: int | None = None,
+        loop_start: int | None = None,
         end: int | None = None,
         gain: int | None = None,
     ) -> None:
@@ -287,6 +289,10 @@ class ImageProject:
             )
         if start is not None:
             self.image[s + self.DRUM_START : s + self.DRUM_START + 4] = start.to_bytes(4, "little")
+        if loop_start is not None:
+            self.image[
+                s + self.DRUM_LOOP_START : s + self.DRUM_LOOP_START + 4
+            ] = loop_start.to_bytes(4, "little")
         if end is not None:
             self.image[s + self.DRUM_END : s + self.DRUM_END + 4] = end.to_bytes(4, "little")
         if gain is not None:
