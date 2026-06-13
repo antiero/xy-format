@@ -1818,15 +1818,38 @@ def generate_report(path: Path, data: bytes) -> str:
 
     if static_mixer:
         lines.append("[Static Mixer]")
-        t1 = static_mixer.tracks[0]
-        lines.append(
-            f"  T1 vol={t1.volume.byte} pan={t1.pan.byte} "
-            f"fx1={t1.send_fx1.byte} fx2={t1.send_fx2.byte}"
-        )
+        for track_mix in static_mixer.tracks[:8]:
+            show_row = (
+                track_mix.track == 1
+                or track_mix.volume.byte != 0x60
+                or track_mix.pan.byte != 0x40
+                or track_mix.send_fx1.byte != 0
+                or track_mix.send_fx2.byte != 0
+            )
+            if not show_row:
+                continue
+            lines.append(
+                f"  T{track_mix.track} vol={track_mix.volume.byte} "
+                f"pan={track_mix.pan.byte} fx1={track_mix.send_fx1.byte} "
+                f"fx2={track_mix.send_fx2.byte}"
+            )
+            lines.append(
+                f"  T{track_mix.track} raw_u32 "
+                f"vol=0x{track_mix.volume.u32:08X} "
+                f"pan=0x{track_mix.pan.u32:08X} "
+                f"fx1=0x{track_mix.send_fx1.u32:08X} "
+                f"fx2=0x{track_mix.send_fx2.u32:08X}"
+            )
         m = static_mixer.master
         lines.append(
             f"  Master perc={m.percussion.byte} melody={m.melody.byte} "
             f"comp={m.compressor.byte} master={m.master.byte}"
+        )
+        lines.append(
+            f"  Master raw_u32 perc=0x{m.percussion.u32:08X} "
+            f"melody=0x{m.melody.u32:08X} "
+            f"comp=0x{m.compressor.u32:08X} "
+            f"master=0x{m.master.u32:08X}"
         )
         lines.append("")
 
@@ -1837,9 +1860,11 @@ def generate_report(path: Path, data: bytes) -> str:
 
     if scene_mix:
         lines.append("[Scene Mix]")
+        present_slots = ",".join(str(slot) for slot in scene_mix.present_scene_slots) or "-"
         lines.append(
-            f"  scenes={scene_mix.scene_count} active={scene_mix.active_scene_ordinal} "
-            f"master_vol={scene_mix.master_vol_byte}"
+            f"  scenes={scene_mix.scene_count} present={scene_mix.present_scene_count} "
+            f"active={scene_mix.active_scene_ordinal} master_vol={scene_mix.master_vol_byte} "
+            f"present_slots={present_slots}"
         )
         for row in scene_mix.track_volumes[:8]:
             lines.append(f"  T{row.track:02d} vol_byte={row.vol_byte}")

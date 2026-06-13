@@ -48,6 +48,13 @@ Hypothesis: scene `S` track `T` volume → struct **track `T + (S − 1)`** at
 `s2b` also sets `GLOBAL+0x06` scene count `0` → `1` (2 scenes) and allocates
 empty scene slot 2 (flags `0`).
 
+Follow-up (2026-06-13): the raw global count byte is not a reliable populated
+row count by itself. In canonical two-scene fixtures, `s0b`, `s1b`, and `s5b`
+still read as raw count `1` while scene slot flags are `(1, 1, 0, ...)`;
+`s2b` reads raw count `2` with the same populated flags. Use
+`present_scene_slots` / `present_scene_count` for populated scene rows and keep
+`scene_count` as the raw global-byte-derived field.
+
 ## Operator playback vs bytes
 
 Operator reports: after scene 1 T1 low, **switching to scene 2 still sounds

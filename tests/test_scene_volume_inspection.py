@@ -7,6 +7,7 @@ from xy.scene_volume_inspection import (
     MIX_VOL_U32_MAX,
     encode_mix_vol_byte,
     inspect_scene_volumes_bytes,
+    read_present_scene_slots,
     read_scene_track_volume,
 )
 from xy.image_writer import ImageProject
@@ -24,10 +25,20 @@ def baseline() -> Path:
 def test_baseline_track_and_master_defaults(baseline: Path) -> None:
     inspection = inspect_scene_volumes_bytes(baseline.read_bytes())
     assert inspection.scene_count == 1
+    assert inspection.scene_flags[:3] == (1, 1, 0)
+    assert inspection.present_scene_slots == (0, 1)
+    assert inspection.present_scene_count == 2
     t1 = inspection.track_volumes[0]
     assert t1.vol_byte == 0x60
     assert t1.vol_u32 == encode_mix_vol_byte(0x60)
     assert inspection.master_vol_byte == 0x40
+
+
+def test_scene_slot_flags_mark_two_populated_rows_in_clean_volume_fixtures(
+    baseline: Path,
+) -> None:
+    project = ImageProject.from_file(str(baseline))
+    assert read_present_scene_slots(project) == (0, 1)
 
 
 def test_scene1_t1_low_is_single_byte_on_t1() -> None:
@@ -49,6 +60,7 @@ def test_scene2_t1_high_lands_on_t2_struct() -> None:
     high = PROBES / "s2b-scene2-t1-vol-high.xy"
     inspection = inspect_scene_volumes_bytes(high.read_bytes())
     assert inspection.scene_count == 2
+    assert inspection.present_scene_count == 2
     assert inspection.track_volumes[0].vol_byte == 0x60
     assert inspection.track_volumes[1].vol_byte == MIX_VOL_BYTE_MAX
     assert inspection.track_volumes[1].vol_u32 == MIX_VOL_U32_MAX

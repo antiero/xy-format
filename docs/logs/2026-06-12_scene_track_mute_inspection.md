@@ -24,7 +24,13 @@ slot 1; …). Same row as that scene's pattern selection. Arrange-view mutes
 | --- | --- |
 | `+0..15` | pattern sel per track |
 | `+16..31` | mute per track |
-| `+32` | flags |
+| `+32` | row-present flag (`0x01` populated, `0x00` empty trailing row in current fixtures) |
+
+Follow-up local scan (2026-06-13): single-scene mute captures flag only slot 0;
+clean two-scene volume captures flag slots 0 and 1; the eight-scene mute baseline
+flags slots 0..7. `xy.scene_volume_inspection` exposes this as
+`read_scene_slot_flag()` / `read_present_scene_slots()` and
+`SceneVolumeInspection.present_scene_slots`.
 
 ## Scene 1 captures (single-scene project)
 

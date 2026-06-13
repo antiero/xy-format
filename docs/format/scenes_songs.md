@@ -19,6 +19,21 @@ Current stable model is split storage:
 
 ## Stable Findings
 
+### 0) Flat Scene Slot Layout
+
+Decoded-image scene rows are 33-byte slots at `GLOBAL+0x95 + slot×33`:
+
+- `+0..15`: 0-based pattern selection per track.
+- `+16..31`: mute byte per track (`0x00` unmuted, `0x02` muted in device probes).
+- `+32`: row flag. Existing device fixtures and `build_arrangement` use `0x01`
+  for populated/present rows and `0x00` for empty trailing rows.
+
+Examples: single-scene mute probes flag only slot 0; clean two-scene volume
+probes flag slots 0 and 1; the eight-scene mute baseline flags slots 0..7.
+Use row flags, not the global `0x06` scene-count-ish byte alone, when counting
+populated scene rows (`s0b`/`s1b`/`s5b` have two present rows while the global
+byte-derived count still reads as 1).
+
 ### 1) Loop Is Per-Song (Normalized Branch)
 Loop toggles were isolated as Track 16 control-byte changes:
 

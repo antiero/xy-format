@@ -7,7 +7,9 @@ from xy.rle import decode_project
 from xy.scene_volume_inspection import (
     SCENE_MUTE_OFFSET,
     SCENE_MUTE_VALUE,
+    read_present_scene_slots,
     read_scene_muted_tracks,
+    read_scene_slot_flag,
     read_scene_slot_mute_bytes,
     scene_mute_storage_slot,
 )
@@ -88,6 +90,25 @@ def test_multi_baseline_has_no_muted_tracks() -> None:
     project = ImageProject.from_file(str(MULTI_BASELINE))
     for slot in range(8):
         assert read_scene_muted_tracks(project, slot) == ()
+
+
+@pytest.mark.parametrize(
+    "filename,expected_slots",
+    [
+        ("mute-#-#-#-#.xy", (0,)),
+        ("mute-1-3-6-7.xy", (0,)),
+        ("mute#-#-#-#-#.xy", tuple(range(8))),
+        ("mute2-1-7-8-#.xy", tuple(range(8))),
+        ("mute8-6-7-8-#.xy", tuple(range(8))),
+    ],
+)
+def test_scene_slot_flags_mark_populated_rows(
+    filename: str, expected_slots: tuple[int, ...]
+) -> None:
+    project = ImageProject.from_file(str(PROBES / filename))
+    assert read_present_scene_slots(project) == expected_slots
+    for slot in expected_slots:
+        assert read_scene_slot_flag(project, slot) == 1
 
 
 def _scene_region_diffs(base: bytes, var: bytes) -> list[int]:
