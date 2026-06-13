@@ -59,9 +59,11 @@ derived from scene row flags, not from `0x06`.
 |---|---|---|
 | +0x00 | pattern count (leader) | header decode |
 | +0x01 | pattern length in sequencer steps (`0x10`/`0x20`/`0x30`/`0x40` = 1/2/3/4 bars). Whole-bar values are device-captured; non-multiple values are the inferred storage for the guide's final-bar sequence-length control and still need a direct device capture. | u17–u19 |
-| +0x02 | 0xF0 marker | — |
-| +0x03 | signature `00 00 00 [scale] FF 00 FC 00` | — |
+| +0x02 | default step length, u16 LE ticks (`240` = UI 50, min capture `4`, max `480`) | BAR `bar-l-*` |
+| +0x03–0x0A | early header bytes; formerly used as a signature, but BAR fields can mutate this range | BAR |
 | +0x06 | **track scale** (0x01=½, 0x03=1, 0x05=2, 0x0E=16) | u20–u22 |
+| +0x07 | bar-page quantization raw byte (`0x00` min, `0xFF` default/max; full UI scaling partial) | BAR `bar-q-*` |
+| +0x08 | per-track groove override raw signed byte/LUT (`0` default; partial BAR LUT) | BAR `bar-g*` |
 | +0x11 | u16: **8 = pristine, 0 = edited** — the raw "type 0x05/0x07 + `08 00` padding" was this field's RLE shadow; sticky (never returns to 8) | u51, u53, every edit file |
 | +0x1C | M4/LFO type selector (5 bytes change on LFO swap) | u32 |
 | +0x20 | M4 page on/off | u31, u33 |
@@ -71,6 +73,7 @@ derived from scene row flags, not from `0x06`.
 | +0x38F7 | **track pan** u32 (byte @ +0x38FA; center `0x40`) | P2-A `f3`–`f5` |
 | +0x38FB | **track mix volume** u32 (byte @ +0x38FE; default `0x60`) | P2-A/P2-D |
 | +0x25 | filter on/off | u29 |
+| +0x3056 | bar-page p-lock interpolation/shape raw byte (`0x00` default/min, `0x04`/`0x08` min+1/+2, `0xFF` max) | BAR `bar-s-*` |
 | +0x3057 + 16×(step−1) | **step-component slot, 16 bytes per step**, one byte per component type within the slot (portamento +9, bend +10, tonality +11, jump +12, param +13, conditional +14, …) | u8/u9, u59–u77 |
 | +0x3857 | engine parameter block: 4-byte values (param1 +0x3857, param4 +0x3863, …) | u23–u25, u96 |
 | +0x3877 | M2 amp envelope ADSR (16 bytes) | u26 |

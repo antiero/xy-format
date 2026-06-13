@@ -121,10 +121,14 @@ Field offsets: `docs/format/decoded_image_map.md`.
 - [x] Track scale byte (subset: 1/2, 1/2, 16 observed) — `set_track_scale`
 - [~] Track scale full enum (3, 4, 6, 8) — partial — `opxy_user_guide_save_audit.md`
 - [ ] Final-bar / partial-bar length — gap
-- [ ] Per-track quantization amount — gap
-- [ ] Default step length (persistent) — gap
-- [ ] Per-track groove override — gap
-- [ ] P-lock smoothing/shape — gap
+- [~] Per-track quantization amount — raw byte pinned at track+`0x07`;
+  scaling/LUT still partial — BAR fixtures
+- [x] Default step length (persistent) — u16 ticks at track+`0x02`;
+  `240` default, `480` max — `xy/bar_menu_inspection.py`
+- [~] Per-track groove override — raw signed/LUT byte at track+`0x08`;
+  limited BAR sweep, one anomalous `bar-gp002` capture
+- [x] P-lock smoothing/shape — raw byte at track+`0x3056`;
+  UI labels/icons still open — `xy/bar_menu_inspection.py`
 
 ## 5. Step components (14 types)
 

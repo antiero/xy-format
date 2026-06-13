@@ -132,6 +132,15 @@ from .project_config_inspection import (  # noqa: F401
     inspect_project_config_bytes,
     read_project_config,
 )
+from .bar_menu_inspection import (  # noqa: F401
+    TRACK_DEFAULT_STEP_LENGTH_OFFSET,
+    TRACK_GROOVE_OFFSET,
+    TRACK_PLOCK_SHAPE_OFFSET,
+    TRACK_QUANTIZATION_OFFSET,
+    TrackBarMenu,
+    inspect_bar_menu_bytes,
+    read_track_bar_menu,
+)
 from .sampler_sample_inspection import (  # noqa: F401
     LOOP_TYPE_INFINITE,
     LOOP_TYPE_OFF,

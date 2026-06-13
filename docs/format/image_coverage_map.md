@@ -115,9 +115,11 @@ track unless noted.
 | --- | --- | --- | --- |
 | `+0x00` | **x** | Pattern count (leader) | Multi-pattern |
 | `+0x01` | **x** | Bars/steps (`0x10`…`0x40` = 1–4 bars) | `set_bars` |
-| `+0x02` | **x** | `0xF0` marker | — |
-| `+0x03`–`+0x0A` | **x** | Signature `00 00 00 [scale] FF 00 FC 00` | scale @ `+0x06` |
+| `+0x02`–`+0x03` | **x** | Bar-menu default step length, u16 ticks (`240` default, `480` max) | BAR `bar-l-*` |
 | `+0x06` | **x** | Track scale byte | `set_track_scale` |
+| `+0x07` | **~** | Bar-menu quantization raw byte; UI scaling partial | BAR `bar-q-*` |
+| `+0x08` | **~** | Bar-menu per-track groove override raw/LUT; partial sweep | BAR `bar-g*` |
+| `+0x03`–`+0x0A` | **~** | Early header bytes; no longer a stable signature because BAR fields mutate this range | BAR |
 | `+0x11` | **x** | Pristine u16 (`8` = factory, `0` = edited) | sticky |
 | `+0x13`–`+0x29F` | **~** | Preset identity region (part 1) | `set_preset` donor copy |
 | `+0x14` | **x** | Engine ID | `set_engine` |
@@ -134,6 +136,7 @@ track unless noted.
 | `+0x02A0` | 64×84 | **x** | P-lock table (64 steps × 42 u16 cols) | `xy/plocks.py` |
 | `+0x2C4E` | 8×64 | **x** | Per-step automation active flags |
 | `+0x304E` | 1 | **x** | Track automation master flag |
+| `+0x3056` | 1 | **x** | Bar-menu p-lock interpolation/shape raw byte | BAR `bar-s-*` |
 | `+0x3057` | 64×16 | **x** | Step-component slots (14 types × **64** steps; ends `+0x3456`) | `step_components.py` |
 
 ### 2c. Sound engine & mix page

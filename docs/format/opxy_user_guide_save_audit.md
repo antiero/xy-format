@@ -95,10 +95,10 @@ Guide refs: section 7.1 p.22-23; section 7.2 p.24; section 7.3 p.25; section 7.4
 | Add/remove bars | 1-4 bars per pattern. | Decoded at track `+0x01` (`bars << 4`). |
 | Duplicate bar | Copy notes/locks/components between step ranges. | Operation over decoded structures; no separate field. |
 | Sequence length / final-bar length | Number of active steps when last bar is shortened. | Gap. Bar count is known; final partial-bar length is not pinned. |
-| Track quantization | Recording quantize amount; affects whether nudge is allowed at 100. | Gap. No stable field identified. |
-| Default step length | Length of newly step-sequenced notes. | Gap/partial. Individual note gates are decoded; the persistent default-length control is not mapped. |
-| Per-track groove override | Bar-page groove overriding tempo swing. | Gap/partial. Global groove type is decoded; per-track groove amount/override field is not promoted. |
-| P-lock smoothing/shape | Interpolation/smoothing between p-locks. | Gap. No stable offset promoted. |
+| Track quantization | Recording quantize amount; affects whether nudge is allowed at 100. | Partial (BAR). Raw byte at track `+0x07`; min/default/max-adjacent captured, full UI scaling still partial. |
+| Default step length | Length of newly step-sequenced notes. | Decoded (BAR). U16 ticks at track `+0x02`; default `240`, max `480`, one detent near center = 4 ticks. |
+| Per-track groove override | Bar-page groove overriding tempo swing. | Partial (BAR). Raw signed/LUT byte at track `+0x08`; limited sweep captured. |
+| P-lock smoothing/shape | Interpolation/smoothing between p-locks. | Decoded raw storage (BAR) at track `+0x3056`; UI curve names/icons still not mapped. |
 
 ### Step Components
 

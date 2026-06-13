@@ -30,6 +30,7 @@ if str(REPO_ROOT) not in sys.path:
 import re
 
 from xy.drum_sample_inspection import inspect_drum_samples_bytes  # noqa: E402
+from xy.bar_menu_inspection import inspect_bar_menu_bytes  # noqa: E402
 from xy.container import XYProject  # noqa: E402
 from xy.image_writer import ImageProject  # noqa: E402
 from xy.master_eq_inspection import inspect_master_eq_bytes  # noqa: E402
@@ -1981,6 +1982,24 @@ def generate_report(path: Path, data: bytes) -> str:
         )
         lines.append(f"  voices {voice_s}")
         lines.append(f"  midi {midi_s}")
+        lines.append("")
+
+    try:
+        bar_menu = inspect_bar_menu_bytes(data, tracks=1)
+    except Exception:
+        bar_menu = ()
+
+    if bar_menu:
+        row = bar_menu[0]
+        lines.append("[Bar Menu]")
+        lines.append(
+            f"  T{row.track} length_ticks={row.default_step_length_ticks} "
+            f"length_ui~={row.default_step_length_ui} "
+            f"quant_raw={row.quantization_raw} "
+            f"quant_ui~={row.quantization_ui_approx} "
+            f"groove_raw={row.groove_signed_raw:+d} "
+            f"plock_shape_raw={row.plock_shape_signed_raw:+d}"
+        )
         lines.append("")
 
     try:

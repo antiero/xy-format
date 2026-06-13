@@ -22,7 +22,10 @@ SIG_RE = re.compile(rb"\x00\x00\x00[\x00-\x0f]\xff\x00\xfc\x00", re.S)
 OFF_PATTERN_STEPS = 0x01
 OFF_BARS = OFF_PATTERN_STEPS  # compatibility alias: whole bars are steps/16
 OFF_SCALE = 0x06
+OFF_QUANTIZATION = 0x07
+OFF_TRACK_GROOVE = 0x08
 OFF_PRISTINE = 0x11   # u16: 8 = factory, 0 = edited (sticky)
+OFF_PLOCK_SHAPE = 0x3056
 OFF_NOTE_COUNT = 0x456F
 NOTE_SIZE = 12
 
@@ -71,6 +74,35 @@ class ImageProject:
         if not 1 <= bars <= 4:
             raise ValueError("bar count must be 1..4")
         self.set_pattern_steps(track, bars * 16)
+
+    def set_default_step_length_ticks(self, track: int, ticks: int) -> None:
+        if not 0 <= ticks <= STEP_TICKS:
+            raise ValueError("default step length must be 0..480 ticks")
+        s = self.track_start(track)
+        self.image[s + OFF_PATTERN_STEPS + 1 : s + OFF_PATTERN_STEPS + 3] = (
+            ticks.to_bytes(2, "little")
+        )
+        self.mark_edited(track)
+
+    def set_track_quantization_raw(self, track: int, raw: int) -> None:
+        if not 0 <= raw <= 0xFF:
+            raise ValueError("quantization raw value must be 0..255")
+        s = self.track_start(track)
+        self.image[s + OFF_QUANTIZATION] = raw
+        self.mark_edited(track)
+
+    def set_track_groove_raw(self, track: int, raw: int) -> None:
+        if not 0 <= raw <= 0xFF:
+            raise ValueError("track groove raw value must be 0..255")
+        s = self.track_start(track)
+        self.image[s + OFF_TRACK_GROOVE] = raw
+        self.mark_edited(track)
+
+    def set_plock_shape_raw(self, track: int, raw: int) -> None:
+        if not 0 <= raw <= 0xFF:
+            raise ValueError("p-lock shape raw value must be 0..255")
+        s = self.track_start(track)
+        self.image[s + OFF_PLOCK_SHAPE] = raw
 
     # --- note vector -----------------------------------------------------
     def note_count(self, track: int) -> int:
