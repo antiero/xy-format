@@ -135,6 +135,7 @@ from .project_config_inspection import (  # noqa: F401
 from .bar_menu_inspection import (  # noqa: F401
     TRACK_DEFAULT_STEP_LENGTH_OFFSET,
     TRACK_GROOVE_OFFSET,
+    TRACK_GROOVE_UI_SEQUENCE,
     TRACK_PLOCK_SHAPE_OFFSET,
     TRACK_QUANTIZATION_OFFSET,
     TrackBarMenu,

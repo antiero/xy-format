@@ -122,11 +122,11 @@ Field offsets: `docs/format/decoded_image_map.md`.
 - [~] Track scale full enum (3, 4, 6, 8) — partial — `opxy_user_guide_save_audit.md`
 - [ ] Final-bar / partial-bar length — gap
 - [~] Per-track quantization amount — raw byte pinned at track+`0x07`;
-  scaling/LUT still partial — BAR fixtures
+  UI 0/1/2/98/99/100 captured, middle scaling still partial — BAR fixtures
 - [x] Default step length (persistent) — u16 ticks at track+`0x02`;
   `240` default, `480` max — `xy/bar_menu_inspection.py`
-- [~] Per-track groove override — raw signed/LUT byte at track+`0x08`;
-  limited BAR sweep, one anomalous `bar-gp002` capture
+- [~] Per-track groove override — index byte at track+`0x08`;
+  storage is `3 * index` into the displayed UI sequence; `bar-gp002` recapture needed
 - [x] P-lock smoothing/shape — raw byte at track+`0x3056`;
   UI labels/icons still open — `xy/bar_menu_inspection.py`
 

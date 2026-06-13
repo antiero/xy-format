@@ -1997,6 +1997,8 @@ def generate_report(path: Path, data: bytes) -> str:
             f"length_ui~={row.default_step_length_ui} "
             f"quant_raw={row.quantization_raw} "
             f"quant_ui~={row.quantization_ui_approx} "
+            f"groove_ui={row.groove_ui_value if row.groove_ui_value is not None else '?'} "
+            f"groove_index={row.groove_index if row.groove_index is not None else '?'} "
             f"groove_raw={row.groove_signed_raw:+d} "
             f"plock_shape_raw={row.plock_shape_signed_raw:+d}"
         )

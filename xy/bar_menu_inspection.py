@@ -14,6 +14,52 @@ TRACK_QUANTIZATION_OFFSET = 0x07
 TRACK_GROOVE_OFFSET = 0x08
 TRACK_PLOCK_SHAPE_OFFSET = 0x3056
 
+TRACK_GROOVE_UI_SEQUENCE = (
+    2,
+    4,
+    7,
+    9,
+    11,
+    14,
+    16,
+    18,
+    21,
+    23,
+    25,
+    28,
+    30,
+    32,
+    35,
+    37,
+    39,
+    42,
+    44,
+    46,
+    49,
+    51,
+    53,
+    56,
+    58,
+    60,
+    63,
+    65,
+    67,
+    70,
+    72,
+    75,
+    77,
+    79,
+    82,
+    84,
+    86,
+    89,
+    91,
+    93,
+    96,
+    98,
+    99,
+)
+
 
 @dataclass(frozen=True)
 class TrackBarMenu:
@@ -25,8 +71,10 @@ class TrackBarMenu:
 
     @property
     def default_step_length_ui(self) -> int:
-        """Approximate device UI percent for the 0..480 tick length range."""
-        return round(self.default_step_length_ticks * 100 / 480)
+        """Best-effort device UI value for the captured 0..100 length control."""
+        if self.default_step_length_ticks <= 12:
+            return max(0, self.default_step_length_ticks // 4 - 1)
+        return int((self.default_step_length_ticks * 100 / 480) + 0.5)
 
     @property
     def quantization_ui_approx(self) -> int:
@@ -38,6 +86,32 @@ class TrackBarMenu:
         if self.groove_raw >= 0x80:
             return self.groove_raw - 0x100
         return self.groove_raw
+
+    @property
+    def groove_index(self) -> int | None:
+        signed = self.groove_signed_raw
+        if signed == 0:
+            return 0
+        if signed % 3 == 0:
+            index = signed // 3
+            if abs(index) <= len(TRACK_GROOVE_UI_SEQUENCE):
+                return index
+        # Edge values are inferred from the UI table but not in the BAR pack.
+        if signed == 0x7F:
+            return len(TRACK_GROOVE_UI_SEQUENCE)
+        if signed == -0x80:
+            return -len(TRACK_GROOVE_UI_SEQUENCE)
+        return None
+
+    @property
+    def groove_ui_value(self) -> int | None:
+        index = self.groove_index
+        if index is None:
+            return None
+        if index == 0:
+            return 0
+        ui = TRACK_GROOVE_UI_SEQUENCE[abs(index) - 1]
+        return ui if index > 0 else -ui
 
     @property
     def plock_shape_signed_raw(self) -> int:

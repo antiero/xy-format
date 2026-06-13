@@ -7,6 +7,7 @@ from xy.bar_menu_inspection import (
     TRACK_GROOVE_OFFSET,
     TRACK_PLOCK_SHAPE_OFFSET,
     TRACK_QUANTIZATION_OFFSET,
+    TRACK_GROOVE_UI_SEQUENCE,
     inspect_bar_menu_bytes,
 )
 from xy.image_writer import ImageProject
@@ -29,6 +30,8 @@ def test_bar_menu_baseline_defaults() -> None:
     assert bar.quantization_ui_approx == 100
     assert bar.groove_raw == 0
     assert bar.groove_signed_raw == 0
+    assert bar.groove_index == 0
+    assert bar.groove_ui_value == 0
     assert bar.plock_shape_raw == 0
     assert bar.plock_shape_signed_raw == 0
 
@@ -36,16 +39,17 @@ def test_bar_menu_baseline_defaults() -> None:
 @pytest.mark.parametrize(
     "filename,ticks,ui",
     [
-        ("bar-l-min.xy", 4, 1),
-        ("bar-l-minp1.xy", 8, 2),
-        ("bar-l-minp2.xy", 12, 2),
-        ("bar-l-l2.xy", 232, 48),
-        ("bar-l-l1.xy", 236, 49),
-        ("bar-l-r1.xy", 248, 52),
-        ("bar-l-r2.xy", 252, 52),
-        ("bar-l-maxm2.xy", 472, 98),
-        ("bar-l-maxm1.xy", 476, 99),
-        ("bar-l-max.xy", 480, 100),
+        ("bar-l-000.xy", 4, 0),
+        ("bar-l-001.xy", 8, 1),
+        ("bar-l-002.xy", 12, 2),
+        ("bar-l-048.xy", 232, 48),
+        ("bar-l-049.xy", 236, 49),
+        ("bar-l-051.xy", 244, 51),
+        ("bar-l-052.xy", 248, 52),
+        ("bar-l-053.xy", 252, 53),
+        ("bar-l-098.xy", 472, 98),
+        ("bar-l-099.xy", 476, 99),
+        ("bar-l-100.xy", 480, 100),
     ],
 )
 def test_default_step_length_ticks(filename: str, ticks: int, ui: int) -> None:
@@ -57,11 +61,11 @@ def test_default_step_length_ticks(filename: str, ticks: int, ui: int) -> None:
 @pytest.mark.parametrize(
     "filename,raw,ui_approx",
     [
-        ("bar-q-min.xy", 0x00, 0),
-        ("bar-q-minp1.xy", 0x04, 2),
-        ("bar-q-minp2.xy", 0x07, 3),
-        ("bar-q-maxm2.xy", 0xFC, 99),
-        ("bar-q-maxm1.xy", 0xFE, 100),
+        ("bar-q-000.xy", 0x00, 0),
+        ("bar-q-001.xy", 0x04, 2),
+        ("bar-q-002.xy", 0x07, 3),
+        ("bar-q-098.xy", 0xFC, 99),
+        ("bar-q-099.xy", 0xFE, 100),
     ],
 )
 def test_quantization_raw_byte(filename: str, raw: int, ui_approx: int) -> None:
@@ -71,25 +75,40 @@ def test_quantization_raw_byte(filename: str, raw: int, ui_approx: int) -> None:
 
 
 @pytest.mark.parametrize(
-    "filename,raw,signed",
+    "filename,raw,signed,index,ui",
     [
-        ("bar-gn011.xy", 0xF1, -15),
-        ("bar-gn009.xy", 0xF4, -12),
-        ("bar-gn007.xy", 0xF7, -9),
-        ("bar-gn004.xy", 0xFA, -6),
-        ("bar-gn002.xy", 0xFD, -3),
-        ("bar-gp004.xy", 0x06, 6),
-        ("bar-gp007.xy", 0x09, 9),
-        ("bar-gp009.xy", 0x0C, 12),
-        ("bar-gp011.xy", 0x0F, 15),
-        ("bar-gp014.xy", 0x12, 18),
-        ("bar-gp060.xy", 0x4E, 78),
+        ("bar-gn011.xy", 0xF1, -15, -5, -11),
+        ("bar-gn009.xy", 0xF4, -12, -4, -9),
+        ("bar-gn007.xy", 0xF7, -9, -3, -7),
+        ("bar-gn004.xy", 0xFA, -6, -2, -4),
+        ("bar-gn002.xy", 0xFD, -3, -1, -2),
+        ("bar-gp004.xy", 0x06, 6, 2, 4),
+        ("bar-gp007.xy", 0x09, 9, 3, 7),
+        ("bar-gp009.xy", 0x0C, 12, 4, 9),
+        ("bar-gp011.xy", 0x0F, 15, 5, 11),
+        ("bar-gp014.xy", 0x12, 18, 6, 14),
+        ("bar-gp060.xy", 0x4E, 78, 26, 60),
     ],
 )
-def test_track_groove_partial_lut(filename: str, raw: int, signed: int) -> None:
+def test_track_groove_partial_lut(
+    filename: str, raw: int, signed: int, index: int, ui: int
+) -> None:
     bar = _bar(filename)
     assert bar.groove_raw == raw
     assert bar.groove_signed_raw == signed
+    assert bar.groove_index == index
+    assert bar.groove_ui_value == ui
+
+
+def test_track_groove_uses_handwritten_ui_sequence() -> None:
+    assert TRACK_GROOVE_UI_SEQUENCE[:8] == (2, 4, 7, 9, 11, 14, 16, 18)
+
+
+def test_bar_gp002_capture_decodes_as_gp007_index() -> None:
+    bar = _bar("bar-gp002.xy")
+    assert bar.groove_raw == 0x09
+    assert bar.groove_index == 3
+    assert bar.groove_ui_value == 7
 
 
 @pytest.mark.parametrize(
@@ -109,10 +128,11 @@ def test_plock_shape_raw_byte(filename: str, raw: int, signed: int) -> None:
     assert bar.plock_shape_signed_raw == signed
 
 
-def test_bar_q_max_capture_is_length_anomaly_not_quantization() -> None:
-    bar = _bar("bar-q-max.xy")
+def test_former_bar_q_max_capture_is_length_051_not_quantization() -> None:
+    bar = _bar("bar-l-051.xy")
     assert bar.quantization_raw == 0xFF
     assert bar.default_step_length_ticks == 244
+    assert bar.default_step_length_ui == 51
 
 
 def test_bar_menu_setters_write_decoded_bytes() -> None:

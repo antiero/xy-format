@@ -51,12 +51,15 @@ Bar menu → **Quantization**. Default **100** on `bar0`. Re-copy `bar0` before 
 
 | PC filename | Procedure |
 | --- | --- |
-| `bar-q-min.xy` | Turn to **minimum (0)** |
-| `bar-q-minp1.xy` | From min: **+1 click** |
-| `bar-q-minp2.xy` | From min: **+2 clicks** |
-| `bar-q-max.xy` | Turn to **maximum (100)** |
-| `bar-q-maxm1.xy` | From max: **−1 click** |
-| `bar-q-maxm2.xy` | From max: **−2 clicks** |
+| `bar-q-000.xy` | Set UI to **0** |
+| `bar-q-001.xy` | Set UI to **1** |
+| `bar-q-002.xy` | Set UI to **2** |
+| `bar-q-098.xy` | Set UI to **98** |
+| `bar-q-099.xy` | Set UI to **99** |
+
+`bar0.xy` already covers quantization UI **100** (`0xFF`). Numeric UI controls
+use numeric filenames; min/max-relative names are reserved for controls without
+a numeric display.
 
 ---
 
@@ -66,16 +69,17 @@ Bar menu → **Length**. Default **50** on `bar0`. Re-copy `bar0` before each ro
 
 | PC filename | Procedure |
 | --- | --- |
-| `bar-l-l1.xy` | From 50: **1 click left** |
-| `bar-l-l2.xy` | From 50: **2 clicks left** |
-| `bar-l-r1.xy` | From 50: **1 click right** |
-| `bar-l-r2.xy` | From 50: **2 clicks right** |
-| `bar-l-min.xy` | Turn to **minimum (0)** |
-| `bar-l-minp1.xy` | From min: **+1 click** |
-| `bar-l-minp2.xy` | From min: **+2 clicks** |
-| `bar-l-max.xy` | Turn to **maximum (100)** |
-| `bar-l-maxm1.xy` | From max: **−1 click** |
-| `bar-l-maxm2.xy` | From max: **−2 clicks** |
+| `bar-l-000.xy` | Set UI to **0** |
+| `bar-l-001.xy` | Set UI to **1** |
+| `bar-l-002.xy` | Set UI to **2** |
+| `bar-l-048.xy` | Set UI to **48** |
+| `bar-l-049.xy` | Set UI to **49** |
+| `bar-l-051.xy` | Set UI to **51** (renamed from the old `bar-q-max.xy`; bytes prove this is length, not quantization) |
+| `bar-l-052.xy` | Set UI to **52** |
+| `bar-l-053.xy` | Set UI to **53** |
+| `bar-l-098.xy` | Set UI to **98** |
+| `bar-l-099.xy` | Set UI to **99** |
+| `bar-l-100.xy` | Set UI to **100** |
 
 ---
 
@@ -139,13 +143,13 @@ Create new filenames when ready (e.g. `bar-x-s2-gp014.xy`).
 | Block | Files |
 | --- | ---: |
 | Baseline `bar0` | 1 |
-| Quantization sweep | 10 |
-| Length sweep | 10 |
-| Groove LUT (0 + 43 + 43) | 87 |
+| Quantization sweep | 5 captured (`bar0` covers UI 100) |
+| Length sweep | 11 captured |
+| Groove LUT | 19 captured (limited sweep) |
 | P-lock shape | 6 |
-| **Total** | **114** |
+| **Total in this pack** | **42 `.xy` files** |
 
-(`bar-g0` duplicates `bar0` defaults — included for LUT completeness; you may skip re-saving if identical to `bar0`.)
+(`bar-g0` duplicates `bar0` defaults — included for LUT completeness.)
 
 ---
 
@@ -157,58 +161,61 @@ Create new filenames when ready (e.g. `bar-x-s2-gp014.xy`).
 | --- | --- | --- | --- |
 | Quantization | 100 | `+0x07 = FF` | raw byte pinned; UI scaling partial |
 | Length | 50 | `+0x02 = F0 00` (`240` ticks) | decoded |
-| Groove | 0 | `+0x08 = 00` | raw/LUT byte pinned; partial sweep |
+| Groove | 0 | `+0x08 = 00` | index model pinned; `bar-gp002` needs recapture |
 | P-lock shape | default | `+0x3056 = 00` | decoded raw storage |
 
 ### Groove LUT decode
 
-`TRACK+0x08` stores the per-track groove override as a raw signed/LUT byte.
-The limited sweep suggests most positive values follow the same 3-unit raw
-ladder as the negative captures, but `bar-gp002.xy` stores `0x09`, matching
-`bar-gp007.xy`; treat that capture as anomalous until re-probed.
+`TRACK+0x08` stores the per-track groove override as an index into the
+hand-written UI sequence above. Raw signed storage is `3 * index`, where
+index 0 = groove UI 0, index +1 = UI +2, index +2 = UI +4, index +3 = UI +7,
+and so on. Negative values mirror the same index table. `bar-gp002.xy` stores
+`0x09`, matching index +3 / UI +7, so treat that one capture as anomalous
+until re-probed.
 
-| PC filename | UI groove | Stored raw | Signed raw |
+| PC filename | UI groove | Index | Stored raw |
 | --- | --- | --- | --- |
-| `bar-g0.xy` | 0 | `00` | 0 |
-| `bar-gn002.xy` | -2 | `FD` | -3 |
-| `bar-gn004.xy` | -4 | `FA` | -6 |
-| `bar-gn007.xy` | -7 | `F7` | -9 |
-| `bar-gn009.xy` | -9 | `F4` | -12 |
-| `bar-gn011.xy` | -11 | `F1` | -15 |
-| `bar-gp002.xy` | +2 | `09` | +9 |
-| `bar-gp004.xy` | +4 | `06` | +6 |
-| `bar-gp007.xy` | +7 | `09` | +9 |
-| `bar-gp009.xy` | +9 | `0C` | +12 |
-| `bar-gp011.xy` | +11 | `0F` | +15 |
-| `bar-gp014.xy` | +14 | `12` | +18 |
-| `bar-gp016.xy` | +16 | `15` | +21 |
-| `bar-gp018.xy` | +18 | `18` | +24 |
-| `bar-gp051.xy` | +51 | `42` | +66 |
-| `bar-gp053.xy` | +53 | `45` | +69 |
-| `bar-gp056.xy` | +56 | `48` | +72 |
-| `bar-gp058.xy` | +58 | `4B` | +75 |
-| `bar-gp060.xy` | +60 | `4E` | +78 |
+| `bar-g0.xy` | 0 | 0 | `00` |
+| `bar-gn002.xy` | -2 | -1 | `FD` |
+| `bar-gn004.xy` | -4 | -2 | `FA` |
+| `bar-gn007.xy` | -7 | -3 | `F7` |
+| `bar-gn009.xy` | -9 | -4 | `F4` |
+| `bar-gn011.xy` | -11 | -5 | `F1` |
+| `bar-gp002.xy` | +2 intended, decodes +7 | +3 | `09` |
+| `bar-gp004.xy` | +4 | +2 | `06` |
+| `bar-gp007.xy` | +7 | +3 | `09` |
+| `bar-gp009.xy` | +9 | +4 | `0C` |
+| `bar-gp011.xy` | +11 | +5 | `0F` |
+| `bar-gp014.xy` | +14 | +6 | `12` |
+| `bar-gp016.xy` | +16 | +7 | `15` |
+| `bar-gp018.xy` | +18 | +8 | `18` |
+| `bar-gp051.xy` | +51 | +22 | `42` |
+| `bar-gp053.xy` | +53 | +23 | `45` |
+| `bar-gp056.xy` | +56 | +24 | `48` |
+| `bar-gp058.xy` | +58 | +25 | `4B` |
+| `bar-gp060.xy` | +60 | +26 | `4E` |
 
 ### Quant / length / shape
 
 | PC filename | Status | UI | Decoded |
 | --- | --- | --- | --- |
-| `bar-q-min.xy` | decoded | quant 0 | `+0x07 = 00` |
-| `bar-q-minp1.xy` | decoded | near min +1 | `+0x07 = 04` |
-| `bar-q-minp2.xy` | decoded | near min +2 | `+0x07 = 07` |
-| `bar-q-maxm2.xy` | decoded | near max -2 | `+0x07 = FC` |
-| `bar-q-maxm1.xy` | decoded | near max -1 | `+0x07 = FE` |
-| `bar-q-max.xy` | anomalous | max/default | quant stayed `FF`; length changed to `244` ticks |
-| `bar-l-min.xy` | decoded | length 0/min | `+0x02 = 04 00` (`4` ticks) |
-| `bar-l-minp1.xy` | decoded | min +1 | `+0x02 = 08 00` (`8`) |
-| `bar-l-minp2.xy` | decoded | min +2 | `+0x02 = 0C 00` (`12`) |
-| `bar-l-l2.xy` | decoded | 50 -2 clicks | `+0x02 = E8 00` (`232`) |
-| `bar-l-l1.xy` | decoded | 50 -1 click | `+0x02 = EC 00` (`236`) |
-| `bar-l-r1.xy` | decoded | 50 +1 click | `+0x02 = F8 00` (`248`) |
-| `bar-l-r2.xy` | decoded | 50 +2 clicks | `+0x02 = FC 00` (`252`) |
-| `bar-l-maxm2.xy` | decoded | max -2 | `+0x02 = D8 01` (`472`) |
-| `bar-l-maxm1.xy` | decoded | max -1 | `+0x02 = DC 01` (`476`) |
-| `bar-l-max.xy` | decoded | max | `+0x02 = E0 01` (`480`) |
+| `bar-q-000.xy` | decoded | quant 0 | `+0x07 = 00` |
+| `bar-q-001.xy` | decoded | quant 1 | `+0x07 = 04` |
+| `bar-q-002.xy` | decoded | quant 2 | `+0x07 = 07` |
+| `bar-q-098.xy` | decoded | quant 98 | `+0x07 = FC` |
+| `bar-q-099.xy` | decoded | quant 99 | `+0x07 = FE` |
+| `bar0.xy` | baseline | quant 100 | `+0x07 = FF` |
+| `bar-l-000.xy` | decoded | length 0 | `+0x02 = 04 00` (`4` ticks) |
+| `bar-l-001.xy` | decoded | length 1 | `+0x02 = 08 00` (`8`) |
+| `bar-l-002.xy` | decoded | length 2 | `+0x02 = 0C 00` (`12`) |
+| `bar-l-048.xy` | decoded | length 48 | `+0x02 = E8 00` (`232`) |
+| `bar-l-049.xy` | decoded | length 49 | `+0x02 = EC 00` (`236`) |
+| `bar-l-051.xy` | decoded | length 51 | `+0x02 = F4 00` (`244`) |
+| `bar-l-052.xy` | decoded | length 52 | `+0x02 = F8 00` (`248`) |
+| `bar-l-053.xy` | decoded | length 53 | `+0x02 = FC 00` (`252`) |
+| `bar-l-098.xy` | decoded | length 98 | `+0x02 = D8 01` (`472`) |
+| `bar-l-099.xy` | decoded | length 99 | `+0x02 = DC 01` (`476`) |
+| `bar-l-100.xy` | decoded | length 100 | `+0x02 = E0 01` (`480`) |
 | `bar-s-min.xy` | decoded | min/default | `+0x3056 = 00` |
 | `bar-s-minp1.xy` | decoded | min +1 | `+0x3056 = 04` |
 | `bar-s-minp2.xy` | decoded | min +2 | `+0x3056 = 08` |
