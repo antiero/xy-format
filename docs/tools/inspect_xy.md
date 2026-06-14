@@ -13,15 +13,18 @@
   (`xy/drum_sample_inspection.py`).
 - One-shot sampler sample-edit screen (`xy/sampler_sample_inspection.py`).
 - Static mixer: T1 vol/pan/sends + master buses (`xy/mixer_static_inspection.py`).
-- Scene mix: scene count, active scene, master vol, T1–T8 volume bytes
+- Scene mix: present scene rows, active scene/song, master vol, T1-T8 volume bytes
   (`xy/scene_volume_inspection.py`).
 - Scene mutes: per-slot muted tracks when any mutes present (`read_scene_muted_tracks`).
 - Master EQ bands (`xy/master_eq_inspection.py`).
 - Master saturator (`xy/master_saturator_inspection.py`).
-- Project config: transpose, scene length, time signature, groove, T1–T8 voice
-  allocation, T1–T16 MIDI channels (`xy/project_config_inspection.py`).
-- P-lock lane summary from decoded-image tables.
-- Per-track decoded state summaries.
+- Project config: transpose, scene length, time signature, groove type/amount,
+  click volume, active scene/song, T1-T8 voice allocation, T1-T16 MIDI channels
+  (`xy/project_config_inspection.py`).
+- Bar menu: pattern steps/bars/final bar, default step length, quant raw byte,
+  track groove index/UI value, and p-lock shape raw byte (`xy/bar_menu_inspection.py`).
+- P-lock lane summary for standard and known T10 9-byte p-lock headers.
+- Per-track scan and event summaries.
 - Legacy EQ/global snippets (older offsets).
 
 ## Usage

@@ -74,8 +74,8 @@ Guide refs: section 11.1 p.39; section 11.2 p.40.
 |---|---|---|
 | Tempo | BPM/tap tempo. | Decoded: global `0x00`, u16 LE tenths of BPM in decoded image. |
 | Groove type | Shuffle/half-shuffle/danish/bombora/wobbly/gaussian/accents/island nod/disfunk/roll over/prophetic. | Decoded location: global `0x03`; only some enum values are named from captures. |
-| Groove amount | Amount of selected groove. | Partial. `docs/format/header.md` lists header `0x0C` and related `0x10-0x17` words as groove/metronome related; decoded-image map only promotes groove type. |
-| Metronome volume/toggle | Click level and enabled state. | Volume decoded at global `0x04`; enabled/on-off state remains partial. |
+| Groove amount | Amount of selected groove. | Decoded: signed global `0x02`; writer: `ImageProject.set_groove_amount()`. |
+| Metronome volume/toggle | Click level and enabled state. | Click volume decoded at global `0x04`; off and minimum volume both persist as `0x00`, and probes did not reveal a separate toggle byte. |
 
 ### Sequencer, Pattern, and Bar State
 
@@ -92,7 +92,7 @@ Guide refs: section 7.1 p.22-23; section 7.2 p.24; section 7.3 p.25; section 7.4
 | Change sequence octave/semitone | Mass note transposition. | Operation over note values, not a separate field unless project transpose is used. |
 | Parameter lock | Per-step parameter value. | Decoded: p-lock table at track `+0x2A0`, 64 rows x 84 bytes, 42 u16 columns. |
 | Track scale | One step duration: 1, 2, 3, 4, 6, 8, 16, 1/2 per guide. | Partial. Location decoded at track `+0x06`; observed values include 1, 2, 16, and 1/2. Missing confirmed enum bytes for 3, 4, 6, 8. |
-| Add/remove bars | 1-4 bars per pattern. | Decoded at track `+0x01` (`bars << 4`). |
+| Add/remove bars | 1-4 bars per pattern. | Decoded at track `+0x01` as total active steps. Full bars are `16`, `32`, `48`, `64`; partial final bars use `(bar_count - 1) * 16 + final_bar_steps`. |
 | Duplicate bar | Copy notes/locks/components between step ranges. | Operation over decoded structures; no separate field. |
 | Sequence length / final-bar length | Number of active steps when last bar is shortened. | Decoded (BAR-LEN). Track `+0x01` stores total active steps: `(bar_count - 1) * 16 + final_bar_steps`. |
 | Track quantization | Recording quantize amount; affects whether nudge is allowed at 100. | Partial (BAR). Raw byte at track `+0x07`; UI 0/1/2/25/50/75/98/99/100 captured, exact scaling still partial. |

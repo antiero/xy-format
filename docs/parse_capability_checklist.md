@@ -40,6 +40,7 @@ fields. Heuristic reads must say so and stay `[~]` until structural decode exist
 | `xy/master_saturator_inspection.py` | `test_master_saturator_inspection.py` | `2026-06-12_master_saturator_inspection.md` | `2026-06-saturator/` |
 | `xy/sampler_sample_inspection.py` | `test_sampler_sample_inspection.py` | `2026-06-12_sampler_oneshot_inspection.md` | `2026-06-oneshot/` |
 | `xy/project_config_inspection.py` | `test_project_config_inspection.py` | `2026-06-13_project_config_inspection.md`, `2026-06-13_global_header_inspection.md` | `2026-06-project-config/`, `2026-06-global-header/` |
+| `xy/bar_menu_inspection.py` | `test_bar_menu_inspection.py` | `2026-06-13_bar_menu_inspection.md`, `2026-06-14_bar_length_inspection.md` | `2026-06-bar-menu/`, `2026-06-bar-length/` |
 
 Contributor workflow: `docs/workflows/contributor_inspection_workflow.md`.
 
@@ -60,7 +61,8 @@ Contributor workflow: `docs/workflows/contributor_inspection_workflow.md`.
 | Scene volumes + mutes read | `xy/scene_volume_inspection.py` | partial write via `build_arrangement` |
 | Master EQ / saturator read | `xy/master_eq_inspection.py`, `xy/master_saturator_inspection.py` | partial (`set_master_eq`) |
 | Sampler one-shot read | `xy/sampler_sample_inspection.py` | gap |
-| Project config read | `xy/project_config_inspection.py` | partial (`set_groove`, `set_midi_channel`, `set_scene_length_mode`, `set_project_transpose`, `set_time_signature`, `set_voice_allocation`) |
+| Project config/global header read | `xy/project_config_inspection.py` | `set_groove`, `set_groove_amount`, `set_click_volume`, `set_scene_length_mode`, `set_project_transpose`, `set_time_signature`, `set_voice_allocation`, `set_midi_channel`, `set_active_scene`, `set_active_song` |
+| Bar menu read | `xy/bar_menu_inspection.py` | `set_pattern_steps`, `set_default_step_length_ticks`, `set_track_quantization_raw`, `set_track_groove_ui`, `set_plock_shape_raw` |
 | Human report | `tools/inspect_xy.py` | — |
 
 Detailed guide cross-reference: `docs/format/opxy_user_guide_save_audit.md`.
@@ -114,8 +116,8 @@ Field offsets: `docs/format/decoded_image_map.md`.
 - [x] Quantized note records (tick, gate, note, velocity, flags) —
   decoded vector at track+`0x456F`, `ImageProject.add_note`
 - [x] 120-note pattern cap enforced on write — `ImageProject.add_note`
-- [x] Bars per pattern (`bars << 4` @ track+`0x01`) — `set_bars`
-- [x] Track scale byte (subset: 1/2, 1/2, 16 observed) — `set_track_scale`
+- [x] Bars per pattern / active steps (full bars: `16`, `32`, `48`, `64` at track+`0x01`) — `set_bars`, `set_pattern_steps`
+- [x] Track scale byte (subset: 1/2, 1, 2, 16 observed) — `set_track_scale`
 - [~] Track scale full enum (3, 4, 6, 8) — partial — `opxy_user_guide_save_audit.md`
 - [x] Final-bar / partial-bar length — total active steps at track+`0x01`;
   `steps = (bars - 1) * 16 + final_bar_steps` — BAR-LEN fixtures
