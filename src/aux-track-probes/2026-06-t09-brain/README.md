@@ -13,7 +13,7 @@ recorded Brain sequence storage.
 | `t09-brain-mode-manual.xy` | Set Brain mode to manual. | Manual - c major |
 | `t09-brain-mode-auto.xy` | Set Brain mode to auto. | Auto - same as default. also detects as c major. |
 | `t09-brain-key-d.xy` | Set key/root to D | manual - key d major. expect increment of 2 semitones from c major.| 
-| `t09-brain-scale-minor.xy` | Set scale to minor. | manual - scale C minor. |
+| `t09-brain-scale-minor.xy` | Set scale to minor. | manual - scale C minor (index 6). |
 | `t09-brain-link-t1.xy` | Link T1. | default is not linked |
 | `t09-brain-link-t2.xy` | Link T2. | default is not linked |
 | `t09-brain-link-t3.xy` | Link T3. | default is not linked |
@@ -32,7 +32,7 @@ recorded Brain sequence storage.
 | `t09-brain-route-t6-only.xy` | Route output to T6 only. | |
 | `t09-brain-route-t7-only.xy` | Route output to T7 only. | |
 | `t09-brain-route-t8-only.xy` | Route output to T8 only. | |
-| `t09-brain-seq-two-notes.xy` | Record the smallest useful Brain sequence, e.g. two notes/chords. |
+| `t09-brain-seq-two-notes.xy` | Record the smallest useful Brain sequence, e.g. two notes/chords. | C on step 1, G on step 9. All "normal" sequencer stuff is available (number of bars, bar scale, etc.) so in all likelyhood this is encoded in exactly the same way as for tracks 1-8. I chose these notes so the auto brain still detects it as c major = default. same goes for the LFO settings (M4). filter (M3) is unavailable for brain (understandable since it doesnt produce sound itself)|
 
 ## Notes
 
@@ -50,3 +50,47 @@ i dont exactly understand link semantics. Guide (section 15.1) says:
 """
 rotate the white knob to link any of the instrument tracks to the brain track, this allows you to riff over your song, while transposing it live.
 """
+
+The link state needs quite a lot of encoder clicks to change. I suspect under the hood it is a full byte and
+the device is doing the floor after division trick to get out 9 distinct indices. Other evidence for this is that it if you rotate a few clicks backwards just after it changes, it changes back quickly,
+but if you rotate back more clicks, it also takes more forward rotations to change it.
+This is only a hypothesis however. But likely if the values found are confusing. (since the floor trick
+causes many values to map to off/1/.../8, and my device authored files will have random values out of those ranges)
+
+i counted it out: it seems like rougly 12 encoder clicks per value -> 9 values -> 108 clicks. So maybe a half byte?
+It also seems inconsistent which aligns with the flooring trick.
+
+as for the selectable scales, there are 7, its the modes of major, so
+1 - major
+2 - dorian
+3 - phrygian
+4 - lydian
+5 - mixolydian
+6 - minor
+7 - locrian
+Not sure if that is the natural order, but that is the order displayed in the UI.
+
+## Analysis Results
+
+Route is decoded as a T1-low bitmask at T9 track-relative `+0x09`:
+`0x00` none, `0x01` T1, `0x02` T2, ..., `0x80` T8, `0xFF` all.
+The baseline/default route is `0xFC`, i.e. T3-T8.
+
+Brain key/root appears to be a 12-bucket encoder word at T9 `+0x385B`:
+`floor(raw * 12 / 0x80000000)` gives C, C#, D, D#, E, F, F#, G, G#,
+A, A#, B. This still needs PC-generated -> device-verified confirmation.
+
+Brain scale appears to be a 7-bucket encoder word at T9 `+0x385F`:
+`floor(raw * 7 / 0x80000000)` gives major, dorian, phrygian, lydian,
+mixolydian, minor, locrian. This still needs PC-generated -> device-verified
+confirmation.
+
+Recorded Brain notes use the generic note vector at T9 `+0x456F`.
+`t09-brain-seq-two-notes.xy` decodes as C4 on step 1 and G4 on step 9.
+
+Link selection is located at T9 `+0x3863`, but the current captures show
+encoder-bucket jitter; treat it as raw until a tighter probe isolates the
+off/T1-T8 bucket boundaries.
+
+`pc-generated-validation/` contains a small PC-generated -> device-inspection
+set for confirming or falsifying the key/scale bucket hypothesis.

@@ -31,6 +31,7 @@ import re
 
 from xy.drum_sample_inspection import inspect_drum_samples_bytes  # noqa: E402
 from xy.bar_menu_inspection import inspect_bar_menu_bytes  # noqa: E402
+from xy.brain_inspection import inspect_brain_bytes  # noqa: E402
 from xy.container import XYProject  # noqa: E402
 from xy.image_writer import ImageProject  # noqa: E402
 from xy.master_eq_inspection import inspect_master_eq_bytes  # noqa: E402
@@ -1642,13 +1643,13 @@ def generate_report(path: Path, data: bytes) -> str:
     header = parse_header(data)
     handles = find_track_handles(data)
     blocks = find_track_blocks(data)
-    legacy_track_error: str | None = None
+    track_scan_error: str | None = None
     try:
         tracks = build_track_infos(data, handles, blocks)
         attach_meta_events(data, tracks, blocks)
     except ValueError as exc:
         tracks = []
-        legacy_track_error = str(exc)
+        track_scan_error = str(exc)
     slot_descriptors = list(
         iter_slot_descriptors(data, (h.slot for h in handles if not h.is_unused()))
     )
@@ -1950,6 +1951,35 @@ def generate_report(path: Path, data: bytes) -> str:
         lines.append("")
 
     try:
+        brain = inspect_brain_bytes(data)
+    except Exception:
+        brain = None
+
+    if brain:
+        routes = ",".join(f"T{track}" for track in brain.routed_tracks) or "none"
+        note_summary = "none"
+        if brain.notes:
+            note_summary = ", ".join(
+                f"step={note.step if note.step is not None else '?'} "
+                f"note={note.note} vel={note.velocity} gate={note.gate_ticks}"
+                for note in brain.notes
+            )
+        params = " ".join(
+            f"p{index + 1}=0x{word:08X}"
+            for index, word in enumerate(brain.param_words)
+        )
+        lines.append("[Brain T9]")
+        lines.append(
+            f"  route_mask=0x{brain.route_mask:02X} routed={routes} "
+            f"edited={'yes' if brain.edited else 'no'} "
+            f"key_candidate={brain.candidate_key_name} "
+            f"scale_candidate={brain.candidate_scale_name}"
+        )
+        lines.append(f"  raw_params {params}")
+        lines.append(f"  notes {note_summary}")
+        lines.append("")
+
+    try:
         saturator = inspect_master_saturator_bytes(data)
     except Exception:
         saturator = None
@@ -1985,10 +2015,10 @@ def generate_report(path: Path, data: bytes) -> str:
             lines.append("")
 
     lines.append("[Tracks]")
-    if legacy_track_error is not None:
+    if track_scan_error is not None:
         lines.append(
             "  Legacy compressed-stream track scan unavailable: "
-            f"{legacy_track_error}"
+            f"{track_scan_error}"
         )
         lines.append(
             "  Decoded-image sections above remain authoritative for current authoring."

@@ -66,6 +66,7 @@ derived from scene row flags, not from `0x06`.
 | +0x06 | **track scale** (0x01=½, 0x03=1, 0x05=2, 0x0E=16) | u20–u22 |
 | +0x07 | bar-page quantization raw byte; UI display is `floor(raw * 100 / 255)` (`0x00` UI 0, `0x80/0x81` UI 50, `0xFD/0xFE` UI 99, `0xFF` UI 100) | BAR `bar-q-*`, generated `2026-06-quant-generated/` |
 | +0x08 | per-track groove override index byte (`signed_raw = 3 * index` into the UI sequence, saturated to signed i8 at ±99) | BAR `bar-g*` |
+| +0x09 | **T9 Brain route mask** (`bit0=T1` … `bit7=T8`; default `0xFC` routes T3–T8, `0x00` none, `0xFF` all) | AUX-BRAIN |
 | +0x11 | u16: **8 = pristine, 0 = edited** — the raw "type 0x05/0x07 + `08 00` padding" was this field's RLE shadow; sticky (never returns to 8) | u51, u53, every edit file |
 | +0x1C | M4/LFO type selector (5 bytes change on LFO swap) | u32 |
 | +0x20 | M4 page on/off | u31, u33 |
@@ -78,6 +79,7 @@ derived from scene row flags, not from `0x06`.
 | +0x3056 | bar-page p-lock interpolation/shape raw byte (`0x00` default/min, `0x04`/`0x08` min+1/+2, `0xFF` max) | BAR `bar-s-*` |
 | +0x3057 + 16×(step−1) | **step-component slot, 16 bytes per step**, one byte per component type within the slot (portamento +9, bend +10, tonality +11, jump +12, param +13, conditional +14, …) | u8/u9, u59–u77 |
 | +0x3857 | engine parameter block: eight 4-byte q16-ish values for synth engines; tonal sampler keeps these centered at `0x40000000` even when preset `engine.params` are unique | u23–u25, u96, 2026-06-15 unique sampler preset |
+| +0x3857 / +0x385B / +0x385F / +0x3863 | **T9 Brain parameter words**: raw key/mode/scale/link fields are located; candidate bucket interpretations for `+0x385B` and `+0x385F` fit device-authored captures but still need PC-generated → device-verified confirmation | AUX-BRAIN |
 | +0x3877 | M2 amp envelope ADSR (16 bytes) | u26 |
 | +0x3897 | M3 filter/FX knobs: at least eight 4-byte lanes in sampler presets; unique capture maps params 0-4 and 6-7, while lane 5 serialized as `0x7FFFFFFF` | u30, 2026-06-15 unique sampler preset |
 | +0x38B7 | M4/LFO values: eight 4-byte q16 lanes in sampler presets | u32, u33, 2026-06-15 unique sampler preset |

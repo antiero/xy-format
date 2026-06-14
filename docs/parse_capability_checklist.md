@@ -217,7 +217,9 @@ Field offsets: `docs/format/decoded_image_map.md`.
 ## 12. Auxiliary tracks (T9–T16)
 
 - [~] Generic track struct, notes, p-locks — same as instrument tracks
-- [ ] Brain (T9) settings / routing — gap
+- [~] Brain (T9) settings / routing — route mask and generic notes decoded;
+  key/scale/link raw fields located, semantic mapping pending PC-generated
+  device verification
 - [ ] Punch-in FX (T10) — gap
 - [ ] External MIDI channel/bank/program/CC (T11) — gap
 - [ ] External CV (T12), audio (T13), tape (T14) — gap
