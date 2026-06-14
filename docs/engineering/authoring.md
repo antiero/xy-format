@@ -47,6 +47,7 @@ p.set_pattern_steps(track, steps)        # total active steps, incl. partial fin
 p.add_note(track, step=9, note=60, velocity=100, gate=240)   # tick optional
 p.set_track_scale(track, 2)              # 0.5 / 1 / 2 / 16 (or raw byte)
 p.set_default_step_length_ticks(track, 240)
+p.set_track_quantization_ui(track, 99)
 p.set_track_quantization_raw(track, 0xFF)
 p.set_track_groove_ui(track, 14)         # displayed BAR groove value
 p.set_plock_shape_raw(track, 0)

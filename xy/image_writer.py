@@ -171,6 +171,11 @@ class ImageProject:
         self.image[s + OFF_QUANTIZATION] = raw
         self.mark_edited(track)
 
+    def set_track_quantization_ui(self, track: int, ui_value: int) -> None:
+        from .bar_menu_inspection import encode_track_quantization_ui
+
+        self.set_track_quantization_raw(track, encode_track_quantization_ui(ui_value))
+
     def set_track_groove_raw(self, track: int, raw: int) -> None:
         if not 0 <= raw <= 0xFF:
             raise ValueError("track groove raw value must be 0..255")

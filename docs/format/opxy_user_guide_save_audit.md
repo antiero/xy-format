@@ -41,7 +41,7 @@ Primary repo references:
 | Project settings | global transpose, time signature, voice allocation, per-track MIDI channel | Core project settings decoded by PCFG/HDR probes. |
 | Tempo | BPM, groove type/amount, metronome level/on-off | BPM, groove type/amount, time signature, click volume, and metronome persistence decoded. |
 | Patterns/sequencer | notes, chords, gate, microtiming, bars, track scale, p-locks, step components | Decoded. |
-| Bar page | quantization, default length, per-track groove, lock smoothing, final-bar length | Decoded; quantization scaling and p-lock shape UI labels remain partial. |
+| Bar page | quantization, default length, per-track groove, lock smoothing, final-bar length | Quantization, final-bar length, default step length, per-track groove, and p-lock shape decoded. |
 | Players | arpeggio, maestro, hold | Gap. |
 | Instrument | engine, preset, M1 params, envelopes, filter, LFO, preset settings | Main regions decoded; several shift/subfunction values are partial. |
 | Auxiliary tracks | Brain, Punch-in FX, External MIDI/CV/Audio, Tape, FX I/II | Track structs exist; many aux-specific parameter labels/enums are gaps. |
@@ -95,7 +95,7 @@ Guide refs: section 7.1 p.22-23; section 7.2 p.24; section 7.3 p.25; section 7.4
 | Add/remove bars | 1-4 bars per pattern. | Decoded at track `+0x01` as total active steps. Full bars are `16`, `32`, `48`, `64`; partial final bars use `(bar_count - 1) * 16 + final_bar_steps`. |
 | Duplicate bar | Copy notes/locks/components between step ranges. | Operation over decoded structures; no separate field. |
 | Sequence length / final-bar length | Number of active steps when last bar is shortened. | Decoded (BAR-LEN). Track `+0x01` stores total active steps: `(bar_count - 1) * 16 + final_bar_steps`. |
-| Track quantization | Recording quantize amount; affects whether nudge is allowed at 100. | Partial (BAR). Raw byte at track `+0x07`; UI 0/1/2/25/50/75/98/99/100 captured, exact scaling still partial. |
+| Track quantization | Recording quantize amount; affects whether nudge is allowed at 100. | Decoded (BAR). Raw byte at track `+0x07`; displayed UI is `floor(raw * 100 / 255)`. Generated PC-to-device probes confirmed top-end boundaries, including `0xFD -> 99`. |
 | Default step length | Length of newly step-sequenced notes. | Decoded (BAR). U16 ticks at track `+0x02`; default `240`, max `480`, one detent near center = 4 ticks. |
 | Per-track groove override | Bar-page groove overriding tempo swing. | Decoded (BAR). Raw index byte at track `+0x08`; storage is `3 * index` into the displayed UI sequence, saturated at ±99. |
 | P-lock smoothing/shape | Interpolation/smoothing between p-locks. | Decoded raw storage (BAR) at track `+0x3056`; UI curve names/icons still not mapped. |

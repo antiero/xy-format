@@ -62,7 +62,7 @@ Contributor workflow: `docs/workflows/contributor_inspection_workflow.md`.
 | Master EQ / saturator read | `xy/master_eq_inspection.py`, `xy/master_saturator_inspection.py` | partial (`set_master_eq`) |
 | Sampler one-shot read | `xy/sampler_sample_inspection.py` | gap |
 | Project config/global header read | `xy/project_config_inspection.py` | `set_groove`, `set_groove_amount`, `set_click_volume`, `set_scene_length_mode`, `set_project_transpose`, `set_time_signature`, `set_voice_allocation`, `set_midi_channel`, `set_active_scene`, `set_active_song` |
-| Bar menu read | `xy/bar_menu_inspection.py` | `set_pattern_steps`, `set_default_step_length_ticks`, `set_track_quantization_raw`, `set_track_groove_ui`, `set_plock_shape_raw` |
+| Bar menu read | `xy/bar_menu_inspection.py` | `set_pattern_steps`, `set_default_step_length_ticks`, `set_track_quantization_raw`, `set_track_quantization_ui`, `set_track_groove_ui`, `set_plock_shape_raw` |
 | Human report | `tools/inspect_xy.py` | — |
 
 Detailed guide cross-reference: `docs/format/opxy_user_guide_save_audit.md`.
@@ -121,8 +121,8 @@ Field offsets: `docs/format/decoded_image_map.md`.
 - [~] Track scale full enum (3, 4, 6, 8) — partial — `opxy_user_guide_save_audit.md`
 - [x] Final-bar / partial-bar length — total active steps at track+`0x01`;
   `steps = (bars - 1) * 16 + final_bar_steps` — BAR-LEN fixtures
-- [~] Per-track quantization amount — raw byte pinned at track+`0x07`;
-  UI 0/1/2/25/50/75/98/99/100 captured, exact scaling still partial — BAR fixtures
+- [x] Per-track quantization amount — raw byte at track+`0x07`;
+  UI display `floor(raw * 100 / 255)` — BAR fixtures + generated quant probes
 - [x] Default step length (persistent) — u16 ticks at track+`0x02`;
   `240` default, `480` max — `xy/bar_menu_inspection.py`
 - [x] Per-track groove override — index byte at track+`0x08`;
