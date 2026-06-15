@@ -37,30 +37,60 @@ Scene **1**, Track **14**. Re-copy baseline before each row.
 | PC filename | Procedure |
 | --- | --- |
 | `t14-tape-baseline.xy` | T14. Factory defaults (speed **100%**). Save. |
-| `t14-tape-pitch-x01.xy` | M1 param 1 → pitch **×1**. |
+| `t14-tape-pitch-x01.xy` | M1 param 1 → pitch **×1**. = default|
 | `t14-tape-pitch-x10.xy` | M1 param 1 → pitch **×10**. |
 | `t14-tape-speed-050.xy` | M1 param 2 → speed **50%**. |
 | `t14-tape-speed-200.xy` | M1 param 2 → speed **200%**. |
-| `t14-tape-length-01.xy` | M1 param 3 → length **1**. |
+| `t14-tape-length-01.xy` | M1 param 3 → length **1**. = default |
 | `t14-tape-length-10.xy` | M1 param 3 → length **10**. |
-| `t14-tape-mix-00.xy` | M1 param 4 → mix **0**. |
+| `t14-tape-mix-00.xy` | M1 param 4 → mix **0**. = default |
 | `t14-tape-mix-99.xy` | M1 param 4 → mix **99**. |
 
 ## Capture procedure — M2 (sends)
 
 | PC filename | Procedure |
 | --- | --- |
-| `t14-tape-send-t1-99.xy` | M2: T1 send → **99**. |
-| `t14-tape-send-t2-99.xy` | M2: T2 send → **99**. |
-| `t14-tape-send-t3-99.xy` | M2: T3 send → **99**. |
-| `t14-tape-send-t4-99.xy` | M2: T4 send → **99**. |
-| `t14-tape-send-t5-99.xy` | M2: T5 send → **99**. |
-| `t14-tape-send-t6-99.xy` | M2: T6 send → **99**. |
-| `t14-tape-send-t7-99.xy` | M2: T7 send → **99**. |
-| `t14-tape-send-t8-99.xy` | M2: T8 send → **99**. |
+| `t14-tape-send-t1-99.xy` | M2: T1 send → **99**. (others 0) |
+| `t14-tape-send-t8-99.xy` | M2: T8 send → **99**. (others 0) |
+
+default is ALL 99 (t1-t8).
+
+We only do two probes since this likely is encoded the same as for t13 (and t15 and t16). More probes if this turns out not to be the case.
 
 ---
 
 ## Analysis Results
 
-_(append after MTP back)_
+Device-returned captures, 2026-06-15:
+
+### M1 fields
+
+| UI field | Storage | Baseline | Captures |
+| --- | ---: | ---: | --- |
+| Pitch | T14 `+0x3857` | `0x00000000` = x1 | x10 `0x780A3037` |
+| Speed | T14 `+0x385B` | `0x40000000` = 100% | 50% `0x00A237C3`, 200% `0x7FAE7C9F` |
+| Length | T14 `+0x385F` | `0x00000000` = 1 | length 10 `0x5C05180F` |
+| Mix | T14 `+0x3863` | `0x00000000` = 0 | mix 99 `0x7FAE7C9F` |
+
+`t14-tape-pitch-x01.xy`, `t14-tape-length-01.xy`, and `t14-tape-mix-00.xy`
+are byte-identical to baseline because those are defaults.
+
+Note: `t14-tape-pitch-x10.xy` also nudged the speed word from `0x40000000` to
+`0x3FFFFFE7`. Treat this as capture/detent jitter unless a follow-up proves
+pitch x10 intentionally edits speed.
+
+These are device-authored anchors; exact bucket/display boundaries are not
+PC-generated verified.
+
+### M2 sends
+
+T14 Tape sends are stored on source tracks at track-relative `+0x38AB`, not in
+the T14 struct. Baseline has every T1-T8 Tape send at `0x7FFFFFFF` (UI 99).
+
+```text
+t14-tape-send-t1-99.xy: T1=7FFFFFFF, T2-T8=00000000
+t14-tape-send-t8-99.xy: T1-T7=00000000, T8=7FFFFFFF
+```
+
+Known non-semantic save noise: T9-T16 `+0x38F2/+0x38F6` (`0x00 -> 0x40`).
+Edited captures also clear the edited track's `+0x11` (`0x08 -> 0x00`).
