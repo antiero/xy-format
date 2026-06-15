@@ -49,8 +49,16 @@ decode).
 
 ## Analysis Results
 
-_(append after MTP back — do not replace capture procedure above)_
+Confirmed: Punch-in FX triggers are generic note-vector entries at T10
+track-relative `+0x456F`.
 
-**Hypothesis:** `t10-punch-trigger-step1.xy` decodes as one note on step 1;
-`t10-punch-trigger-step9.xy` as one note on step 9; both at T10 `+0x456F`
-using `{u32 tick; u32 gate; u8 note; u8 vel; u8 flags[2]}`.
+| File | Count | Tick | Step | Gate | Note byte | Velocity | Flags |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | --- |
+| `t10-punch-in-fx-baseline.xy` | 0 | - | - | - | - | - | - |
+| `t10-punch-trigger-step1.xy` | 1 | 0 | 1 | 240 | 101 | 100 | `00 00` |
+| `t10-punch-trigger-step9.xy` | 1 | 3840 | 9 | 240 | 101 | 100 | `00 00` |
+
+This closes the basic T10 event-record format: punch triggers use the same
+12-byte note record shape as generic track notes and T9 Brain notes. The
+current captures do not yet map the full punch key range; both trigger captures
+landed on note byte `101`.

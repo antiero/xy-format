@@ -88,7 +88,7 @@ derived from scene row flags, not from `0x06`.
 | +0x3917 / +0x392F | velocity sensitivity / track high-pass filter | u82, u40 |
 | +0x38F2 / +0x38F6 | T9–T16 project-config save side-effect (`0x00`→`0x40` in every PCFG variant; not the edited setting) | PCFG |
 | +0x3CBF | 2-byte UI-state (last-touched?) — co-changes with edits | u40, u66, u82 |
-| ~+0x456F | **note event area**: `[count u8]` + 12-byte note records `{u32 tick; u32 gate; u8 note; u8 vel; u8 flags[2]}` (tick 480/16th, gate 240 = default). Micro-timing lives in `tick` (non-grid values, u79/u87), not the flags. `flags[1]` always 0 in corpus; `flags[0]` 0 for programmed notes, 2 on some MIDI-recorded drum notes (n110); firmware **does** read them (device probe 07: `flags[0]=127` caused a note retrigger), but out-of-range values misbehave — writer emits 0,0 (device default). | u81 decode; corpus scan; probe 07 |
+| ~+0x456F | **note event area**: `[count u8]` + 12-byte note records `{u32 tick; u32 gate; u8 note; u8 vel; u8 flags[2]}` (tick 480/16th, gate 240 = default). Micro-timing lives in `tick` (non-grid values, u79/u87), not the flags. `flags[1]` always 0 in corpus; `flags[0]` 0 for programmed notes, 2 on some MIDI-recorded drum notes (n110); firmware **does** read them (device probe 07: `flags[0]=127` caused a note retrigger), but out-of-range values misbehave — writer emits 0,0 (device default). Confirmed on T9 Brain and T10 Punch-in FX trigger probes. | u81 decode; corpus scan; probe 07; AUX-BRAIN; AUX-T10 |
 | end | trailing zero region (raw-space "tail byte" = its run extension) | — |
 
 **Aux tracks**: T15 = FX1, T16 = FX2 — FX type changes substitute in the
