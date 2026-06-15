@@ -247,6 +247,10 @@ class ImageProject:
     GLOBAL_MASTER_MELODY = 0x89
     GLOBAL_MASTER_COMP = 0x8D
     GLOBAL_MASTER_VOL = 0x91
+    GLOBAL_SAT_GAIN = 0x75
+    GLOBAL_SAT_CLIP = 0x79
+    GLOBAL_SAT_TONE = 0x7D
+    GLOBAL_SAT_MIX = 0x81
 
     @staticmethod
     def _u32(value: int, *, where: str = "value") -> bytes:
@@ -381,6 +385,30 @@ class ImageProject:
 
     def set_master_volume_byte(self, byte: int) -> None:
         self.set_master_volume_raw(self._encode_mix_u32_from_byte(byte, min_u32=0x00A3D70A))
+
+    def set_master_saturator_gain_raw(self, value: int) -> None:
+        self._set_global_u32(self.GLOBAL_SAT_GAIN, value)
+
+    def set_master_saturator_clip_raw(self, value: int) -> None:
+        self._set_global_u32(self.GLOBAL_SAT_CLIP, value)
+
+    def set_master_saturator_tone_raw(self, value: int) -> None:
+        self._set_global_u32(self.GLOBAL_SAT_TONE, value)
+
+    def set_master_saturator_mix_raw(self, value: int) -> None:
+        self._set_global_u32(self.GLOBAL_SAT_MIX, value)
+
+    def set_master_saturator_gain_byte(self, byte: int) -> None:
+        self.set_master_saturator_gain_raw(self._encode_mix_u32_from_byte(byte))
+
+    def set_master_saturator_clip_byte(self, byte: int) -> None:
+        self.set_master_saturator_clip_raw(self._encode_mix_u32_from_byte(byte))
+
+    def set_master_saturator_tone_byte(self, byte: int) -> None:
+        self.set_master_saturator_tone_raw(self._encode_mix_u32_from_byte(byte))
+
+    def set_master_saturator_mix_byte(self, byte: int) -> None:
+        self.set_master_saturator_mix_raw(self._encode_mix_u32_from_byte(byte))
 
     # --- per-track sound / engine (track-relative offsets) ----------------
     TRK_SCALE = 0x06
@@ -710,6 +738,17 @@ class ImageProject:
     DRUM_PAN = 0x06        # signed byte pan (−100..+100 observed on device)
     DRUM_GAIN = 0x7C       # u32 sample gain / loop-crossfade, default 0 (max 0x7FFFFFFF)
 
+    SAMPLER_START = 0x3943
+    SAMPLER_END = 0x3947
+    SAMPLER_LOOP_START = 0x394B
+    SAMPLER_LOOP_END = 0x394F
+    SAMPLER_LOOP_CROSSFADE = 0x3956
+    SAMPLER_SLOT_TUNE = DRUM_TUNE
+    SAMPLER_SLOT_LOOP_TYPE = DRUM_PLAY_MODE
+    SAMPLER_SLOT_TUNE_AUX = 0x04
+    SAMPLER_SLOT_GAIN = 0x05
+    SAMPLER_SLOT_DIRECTION = DRUM_DIRECTION
+
     def set_drum_voice(
         self,
         track: int,
@@ -772,6 +811,66 @@ class ImageProject:
                 gain,
                 where=f"track {track} drum voice {voice} gain",
             )
+        self.mark_edited(track)
+
+    def set_sampler_sample_edit(
+        self,
+        track: int,
+        *,
+        sample_start: int | None = None,
+        sample_end: int | None = None,
+        loop_start: int | None = None,
+        loop_end: int | None = None,
+        loop_crossfade: int | None = None,
+        tune_tenths: int | None = None,
+        loop_type: int | None = None,
+        gain: int | None = None,
+        direction: int | None = None,
+    ) -> None:
+        """Set confirmed one-shot Sampler sample-edit fields.
+
+        Numeric point fields are raw u16/u8 storage values from the P2-B probes.
+        ``tune_tenths`` uses the probe-backed sampler tune encoder.
+        """
+        from .sampler_sample_inspection import encode_sampler_tune_tenths
+
+        s = self.track_start(track)
+
+        def write_u16(rel: int, value: int) -> None:
+            if not 0 <= value <= 0xFFFF:
+                raise ValueError("sampler point value must be u16")
+            self.image[s + rel : s + rel + 2] = value.to_bytes(2, "little")
+
+        if sample_start is not None:
+            write_u16(self.SAMPLER_START, sample_start)
+        if sample_end is not None:
+            write_u16(self.SAMPLER_END, sample_end)
+        if loop_start is not None:
+            write_u16(self.SAMPLER_LOOP_START, loop_start)
+        if loop_end is not None:
+            write_u16(self.SAMPLER_LOOP_END, loop_end)
+        if loop_crossfade is not None:
+            if not 0 <= loop_crossfade <= 0xFF:
+                raise ValueError("sampler loop crossfade must be u8")
+            self.image[s + self.SAMPLER_LOOP_CROSSFADE] = loop_crossfade
+
+        slot = s + self.DRUM_TABLE
+        if tune_tenths is not None:
+            tune_byte, tune_aux = encode_sampler_tune_tenths(tune_tenths)
+            self.image[slot + self.SAMPLER_SLOT_TUNE] = tune_byte
+            self.image[slot + self.SAMPLER_SLOT_TUNE_AUX] = tune_aux
+        if loop_type is not None:
+            if not 0 <= loop_type <= 0xFF:
+                raise ValueError("sampler loop type must be u8")
+            self.image[slot + self.SAMPLER_SLOT_LOOP_TYPE] = loop_type
+        if gain is not None:
+            if not 0 <= gain <= 0xFF:
+                raise ValueError("sampler gain must be u8")
+            self.image[slot + self.SAMPLER_SLOT_GAIN] = gain
+        if direction is not None:
+            if not 0 <= direction <= 0xFF:
+                raise ValueError("sampler direction must be u8")
+            self.image[slot + self.SAMPLER_SLOT_DIRECTION] = direction
         self.mark_edited(track)
 
     # --- preset / instrument assignment -----------------------------------
