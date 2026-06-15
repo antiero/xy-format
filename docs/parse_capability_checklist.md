@@ -62,7 +62,7 @@ Contributor workflow: `docs/workflows/contributor_inspection_workflow.md`.
 | Master EQ / saturator read | `xy/master_eq_inspection.py`, `xy/master_saturator_inspection.py` | partial (`set_master_eq`) |
 | Sampler one-shot read | `xy/sampler_sample_inspection.py` | gap |
 | Project config/global header read | `xy/project_config_inspection.py` | `set_groove`, `set_groove_amount`, `set_click_volume`, `set_scene_length_mode`, `set_project_transpose`, `set_time_signature`, `set_voice_allocation`, `set_midi_channel`, `set_active_scene`, `set_active_song` |
-| Bar menu read | `xy/bar_menu_inspection.py` | `set_pattern_steps`, `set_default_step_length_ticks`, `set_track_quantization_raw`, `set_track_quantization_ui`, `set_track_groove_ui`, `set_plock_shape_raw` |
+| Bar menu read | `xy/bar_menu_inspection.py` | `set_pattern_steps`, `set_default_step_length_ticks`, `set_track_quantization_raw`, `set_track_groove_ui`, `set_plock_shape_raw` |
 | Human report | `tools/inspect_xy.py` | — |
 
 Detailed guide cross-reference: `docs/format/opxy_user_guide_save_audit.md`.
@@ -216,14 +216,226 @@ Field offsets: `docs/format/decoded_image_map.md`.
 
 ## 12. Auxiliary tracks (T9–T16)
 
-- [~] Generic track struct, notes, p-locks — same as instrument tracks
-- [~] Brain (T9) settings / routing — route mask and generic notes decoded;
-  key/scale/link raw fields located, semantic mapping pending PC-generated
-  device verification
-- [ ] Punch-in FX (T10) — gap
-- [ ] External MIDI channel/bank/program/CC (T11) — gap
-- [ ] External CV (T12), audio (T13), tape (T14) — gap
-- [~] FX I/II (T15/T16) type enums and params — partial
+Guide source: OP–XY guide chapter 15 “auxiliary”. Aux mode holds 8 tracks:
+Brain, Punch-in FX, External MIDI, External CV, External Audio, Tape, FX I,
+and FX II. Guide aux track numbers 1–8 correspond to project tracks T9–T16.
+Guide-visible semantics only; storage offsets remain gaps unless cited below.
+
+### 12.0 Shared auxiliary-track substrate
+
+- [~] Generic auxiliary track struct, note sequencing, p-locks, step components —
+  generic note vector confirmed on T9 Brain, T10 Punch-in FX, and T12 External
+  CV; p-locks/step components still need aux-specific fixture coverage
+- [ ] Aux track identity / type enum for T9–T16 — verify whether fixed by slot
+  index only or persisted as engine/type byte
+- [ ] Aux M1/M2/M3/M4 module selector state persistence — gap
+- [ ] Aux-track keyboard note/event encoding differences vs instrument tracks —
+  gap
+- [ ] Aux routing matrix common format: encoder banks T1–T4 / T5–T8 — guide-visible
+  for Brain, External Audio, Tape, FX I/II; storage gap
+- [ ] Aux LFO common block: speed, amount, destination, parameter — guide-visible
+  for External MIDI, External Audio, Tape, FX I/II; storage gap
+- [ ] Aux filter common block: high-pass cutoff, low-pass cutoff — guide-visible
+  for External Audio, Tape, FX I/II; storage gap
+- [ ] Aux send levels to FX I / FX II / Tape where applicable — guide-visible;
+  storage gap
+
+### 12.1 T9 / aux 1 — Brain™
+
+Guide: Brain transposes a whole song or selected routed tracks. M1 exposes
+Brain scale/key controls; M2 exposes routing. Routed tracks are transposed and
+also participate in automatic key detection.
+
+- [ ] Brain enable / active state — gap
+- [~] Brain manual vs automatic key detection mode — raw word located at T9
+  `+0x3857`; semantic state mapping still partial; AUX-BRAIN
+- [~] Brain key enum — raw word located at T9 `+0x385B`; device-authored detents
+  fit a 12-bucket hypothesis, but PC-generated boundary probes falsified the
+  naive boundary formula; AUX-BRAIN
+- [~] Brain scale enum — raw word located at T9 `+0x385F`; device-authored
+  detents fit a 7-bucket hypothesis, but true boundaries remain open;
+  AUX-BRAIN
+- [~] Brain link target / linked instrument-track selection — raw word located
+  at T9 `+0x3863`; guide says links instrument tracks to Brain for live riffing;
+  semantic map still partial; AUX-BRAIN
+- [x] Brain routing mask T1–T8 — M2 routing, T9 `+0x09`, T1-low bit order;
+  AUX-BRAIN
+- [x] Brain transpose note/event encoding from musical keyboard — generic note
+  vector at T9 `+0x456F`; AUX-BRAIN
+- [ ] Brain recorded automation / p-lock support for key, scale, link, routing —
+  gap
+- [ ] Brain interaction with project transpose/global scale fields — gap
+
+### 12.2 T10 / aux 2 — Punch-in FX™
+
+Guide: Punch-in FX can be played, recorded, and performed from the keyboard.
+Lower octave targets percussion tracks; higher octave targets melodic tracks.
+Some effects use gyroscope and pitchbend. Per-track punch-ins can also be
+recorded from instrument tracks with Shift + keyboard and are stored on the
+Punch-in FX aux track.
+
+- [ ] Punch-in FX note/key map — low octave percussion group, high octave melodic
+  group; exact key → effect enum gap
+- [x] Punch-in FX event record format — recorded punch-ins use the generic
+  note vector at T10 `+0x456F`, `tests/test_t10_punch_in_fx_inspection.py`
+- [ ] Punch-in FX per-track vs group-wide target encoding — gap
+- [ ] Punch-in FX percussion/melodic grouping rule — guide-visible; storage gap
+- [ ] Punch-in FX gyroscope modulation capture / persistence — likely runtime-only
+  or event-modulated; gap
+- [ ] Punch-in FX pitchbend modulation capture / persistence — gap
+- [ ] Punch-in FX duration/gate behavior in sequencer — gap
+- [ ] Punch-in FX p-lock/step component compatibility — gap
+
+### 12.3 T11 / aux 3 — External MIDI
+
+Guide: External MIDI sequences notes to external devices over USB-C or multi-out.
+M1 controls MIDI channel, bank, and program. M2/M3 expose eight MIDI CC controls.
+Shift + encoder turns on or selects each CC message. M4 exposes an LFO with
+speed, amount, destination, and parameter.
+
+- [~] External MIDI generic notes/sequencer events — same track substrate likely;
+  needs fixture confirmation
+- [ ] External MIDI output port / transport target interaction with COM or
+  multi-out settings — probably device-global, not `.xy`; verify
+- [x] External MIDI channel current value — M1 dark gray encoder, T11
+  `+0x3857`; 16-bucket detent hypothesis matches captures; boundary-safe
+  formula not proven; AUX-T11
+- [x] External MIDI bank value — M1 mid gray encoder, T11 `+0x385B`;
+  129-bucket detent hypothesis with index 0 = off matches captures;
+  boundary-safe formula not proven; AUX-T11
+- [x] External MIDI program value — M1 light gray encoder, T11 `+0x385F`;
+  129-bucket detent hypothesis with index 0 = off matches captures;
+  boundary-safe formula not proven; AUX-T11
+- [~] External MIDI CC slot table, 8 slots — table localized to T11
+  `+0x3877..+0x3896`; exact number/message word ownership still partial;
+  AUX-T11
+- [ ] External MIDI CC slot enable/on state — Shift + encoder; gap
+- [ ] External MIDI CC number selection per slot — gap
+- [ ] External MIDI CC current value per slot — gap
+- [ ] External MIDI CC p-lock/automation lanes — guide-visible; storage gap
+- [ ] External MIDI LFO speed — M4 dark gray encoder; gap
+- [ ] External MIDI LFO amount — M4 mid gray encoder; gap
+- [ ] External MIDI LFO destination module enum — M4 light gray encoder; gap
+- [ ] External MIDI LFO destination parameter enum — M4 white encoder; gap
+- [ ] External MIDI bank/program send timing on project load vs pattern start —
+  device-behavior gap
+
+### 12.4 T12 / aux 4 — External CV
+
+Guide: External CV uses the multi-out jack; CV is on tip/left and gate is on
+ring/right. The keyboard and sequencer can play notes on a connected CV device.
+
+- [x] External CV generic notes/sequencer events — generic note vector at T12
+  `+0x456F`; octave stored in the ordinary note byte; AUX-T12
+- [ ] External CV output enable / multi-out mode dependency — likely device-global
+  plus project track data; gap
+- [ ] External CV pitch scaling / volts-per-octave assumptions — no project-file
+  field found in current T12 note probes; likely system/CV behavior, but gap
+- [ ] External CV gate polarity / level persistence — no project-file field
+  found in current T12 note probes; likely system/CV behavior, but gap
+- [~] External CV note-to-voltage mapping and transpose behavior — note pitch
+  persists as generic note byte; voltage calibration/transpose behavior gap
+- [ ] External CV pitchbend / glide / portamento support — gap
+- [ ] External CV p-lockable parameters, if any — gap
+- [ ] External CV interaction with project transpose and Brain routing — gap
+
+### 12.5 T13 / aux 5 — External Audio
+
+Guide: External Audio manages audio input and auxiliary output. M1 controls input
+source, analog input drive, input level, and mix to main output. M2 routes
+instrument tracks to aux audio output, with per-track input amount distinct from
+the main mix. M3 provides high-pass/low-pass filtering plus Tape and FX send
+levels. M4 provides LFO speed, amount, destination, and parameter.
+
+- [ ] External Audio input source enum — mic, headset, audio input, USB audio,
+  main output; M1 dark gray encoder; gap
+- [ ] External Audio analog drive/gain — M1 mid gray encoder; applies to analog
+  inputs only; gap
+- [ ] External Audio input level — M1 light gray encoder; contributes to master
+  mix; gap
+- [ ] External Audio main-output mix — M1 white encoder; gap
+- [ ] External Audio input activation / armed state — guide-visible heading;
+  storage gap
+- [ ] External Audio routing mask T1–T8 to aux output — M2; gap
+- [ ] External Audio per-routed-track send amount to aux output — guide-visible;
+  storage gap
+- [ ] External Audio high-pass cutoff — M3 dark gray encoder; gap
+- [ ] External Audio low-pass cutoff — M3 white encoder; gap
+- [ ] External Audio Tape send level — Shift + mid gray encoder; gap
+- [ ] External Audio FX I send level — Shift + light gray encoder; gap
+- [ ] External Audio FX II send level — Shift + white encoder; gap
+- [ ] External Audio LFO speed — M4 dark gray encoder; gap
+- [ ] External Audio LFO amount — M4 mid gray encoder; gap
+- [ ] External Audio LFO destination module enum — M4 light gray encoder; gap
+- [ ] External Audio LFO destination parameter enum — M4 white encoder; gap
+
+### 12.6 T14 / aux 6 — Tape
+
+Guide: Tape plays clips from routed tracks. M1 controls pitch, speed, loop length,
+and wet/original mix. M2 routes tracks into Tape and allows per-track amount.
+M3 provides high-pass/low-pass filter plus FX send levels. M4 provides LFO speed,
+amount, destination, and parameter.
+
+- [ ] Tape clip/key map from musical keyboard — gap
+- [ ] Tape pitch — M1 dark gray encoder; gap
+- [ ] Tape speed — M1 mid gray encoder; gap
+- [ ] Tape loop length enum/scaling — M1 light gray encoder; gap
+- [ ] Tape wet/original mix — M1 white encoder; gap
+- [ ] Tape routing mask T1–T8 — M2; gap
+- [ ] Tape per-routed-track input amount — guide-visible; storage gap
+- [ ] Tape high-pass cutoff — M3 dark gray encoder; gap
+- [ ] Tape low-pass cutoff — M3 white encoder; gap
+- [ ] Tape FX I send level — Shift + light gray encoder; gap
+- [ ] Tape FX II send level — Shift + white encoder; gap
+- [ ] Tape LFO speed — M4 dark gray encoder; gap
+- [ ] Tape LFO amount — M4 mid gray encoder; gap
+- [ ] Tape LFO destination module enum — M4 light gray encoder; gap
+- [ ] Tape LFO destination parameter enum — M4 white encoder; gap
+
+### 12.7 T15 / aux 7 — FX I
+
+Guide: FX I and FX II are OP–XY’s two FX send tracks. Any sound-producing track
+can send into them, and FX I can send to FX II. M1 edits current FX engine
+parameters. M2 exposes routing. M3 provides high-pass/low-pass filtering, and
+FX I has a send level into FX II. M4 provides LFO speed, amount, destination,
+and parameter.
+
+- [~] FX I type enum and params — current checklist says partial; needs guide/FX
+  chapter/device fixtures
+- [ ] FX I selected engine ID — Shift + FX I changes FX slot; gap
+- [ ] FX I engine parameter block — M1; per-engine schema gap
+- [ ] FX I preview keyboard behavior: plays last selected instrument track —
+  runtime/UI behavior; persistence likely none
+- [ ] FX I routing mask / send sources from sound-producing tracks — M2; gap
+- [ ] FX I route amount per source track — gap
+- [ ] FX I high-pass cutoff — M3 dark gray encoder; gap
+- [ ] FX I low-pass cutoff — M3 white encoder; gap
+- [ ] FX I → FX II send level — Shift + white encoder; gap
+- [ ] FX I LFO speed — M4 dark gray encoder; gap
+- [ ] FX I LFO amount — M4 mid gray encoder; gap
+- [ ] FX I LFO destination module enum — M4 light gray encoder; gap
+- [ ] FX I LFO destination parameter enum — M4 white encoder; gap
+
+### 12.8 T16 / aux 8 — FX II
+
+Guide: FX II is the second FX send track. It shares the FX-track structure:
+engine selection, M1 engine parameters, M2 routing, M3 high-pass/low-pass
+filtering, and M4 LFO modulation.
+
+- [~] FX II type enum and params — current checklist says partial; needs guide/FX
+  chapter/device fixtures
+- [ ] FX II selected engine ID — Shift + FX II changes FX slot; gap
+- [ ] FX II engine parameter block — M1; per-engine schema gap
+- [ ] FX II preview keyboard behavior: plays last selected instrument track —
+  runtime/UI behavior; persistence likely none
+- [ ] FX II routing mask / send sources from sound-producing tracks — M2; gap
+- [ ] FX II route amount per source track — gap
+- [ ] FX II high-pass cutoff — M3 dark gray encoder; gap
+- [ ] FX II low-pass cutoff — M3 white encoder; gap
+- [ ] FX II LFO speed — M4 dark gray encoder; gap
+- [ ] FX II LFO amount — M4 mid gray encoder; gap
+- [ ] FX II LFO destination module enum — M4 light gray encoder; gap
+- [ ] FX II LFO destination parameter enum — M4 white encoder; gap
 
 ## 13. Players (arpeggio / maestro / hold)
 

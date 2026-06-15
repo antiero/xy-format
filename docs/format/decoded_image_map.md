@@ -80,7 +80,7 @@ derived from scene row flags, not from `0x06`.
 | +0x3057 + 16×(step−1) | **step-component slot, 16 bytes per step**, one byte per component type within the slot (portamento +9, bend +10, tonality +11, jump +12, param +13, conditional +14, …) | u8/u9, u59–u77 |
 | +0x3857 | engine parameter block: eight 4-byte q16-ish values for synth engines; tonal sampler keeps these centered at `0x40000000` even when preset `engine.params` are unique | u23–u25, u96, 2026-06-15 unique sampler preset |
 | +0x3857 / +0x385B / +0x385F / +0x3863 | **T9 Brain parameter words**: raw key/mode/scale/link fields are located; candidate bucket interpretations for `+0x385B` and `+0x385F` fit device-authored captures but still need PC-generated → device-verified confirmation | AUX-BRAIN |
-| +0x3857 / +0x385B / +0x385F | **T11 External MIDI M1**: channel, bank, program u32 words. Channel uses 16 buckets (index+1 = channel); bank/program use 129 buckets (0=off, 1-128=value). Device detents fit `floor(raw*N/0x80000000)`; boundary-safe writer values still need PC-gen validation. | AUX-T11 |
+| +0x3857 / +0x385B / +0x385F | **T11 External MIDI M1**: channel, bank, program u32 words. Channel uses 16 buckets (index+1 = channel); bank/program use 129 buckets (0=off, 1-128=value). Device detents fit the hypothesized `floor(raw*N/0x80000000)` mapping, but bucket boundaries are unverified and not boundary-safe for PC authoring. | AUX-T11 |
 | +0x3877 | M2 amp envelope ADSR (16 bytes) | u26 |
 | +0x3897 | M3 filter/FX knobs: at least eight 4-byte lanes in sampler presets; unique capture maps params 0-4 and 6-7, while lane 5 serialized as `0x7FFFFFFF` | u30, 2026-06-15 unique sampler preset |
 | +0x38B7 | M4/LFO values: eight 4-byte q16 lanes in sampler presets | u32, u33, 2026-06-15 unique sampler preset |
@@ -90,7 +90,7 @@ derived from scene row flags, not from `0x06`.
 | +0x3917 / +0x392F | velocity sensitivity / track high-pass filter | u82, u40 |
 | +0x38F2 / +0x38F6 | T9–T16 project-config save side-effect (`0x00`→`0x40` in every PCFG variant; not the edited setting) | PCFG |
 | +0x3CBF | 2-byte UI-state (last-touched?) — co-changes with edits | u40, u66, u82 |
-| ~+0x456F | **note event area**: `[count u8]` + 12-byte note records `{u32 tick; u32 gate; u8 note; u8 vel; u8 flags[2]}` (tick 480/16th, gate 240 = default). Micro-timing lives in `tick` (non-grid values, u79/u87), not the flags. `flags[1]` always 0 in corpus; `flags[0]` 0 for programmed notes, 2 on some MIDI-recorded drum notes (n110); firmware **does** read them (device probe 07: `flags[0]=127` caused a note retrigger), but out-of-range values misbehave — writer emits 0,0 (device default). Confirmed on T9 Brain and T10 Punch-in FX trigger probes. | u81 decode; corpus scan; probe 07; AUX-BRAIN; AUX-T10 |
+| ~+0x456F | **note event area**: `[count u8]` + 12-byte note records `{u32 tick; u32 gate; u8 note; u8 vel; u8 flags[2]}` (tick 480/16th, gate 240 = default). Micro-timing lives in `tick` (non-grid values, u79/u87), not the flags. `flags[1]` always 0 in corpus; `flags[0]` 0 for programmed notes, 2 on some MIDI-recorded drum notes (n110); firmware **does** read them (device probe 07: `flags[0]=127` caused a note retrigger), but out-of-range values misbehave — writer emits 0,0 (device default). Confirmed on T9 Brain, T10 Punch-in FX, and T12 External CV probes. | u81 decode; corpus scan; probe 07; AUX-BRAIN; AUX-T10; AUX-T12 |
 | end | trailing zero region (raw-space "tail byte" = its run extension) | — |
 
 **Aux tracks**: T15 = FX1, T16 = FX2 — FX type changes substitute in the

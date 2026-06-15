@@ -18,14 +18,16 @@ bank off, and program off. The file named `t11-midi-channel-01.xy` was used
 for a channel-2 capture, as noted in the probe README; it should not be read
 as a channel-1 change.
 
-For these captures, the observed bucket index is:
+For these captures, the bucket-index hypothesis is:
 
 ```text
 index = floor(raw * bucket_count / 0x80000000)
 ```
 
-That formula is descriptive evidence from device-authored detents, not a
-boundary-safe authoring rule.
+That formula is **hypothesized only**. It matches the returned device-authored
+detent captures, but it is not boundary-safe until PC-generated boundary
+fixtures are checked on device. Brain key/scale work already showed that a
+formula can fit detents while placing bucket edges incorrectly.
 
 ## CC map table
 

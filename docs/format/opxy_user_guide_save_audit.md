@@ -161,7 +161,7 @@ guide-visible aux semantics are still the largest project-format gap.
 | T9 Brain | Manual/auto, key, scale, linked tracks, routing, recorded Brain sequence. | Gap/partial. Track struct exists; no promoted field map for Brain settings/routing. |
 | T10 Punch-in FX | Percussion/melodic mode, punch effect assignments/recorded triggers. | Partial. Recorded punch triggers use the generic note vector at T10 `+0x456F`; full punch key/effect map and modulation behavior remain gaps. |
 | T11 External MIDI | MIDI channel, bank, program, eight assignable CC controls. | Partial. Channel/bank/program words are located at T11 `+0x3857/+0x385B/+0x385F`; CC assignment table localizes to `+0x3877..+0x3896`, but exact number/message ownership remains partial. T11 note-vector confirmation fixture was not captured yet. |
-| T12 External CV | CV/gate behavior and track params. | Gap/partial. |
+| T12 External CV | CV/gate behavior and track params. | Partial. Sequenced CV notes use the generic note vector at T12 `+0x456F`; no project-file CV mode/gate/calibration fields are confirmed. |
 | T13 External Audio | Input level/drive/filters/sends. | Gap/partial. `unnamed 126` captures CC12 input on T13; there is no source-corpus CC13 drive capture yet. |
 | T14 Tape | Tape parameters and sends. | Gap/partial. |
 | T15/T16 FX I/II | FX type and parameters. | Partial. Aux track identity and params are structurally decoded; exact type enums/parameter scaling for chorus/delay/distortion/lofi/phaser/reverb need full tables. |

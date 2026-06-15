@@ -95,14 +95,17 @@ Device-returned captures, 2026-06-15:
 | `t11-midi-program-001.xy` | program | `0x017D05F4` | 1 |
 | `t11-midi-program-128.xy` | program | `0x7F80FDFC` | 128 |
 
-Bucket index observed from device-authored detents:
+Bucket index hypothesis that matches the device-authored detents:
 
 ```text
 index = floor(raw * bucket_count / 0x80000000)
 ```
 
-This is good read evidence for current captures, not yet a boundary-safe PC
-authoring rule.
+This is **hypothesized only**. It is correct for the returned device-authored
+captures in this directory, but should not be used as a boundary-safe decoder
+or PC authoring rule until PC-generated boundary fixtures are verified on
+device. Brain key/scale probes already showed that detent-fitting formulas can
+put bucket boundaries in the wrong place.
 
 ### CC map result: table located, ownership still partial
 

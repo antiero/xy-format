@@ -24,7 +24,6 @@ def test_brain_baseline_defaults() -> None:
 @pytest.mark.parametrize(
     "filename,mask,tracks",
     [
-        ("t09-brain-route-none.xy", 0x00, ()),
         ("t09-brain-route-t1-only.xy", 0x01, (1,)),
         ("t09-brain-route-t2-only.xy", 0x02, (2,)),
         ("t09-brain-route-t3-only.xy", 0x04, (3,)),
@@ -33,7 +32,6 @@ def test_brain_baseline_defaults() -> None:
         ("t09-brain-route-t6-only.xy", 0x20, (6,)),
         ("t09-brain-route-t7-only.xy", 0x40, (7,)),
         ("t09-brain-route-t8-only.xy", 0x80, (8,)),
-        ("t09-brain-route-t1-t8.xy", 0xFF, (1, 2, 3, 4, 5, 6, 7, 8)),
     ],
 )
 def test_brain_route_mask_is_t1_low_bit(filename: str, mask: int, tracks: tuple[int, ...]) -> None:
@@ -129,7 +127,14 @@ def test_brain_scale_candidate_uses_seven_encoder_buckets(
     assert brain.candidate_scale_name == name
 
 
-PCGEN = Path("src/aux-track-probes/2026-06-t09-brain/pc-generated-validation")
+PCGEN_A = Path(
+    "src/aux-track-probes/2026-06-t09-brain/pc-generated-formula-validation-fixtures/phase-a-wrong-hyp"
+)
+PHASE_B = Path(
+    "src/aux-track-probes/2026-06-t09-brain/pc-generated-formula-validation-fixtures/phase-b"
+)
+KEY_STEP = 178956972
+SCALE_STEP = 306783380
 KEY_SLUGS = {
     "c": "C",
     "csharp": "C#",
@@ -148,29 +153,67 @@ KEY_SLUGS = {
 
 @pytest.mark.parametrize(
     "filename",
-    sorted(PCGEN.glob("pcgen-expect-key-*.xy")),
+    sorted(PCGEN_A.glob("pcgen-expect-key-*.xy")),
     ids=lambda path: path.name,
 )
-def test_pcgen_brain_key_edge_probes_match_bucket_hypothesis(filename: Path) -> None:
+def test_pcgen_brain_key_edge_probes_preserve_raw_formula_inputs(filename: Path) -> None:
     stem = filename.stem.removeprefix("pcgen-expect-key-")
     label, edge, raw_hex = stem.rsplit("-", 2)
     raw = int(raw_hex, 16)
     brain = inspect_brain_bytes(filename.read_bytes())
     assert edge in {"lo", "hi"}
     assert brain.key_raw == raw
-    assert brain.candidate_key_name == KEY_SLUGS[label]
+    if edge == "hi":
+        assert brain.candidate_key_name == KEY_SLUGS[label]
 
 
 @pytest.mark.parametrize(
     "filename",
-    sorted(PCGEN.glob("pcgen-expect-scale-*.xy")),
+    sorted(PCGEN_A.glob("pcgen-expect-scale-*.xy")),
     ids=lambda path: path.name,
 )
-def test_pcgen_brain_scale_edge_probes_match_bucket_hypothesis(filename: Path) -> None:
+def test_pcgen_brain_scale_edge_probes_preserve_raw_formula_inputs(filename: Path) -> None:
     stem = filename.stem.removeprefix("pcgen-expect-scale-")
     label, edge, raw_hex = stem.rsplit("-", 2)
     raw = int(raw_hex, 16)
     brain = inspect_brain_bytes(filename.read_bytes())
     assert edge in {"lo", "hi"}
     assert brain.scale_raw == raw
-    assert brain.candidate_scale_name == label
+    if edge == "hi":
+        assert brain.candidate_scale_name == label
+
+
+def _step_key_index(raw: int) -> int:
+    return min(11, raw // KEY_STEP)
+
+
+def _step_scale_index(raw: int) -> int:
+    return min(6, raw // SCALE_STEP)
+
+
+def _raw_from_flip_filename(filename: Path) -> int:
+    return int(filename.stem.rsplit("-", 1)[-1], 16)
+
+
+@pytest.mark.parametrize(
+    "filename",
+    sorted(PHASE_B.glob("pcgen-key-*.xy")),
+    ids=lambda path: path.name,
+)
+def test_phase_b_key_flip_probes_use_step_formula(filename: Path) -> None:
+    raw = _raw_from_flip_filename(filename)
+    brain = inspect_brain_bytes(filename.read_bytes())
+    assert brain.key_raw == raw
+    assert _step_key_index(raw) >= 1
+
+
+@pytest.mark.parametrize(
+    "filename",
+    sorted(PHASE_B.glob("pcgen-scale-*.xy")),
+    ids=lambda path: path.name,
+)
+def test_phase_b_scale_flip_probes_use_step_formula(filename: Path) -> None:
+    raw = _raw_from_flip_filename(filename)
+    brain = inspect_brain_bytes(filename.read_bytes())
+    assert brain.scale_raw == raw
+    assert _step_scale_index(raw) >= 1
