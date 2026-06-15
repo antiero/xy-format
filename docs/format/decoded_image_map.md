@@ -80,9 +80,11 @@ derived from scene row flags, not from `0x06`.
 | +0x3057 + 16×(step−1) | **step-component slot, 16 bytes per step**, one byte per component type within the slot (portamento +9, bend +10, tonality +11, jump +12, param +13, conditional +14, …) | u8/u9, u59–u77 |
 | +0x3857 | engine parameter block: eight 4-byte q16-ish values for synth engines; tonal sampler keeps these centered at `0x40000000` even when preset `engine.params` are unique | u23–u25, u96, 2026-06-15 unique sampler preset |
 | +0x3857 / +0x385B / +0x385F / +0x3863 | **T9 Brain parameter words**: raw key/mode/scale/link fields are located; candidate bucket interpretations for `+0x385B` and `+0x385F` fit device-authored captures but still need PC-generated → device-verified confirmation | AUX-BRAIN |
+| +0x3857 / +0x385B / +0x385F | **T11 External MIDI M1**: channel, bank, program u32 words. Channel uses 16 buckets (index+1 = channel); bank/program use 129 buckets (0=off, 1-128=value). Device detents fit `floor(raw*N/0x80000000)`; boundary-safe writer values still need PC-gen validation. | AUX-T11 |
 | +0x3877 | M2 amp envelope ADSR (16 bytes) | u26 |
 | +0x3897 | M3 filter/FX knobs: at least eight 4-byte lanes in sampler presets; unique capture maps params 0-4 and 6-7, while lane 5 serialized as `0x7FFFFFFF` | u30, 2026-06-15 unique sampler preset |
 | +0x38B7 | M4/LFO values: eight 4-byte q16 lanes in sampler presets | u32, u33, 2026-06-15 unique sampler preset |
+| +0x3877..+0x3896 | **T11 External MIDI CC map table**: eight u32 words touched by M2/M3 CC assignment captures. Table location and bucket-readable values confirmed; exact CC number vs CC message ownership remains partial. | AUX-T11 |
 | +0x38D7 | filter envelope ADSR (16 bytes) | u27 |
 | +0x38FF–0x393B | modulation/performance matrix: modwheel, aftertouch, pitchbend, velocity target/amount, velocity sensitivity, portamento type, width, high-pass | u83, u84, 2026-06-15 unique sampler preset |
 | +0x3917 / +0x392F | velocity sensitivity / track high-pass filter | u82, u40 |
