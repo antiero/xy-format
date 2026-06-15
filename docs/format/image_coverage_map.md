@@ -146,10 +146,11 @@ track unless noted.
 | `+0x3457`–`+0x3856` | **~** | Preset identity region (part 2); abuts stepcomps @ `+0x3457` | `set_preset` |
 | `+0x3857`–`+0x386A` | **x** | Engine params 1–4 (u32 each) | `set_engine_param` |
 | `+0x3877` | **x** | M2 amp ADSR (16 B) | corpus |
-| `+0x3897` | **x** | M3 filter knobs (16 B) | corpus |
+| `+0x3897` | **x** | M3 filter knobs (16 B); aux T13-T16 HPF/LPF pinned, params 2/3 located but semantic effect unknown | corpus, AUX-FILTER |
 | `+0x38AF` | **x** | Send FX I (byte @ `+0x38B2`) | P2-A |
 | `+0x38B3` | **x** | Send FX II (byte @ `+0x38B6`) | P2-A |
-| `+0x38B7` | **~** | M4/LFO values | partial |
+| `+0x38A7` / `+0x38AB` | **x** | Source-track sends to T13 External Audio / T14 Tape | AUX-T13/AUX-T14 |
+| `+0x38B7` | **~** | M4/LFO values; aux speed/amount/dest/param-dest pinned, bucket boundaries open | AUX-LFO |
 | `+0x38D7` | **x** | Filter envelope ADSR | corpus |
 | `+0x38F7` | **x** | Track pan (byte @ `+0x38FA`) | P2-A |
 | `+0x38FB` | **x** | Track volume (byte @ `+0x38FE`) | P2-A, P2-D |
@@ -182,7 +183,7 @@ track unless noted.
 | Scene 2+ mutes (slot index) | **x** | P2-E `mute2`–`mute8` — scene *N* → slot *N−1* |
 | One-shot / multisampler zones | **~** one-shot ✅ P2-B · multi todo | P2-C |
 | Player (arp / maestro / hold) | **?** | P3-B |
-| Aux T9–T16 special settings | **?** | P3-A |
+| Aux T9–T16 special settings | **~** | Brain/T10/T12 notes, T11 M1+CC table, T13/T14 M1+sends, T15/T16 type+delay+sends, shared filter/LFO pinned; CC ownership, routing masks, FX schemas, runtime behavior still open |
 | Project transpose, time sig | **?** | global sweep |
 
 ---
@@ -203,16 +204,16 @@ Counts are **order-of-magnitude** for planning, not exact byte percentages.
 
 | Region | Approx. size | Mostly mapped? | Notes |
 | --- | ---: | --- | --- |
-| Global pinned fields | ~120 B | **x** | Many **?** bytes in `0x08`–`0x54` |
-| Global scene/remainder | ~3.3 KB | **~** | Scene slot structure known; surrounding state bytes partial |
+| Global pinned fields | ~120 B | **x** | Many **?** bytes in `0x09`–`0x54` |
+| Global scene/pre-track | ~3.3 KB | **~** | Slot *structure* known; full flat layout open |
 | Per-track pinned | ~4 KB × 16 | **~** | Large preset blobs copied, not itemized |
 | Per-track unknown middle | ~10 KB × 16 | **?** | Between known anchors |
 | Footer | 56 B | **~** | Song chain partial; size vs older 53 B note |
 
 **Bottom line:** container + notes + plocks + stepcomps + drum table + static
 mixer + master EQ/sat + scene mutes are in good shape. The biggest dark areas
-are **global `0x08`–`0x54`**, **track middle gaps**, **aux/player engines**,
-and **sampler zone internals**.
+are **global `0x09`–`0x54`**, **track middle gaps**, **player engines**,
+**remaining aux behavior**, and **multisampler zone internals**.
 
 ---
 
@@ -230,7 +231,7 @@ and **sampler zone internals**.
 | `2026-06-sample-paths` | M1 | drum slot `+0x08` | **captured** |
 | `2026-06-sampler-oneshot` | P2-B | sampler header `+0x3943`, slot `+0x3957` | **captured** |
 | `2026-06-sampler-multi` | P2-C | zone map | **todo** |
-| `2026-06-aux-tracks` | P3-A | T9–T16 structs | **todo** |
+| `2026-06-aux-track-probes` | P3-A | T9–T16 structs plus shared aux filter/LFO | **captured/partial** |
 | `2026-06-players` | P3-B | player state | **todo** |
 
 Operator capture recipes: `src/*-probes/*/README.md`.
@@ -244,7 +245,7 @@ Promoted fixtures: `src/*-probes/`.
 | --- | --- | --- |
 | `0x74` | EQ **power** follow-up: bands at non-default, then power max | Confirm scaling vs clamp |
 | `0x64` | Global FX enable / bus prefix, not sat gain | Toggle master FX bypass if UI has it |
-| `0x08`–`0x54` | Groove amount, time signature, transpose, voice limit | One global knob per file from `eq0`/`sat0` baseline |
+| `0x09`–`0x54` | Remaining project/global header controls | One global knob per file from a clean baseline |
 | `+0x3147` region | Player or modulation extension | P3-B player enable on T1 |
 | Scene slot routing on multi-scene | Scene *N* mutes → slot *N−1* (P2-E ✅); volumes partial (P2-D) | — |
 | Footer extra byte | Loop/song mode flags | Multi-song arrangement save |
@@ -282,4 +283,4 @@ Audited 2026-06-12 against the format doc set. **Trust order** for offsets:
 | Master compressor | `global+0x90` P2-A | `parse_capability_checklist.md` §11 had duplicate “gap” line — **removed** |
 | Footer size | 56 B in baseline | `record_structure.md` / `decoded_image_map.md` say 53 B — reconcile on next song-table probe |
 
-*Last updated: 2026-06-12 (audit pass: layout math, stepcomp 64×16, doc cross-check).*
+*Last updated: 2026-06-15 (aux probe sync + coverage status refresh).*
