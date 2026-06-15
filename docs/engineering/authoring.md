@@ -45,7 +45,12 @@ p.set_track_scale(track, 2)              # 0.5 / 1 / 2 / 16 (or raw byte)
 # instrument / sound
 p.set_engine(track, engine_id)
 p.set_engine_param(track, index, value)  # index 1..4, internal u32
+p.set_m2_shift(track, play_mode=..., portamento=..., pitch_bend_range=...,
+               engine_volume=...)       # raw current-value u32 lanes
 p.set_filter(track, type=..., enabled=...)
+p.set_sends(track, ext=..., tape=..., fx1=..., fx2=...)
+p.set_lfo_current(track, cc40=..., cc41=...)
+p.set_track_mix(track, pan=..., volume=...)
 p.set_preset(track, donor_path, donor_track)   # whole-instrument copy
 p.set_track_block(track, offset, data)   # envelopes/filter/mod-routing blocks
 
@@ -62,6 +67,18 @@ p.save("out.xy")
 Every method above is validated by byte-exact replication of its device
 capture (`tests/test_image_writer.py`). Component names:
 `STEP_COMPONENTS`; p-lock param names: `PLOCK_PARAMS`.
+
+The M2 shift, send, LFO-current, and mix helpers write static/current u32
+lanes. They do not create automation. To create step automation, use
+`set_plock`/`automate_param`, which also writes the firmware's per-step and
+master automation flags.
+
+`xy/project_to_json.py` now emits an editable `sound_state` section plus
+decoded-image diagnostics under `_decoded_global_state` and
+`_decoded_track_state`. The editable section carries master EQ, engine params,
+envelope blocks, filter knobs, sends, pinned LFO lanes, and mixer pan/volume.
+The underscore-prefixed diagnostics keep byte offsets and candidate regions for
+inspection; they are ignored by the BuildSpec parser.
 
 ### `build_arrangement` (multi-pattern / scenes / songs)
 
