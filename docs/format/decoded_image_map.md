@@ -71,6 +71,8 @@ derived from scene row flags, not from `0x06`.
 | +0x1C | M4/LFO type selector (5 bytes change on LFO swap) | u32 |
 | +0x20 | M4 page on/off | u31, u33 |
 | +0x21 | filter type (SVF/Ladder) | u28 |
+| +0x38A7 | **send to T13 External Audio aux output** u32, stored on the source track | AUX-T13 |
+| +0x38AB | **send to T14 Tape** u32, stored on the source track | AUX-T14 |
 | +0x38AF | **send FX I** u32 (byte @ +0x38B2) | P2-A `f6`/`f7` |
 | +0x38B3 | **send FX II** u32 (byte @ +0x38B6) | P2-A `f8`/`f9` |
 | +0x38F7 | **track pan** u32 (byte @ +0x38FA; center `0x40`) | P2-A `f3`–`f5` |
@@ -81,6 +83,8 @@ derived from scene row flags, not from `0x06`.
 | +0x3857 | engine parameter block: eight 4-byte q16-ish values for synth engines; tonal sampler keeps these centered at `0x40000000` even when preset `engine.params` are unique | u23–u25, u96, 2026-06-15 unique sampler preset |
 | +0x3857 / +0x385B / +0x385F / +0x3863 | **T9 Brain parameter words**: raw key/mode/scale/link fields are located; candidate bucket interpretations for `+0x385B` and `+0x385F` fit device-authored captures but still need PC-generated → device-verified confirmation | AUX-BRAIN |
 | +0x3857 / +0x385B / +0x385F | **T11 External MIDI M1**: channel, bank, program u32 words. Channel uses 16 buckets (index+1 = channel); bank/program use 129 buckets (0=off, 1-128=value). Device detents fit the hypothesized `floor(raw*N/0x80000000)` mapping, but bucket boundaries are unverified and not boundary-safe for PC authoring. | AUX-T11 |
+| +0x3857 / +0x385B / +0x3863 / +0x38FB | **T13 External Audio M1**: source, drive, mix, level. Source detents confirmed for mic/headset/line/USB-C/main; drive/level/mix endpoints or anchors captured. Display/bucket boundaries remain unverified. | AUX-T13 |
+| +0x3857 / +0x385B / +0x385F / +0x3863 | **T14 Tape M1**: pitch, speed, length, mix. Device-authored anchors captured; display/bucket boundaries remain unverified. | AUX-T14 |
 | +0x3877 | M2 amp envelope ADSR (16 bytes) | u26 |
 | +0x3897 | M3 filter/FX knobs: at least eight 4-byte lanes in sampler presets; unique capture maps params 0-4 and 6-7, while lane 5 serialized as `0x7FFFFFFF` | u30, 2026-06-15 unique sampler preset |
 | +0x38B7 | M4/LFO values: eight 4-byte q16 lanes in sampler presets | u32, u33, 2026-06-15 unique sampler preset |

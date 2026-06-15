@@ -231,8 +231,9 @@ Guide-visible semantics only; storage offsets remain gaps unless cited below.
 - [ ] Aux M1/M2/M3/M4 module selector state persistence — gap
 - [ ] Aux-track keyboard note/event encoding differences vs instrument tracks —
   gap
-- [ ] Aux routing matrix common format: encoder banks T1–T4 / T5–T8 — guide-visible
-  for Brain, External Audio, Tape, FX I/II; storage gap
+- [~] Aux routing matrix common format: encoder banks T1–T4 / T5–T8 — source-track
+  send words confirmed for T13/T14/T15/T16 targets; Brain route mask confirmed;
+  full matrix UI ownership and per-aux semantics still partial
 - [x] Aux LFO common block: speed, amount, destination, parameter — raw words at
   `+0x38B7`, `+0x38BB`, `+0x38BF`, `+0x38C3`; device-authored detents
   confirmed for T13 generic destinations and T11 MIDI destinations; bucket
@@ -240,8 +241,8 @@ Guide-visible semantics only; storage offsets remain gaps unless cited below.
 - [x] Aux filter common block: high-pass cutoff, low-pass cutoff — raw M3 words
   at `+0x3897` and `+0x38A3`; params 2/3 also persist raw words at
   `+0x389B` and `+0x389F`, but semantics remain unknown; AUX-FILTER
-- [ ] Aux send levels to FX I / FX II / Tape where applicable — guide-visible;
-  storage gap
+- [x] Aux send levels to External Audio / Tape / FX I / FX II — source-track
+  words `+0x38A7`, `+0x38AB`, `+0x38AF`, `+0x38B3`; AUX-T13/AUX-T14/AUX-T15/AUX-T16
 
 ### 12.1 T9 / aux 1 — Brain™
 
@@ -352,18 +353,22 @@ instrument tracks to aux audio output, with per-track input amount distinct from
 the main mix. M3 provides high-pass/low-pass filtering plus Tape and FX send
 levels. M4 provides LFO speed, amount, destination, and parameter.
 
-- [ ] External Audio input source enum — mic, headset, audio input, USB audio,
-  main output; M1 dark gray encoder; gap
-- [ ] External Audio analog drive/gain — M1 mid gray encoder; applies to analog
-  inputs only; gap
-- [ ] External Audio input level — M1 light gray encoder; contributes to master
-  mix; gap
-- [ ] External Audio main-output mix — M1 white encoder; gap
-- [ ] External Audio input activation / armed state — guide-visible heading;
-  storage gap
-- [ ] External Audio routing mask T1–T8 to aux output — M2; gap
-- [ ] External Audio per-routed-track send amount to aux output — guide-visible;
-  storage gap
+- [x] External Audio input source enum — T13 `+0x3857`; mic/default plus
+  headset, line, USB-C, main-output detents captured; bucket boundaries
+  unverified; AUX-T13
+- [x] External Audio analog drive/gain — T13 `+0x385B`; 0/default and 20 dB
+  anchors captured; display boundaries unverified; AUX-T13
+- [x] External Audio input level — T13 `+0x38FB`; 0/99 anchors and baseline
+  75 captured; display boundaries unverified; AUX-T13
+- [x] External Audio main-output mix — T13 `+0x3863`; 0 and 99/default
+  anchors captured; display boundaries unverified; AUX-T13
+- [~] External Audio input activation / armed state — input-off/default and
+  input-on captures produced no dedicated setting beyond known save noise;
+  likely runtime-only or implicit, but not proven; AUX-T13
+- [~] External Audio routing mask T1–T8 to aux output — M2 sends are source-track
+  words at `+0x38A7`; explicit separate mask not found; AUX-T13
+- [x] External Audio per-routed-track send amount to aux output — source-track
+  `+0x38A7`; AUX-T13
 - [x] External Audio high-pass cutoff — T13 `+0x3897`; AUX-FILTER
 - [x] External Audio low-pass cutoff — T13 `+0x38A3`; AUX-FILTER
 - [ ] External Audio Tape send level — Shift + mid gray encoder; gap
@@ -384,12 +389,17 @@ M3 provides high-pass/low-pass filter plus FX send levels. M4 provides LFO speed
 amount, destination, and parameter.
 
 - [ ] Tape clip/key map from musical keyboard — gap
-- [ ] Tape pitch — M1 dark gray encoder; gap
-- [ ] Tape speed — M1 mid gray encoder; gap
-- [ ] Tape loop length enum/scaling — M1 light gray encoder; gap
-- [ ] Tape wet/original mix — M1 white encoder; gap
-- [ ] Tape routing mask T1–T8 — M2; gap
-- [ ] Tape per-routed-track input amount — guide-visible; storage gap
+- [x] Tape pitch — T14 `+0x3857`; x1/default and x10 anchor captured;
+  display boundaries unverified; AUX-T14
+- [x] Tape speed — T14 `+0x385B`; 50/default/200 anchors captured; display
+  boundaries unverified; AUX-T14
+- [x] Tape loop length enum/scaling — T14 `+0x385F`; length 1/default and
+  length 10 anchors captured; bucket boundaries unverified; AUX-T14
+- [x] Tape wet/original mix — T14 `+0x3863`; 0/default and 99 anchors captured;
+  display boundaries unverified; AUX-T14
+- [~] Tape routing mask T1–T8 — M2 sends are source-track words at `+0x38AB`;
+  explicit separate mask not found; AUX-T14
+- [x] Tape per-routed-track input amount — source-track `+0x38AB`; AUX-T14
 - [x] Tape high-pass cutoff — shared aux M3 word at `+0x3897`; AUX-FILTER
 - [x] Tape low-pass cutoff — shared aux M3 word at `+0x38A3`; AUX-FILTER
 - [ ] Tape FX I send level — Shift + light gray encoder; gap
@@ -409,17 +419,22 @@ parameters. M2 exposes routing. M3 provides high-pass/low-pass filtering, and
 FX I has a send level into FX II. M4 provides LFO speed, amount, destination,
 and parameter.
 
-- [~] FX I type enum and params — current checklist says partial; needs guide/FX
-  chapter/device fixtures
-- [ ] FX I selected engine ID — Shift + FX I changes FX slot; gap
-- [ ] FX I engine parameter block — M1; per-engine schema gap
+- [~] FX I type enum and params — type byte at T15 `+0x14`; delay/reverb/
+  chorus/phaser/distortion/lofi type bytes and delay param block captured;
+  other engines' parameter schemas remain open; AUX-T15
+- [x] FX I selected engine ID — T15 `+0x14`; known type bytes captured;
+  AUX-T15
+- [~] FX I engine parameter block — T15 `+0x3857..+0x3863`; delay anchors
+  captured, per-engine schemas still partial; AUX-T15
 - [ ] FX I preview keyboard behavior: plays last selected instrument track —
   runtime/UI behavior; persistence likely none
-- [ ] FX I routing mask / send sources from sound-producing tracks — M2; gap
-- [ ] FX I route amount per source track — gap
+- [~] FX I routing mask / send sources from sound-producing tracks — M2 sends
+  are source-track words at `+0x38AF`; explicit separate mask not found; AUX-T15
+- [x] FX I route amount per source track — source-track `+0x38AF`; AUX-T15
 - [x] FX I high-pass cutoff — shared aux M3 word at `+0x3897`; AUX-FILTER
 - [x] FX I low-pass cutoff — shared aux M3 word at `+0x38A3`; AUX-FILTER
-- [ ] FX I → FX II send level — Shift + white encoder; gap
+- [ ] FX I → FX II send level — Shift + white encoder; not isolated from
+  ordinary source-track FX II send yet
 - [x] FX I LFO speed — shared aux M4 word at `+0x38B7`; AUX-LFO
 - [x] FX I LFO amount — shared aux M4 word at `+0x38BB`; AUX-LFO
 - [x] FX I LFO destination module enum — shared aux M4 word at `+0x38BF`;
@@ -433,14 +448,18 @@ Guide: FX II is the second FX send track. It shares the FX-track structure:
 engine selection, M1 engine parameters, M2 routing, M3 high-pass/low-pass
 filtering, and M4 LFO modulation.
 
-- [~] FX II type enum and params — current checklist says partial; needs guide/FX
-  chapter/device fixtures
-- [ ] FX II selected engine ID — Shift + FX II changes FX slot; gap
-- [ ] FX II engine parameter block — M1; per-engine schema gap
+- [~] FX II type enum and params — type byte at T16 `+0x14`; delay/reverb/
+  chorus/phaser/distortion/lofi type bytes and delay param block captured;
+  other engines' parameter schemas remain open; AUX-T16
+- [x] FX II selected engine ID — T16 `+0x14`; known type bytes captured;
+  AUX-T16
+- [~] FX II engine parameter block — T16 `+0x3857..+0x3863`; reverb baseline
+  and delay anchors captured, per-engine schemas still partial; AUX-T16
 - [ ] FX II preview keyboard behavior: plays last selected instrument track —
   runtime/UI behavior; persistence likely none
-- [ ] FX II routing mask / send sources from sound-producing tracks — M2; gap
-- [ ] FX II route amount per source track — gap
+- [~] FX II routing mask / send sources from sound-producing tracks — M2 sends
+  are source-track words at `+0x38B3`; explicit separate mask not found; AUX-T16
+- [x] FX II route amount per source track — source-track `+0x38B3`; AUX-T16
 - [x] FX II high-pass cutoff — shared aux M3 word at `+0x3897`; AUX-FILTER
 - [x] FX II low-pass cutoff — shared aux M3 word at `+0x38A3`; AUX-FILTER
 - [x] FX II LFO speed — shared aux M4 word at `+0x38B7`; AUX-LFO

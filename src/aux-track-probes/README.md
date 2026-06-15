@@ -1,32 +1,38 @@
 # Auxiliary Track Probe Plans
 
-Probe scaffolds for OP-XY auxiliary tracks T9-T16.
+Probe packs for OP-XY auxiliary tracks T9–T16 and **shared** M3/M4 layouts.
 
-Each subdirectory contains a per-track baseline copied from
-`src/bar-menu-probes/2026-06-bar-menu/bar0.xy`. Use that baseline as the
-starting point for one-variable device captures. Save new captures into the
-matching directory with the names listed in each README.
+Baseline for all per-track packs: copy
+`src/bar-menu-probes/2026-06-bar-menu/bar0.xy`.
 
-## Directories
+## Per-track packs
 
-| Track | Directory | Baseline |
+| Track | Directory | Status |
 | --- | --- | --- |
-| T9 Brain | `2026-06-t09-brain/` | `t09-brain-baseline.xy` |
-| T10 Punch-in FX | `2026-06-t10-punch-in-fx/` | `t10-punch-in-fx-baseline.xy` |
-| T11 External MIDI | `2026-06-t11-external-midi/` | `t11-external-midi-baseline.xy` |
-| T12 External CV | `2026-06-t12-external-cv/` | `t12-external-cv-baseline.xy` |
-| T13 External Audio | `2026-06-t13-external-audio/` | `t13-external-audio-baseline.xy` |
-| T14 Tape | `2026-06-t14-tape/` | `t14-tape-baseline.xy` |
-| T15 FX I | `2026-06-t15-fx-i/` | `t15-fx-i-baseline.xy` |
-| T16 FX II | `2026-06-t16-fx-ii/` | `t16-fx-ii-baseline.xy` |
+| T9 Brain | `2026-06-t09-brain/` | **Good** — route, key/scale, link, sequence |
+| T10 Punch-in FX | `2026-06-t10-punch-in-fx/` | **Good** — sequencer triggers only |
+| T11 External MIDI | `2026-06-t11-external-midi/` | M1 channel/bank/program; M2/M3 CC map localized |
+| T12 External CV | `2026-06-t12-external-cv/` | Sequencer notes (octave free); no CV params |
+| T13 External Audio | `2026-06-t13-external-audio/` | M1 input bus; source-track aux sends |
+| T14 Tape | `2026-06-t14-tape/` | M1 pitch/speed/length/mix; M2 sends |
+| T15 FX I | `2026-06-t15-fx-i/` | type enum + delay params; source-track FX I sends |
+| T16 FX II | `2026-06-t16-fx-ii/` | type enum + delay params; source-track FX II sends |
 
-## Capture Rules
+## Shared packs (do not duplicate in per-track READMEs)
 
-1. Start every capture from the directory baseline unless the README says
-   otherwise.
-2. Change exactly one visible control, setting, route, or mode.
-3. Use a conspicuous non-default value, but avoid musical content unless the
-   target is a sequenced behavior.
-4. Save the project and copy the resulting `.xy` using the planned filename.
-5. Record the device-visible value in the README before analysis.
-6. After analysis, promote confirmed offsets into docs and tests.
+| Layout | Directory | Vehicle track |
+| --- | --- | --- |
+| M3 filter (HPF/LPF) | `2026-06-aux-filter/` | T13 (applies to T13–T16) |
+| M4 LFO | `2026-06-aux-lfo/` | T13 generic; T11 for off/cc1/cc2 dest |
+
+## Capture rules
+
+1. Re-copy **`bar0.xy`** (or pack baseline) before each one-variable capture.
+2. Change **one** control → **Save** → MTP back with planned filename.
+3. Record device-visible values in each pack's **Analysis Results** section.
+4. Filter and LFO are **not** captured inside T11–T16 track packs.
+
+## Promotion
+
+Confirmed offsets → `docs/format/decoded_image_map.md`, inspection module,
+`tests/test_*`, dated log under `docs/logs/`.
