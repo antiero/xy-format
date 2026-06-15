@@ -50,4 +50,31 @@ Optional cross-check after decode: repeat `aux-filter-hpf-max.xy` capture on
 
 ## Analysis Results
 
-_(append after MTP back)_
+Decoded against `aux-filter-baseline.xy` with firmware 1.1.4 captures.
+
+### Common write side effects
+
+Every edited capture sets the current track's edited-state byte at `+0x0011`
+from `0x08` to `0x00`, turns on the filter block at `+0x0025`
+(`0x00000000` -> `0x00000001`), and shows the usual aux save side effects at
+`+0x38F2` and `+0x38F6` (`0x00000040`).
+
+### T13 M3 filter fields
+
+These are track-relative offsets. T13 was used as the vehicle track; the same
+M3 layout is expected on T14–T16.
+
+| UI field | Offset | Baseline/default | Observed captures |
+| --- | ---: | ---: | --- |
+| Param 1 / HPF | `+0x3897` | `0x00000000` | min/default `0x00000000`, max `0x7FFFFFFF` |
+| Param 2 | `+0x389B` | `0x00000000` | mid `0x7C28F2FF` |
+| Param 3 | `+0x389F` | `0x00000000` | mid `0x3570CA40` |
+| Param 4 / LPF | `+0x38A3` | `0x7FFFFFFF` | min `0x00000000`, max/default `0x7FFFFFFF` |
+
+Param 2 and Param 3 were expected to be inert from the UI description, but the
+device does persist raw words for them. Their audio/semantic effect remains
+unknown.
+
+`aux-filter-lpf-min.xy` also changed Param 2 (`+0x389B`) to `0x0147AF00`.
+Treat that as a capture co-change until a follow-up isolates LPF-min from
+nearby encoder movement.

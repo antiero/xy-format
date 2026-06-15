@@ -237,8 +237,9 @@ Guide-visible semantics only; storage offsets remain gaps unless cited below.
   `+0x38B7`, `+0x38BB`, `+0x38BF`, `+0x38C3`; device-authored detents
   confirmed for T13 generic destinations and T11 MIDI destinations; bucket
   boundaries unverified for PC authoring; AUX-LFO
-- [ ] Aux filter common block: high-pass cutoff, low-pass cutoff — guide-visible
-  for External Audio, Tape, FX I/II; storage gap
+- [x] Aux filter common block: high-pass cutoff, low-pass cutoff — raw M3 words
+  at `+0x3897` and `+0x38A3`; params 2/3 also persist raw words at
+  `+0x389B` and `+0x389F`, but semantics remain unknown; AUX-FILTER
 - [ ] Aux send levels to FX I / FX II / Tape where applicable — guide-visible;
   storage gap
 
@@ -363,8 +364,8 @@ levels. M4 provides LFO speed, amount, destination, and parameter.
 - [ ] External Audio routing mask T1–T8 to aux output — M2; gap
 - [ ] External Audio per-routed-track send amount to aux output — guide-visible;
   storage gap
-- [ ] External Audio high-pass cutoff — M3 dark gray encoder; gap
-- [ ] External Audio low-pass cutoff — M3 white encoder; gap
+- [x] External Audio high-pass cutoff — T13 `+0x3897`; AUX-FILTER
+- [x] External Audio low-pass cutoff — T13 `+0x38A3`; AUX-FILTER
 - [ ] External Audio Tape send level — Shift + mid gray encoder; gap
 - [ ] External Audio FX I send level — Shift + light gray encoder; gap
 - [ ] External Audio FX II send level — Shift + white encoder; gap
@@ -389,8 +390,8 @@ amount, destination, and parameter.
 - [ ] Tape wet/original mix — M1 white encoder; gap
 - [ ] Tape routing mask T1–T8 — M2; gap
 - [ ] Tape per-routed-track input amount — guide-visible; storage gap
-- [ ] Tape high-pass cutoff — M3 dark gray encoder; gap
-- [ ] Tape low-pass cutoff — M3 white encoder; gap
+- [x] Tape high-pass cutoff — shared aux M3 word at `+0x3897`; AUX-FILTER
+- [x] Tape low-pass cutoff — shared aux M3 word at `+0x38A3`; AUX-FILTER
 - [ ] Tape FX I send level — Shift + light gray encoder; gap
 - [ ] Tape FX II send level — Shift + white encoder; gap
 - [x] Tape LFO speed — shared aux M4 word at `+0x38B7`; AUX-LFO
@@ -416,8 +417,8 @@ and parameter.
   runtime/UI behavior; persistence likely none
 - [ ] FX I routing mask / send sources from sound-producing tracks — M2; gap
 - [ ] FX I route amount per source track — gap
-- [ ] FX I high-pass cutoff — M3 dark gray encoder; gap
-- [ ] FX I low-pass cutoff — M3 white encoder; gap
+- [x] FX I high-pass cutoff — shared aux M3 word at `+0x3897`; AUX-FILTER
+- [x] FX I low-pass cutoff — shared aux M3 word at `+0x38A3`; AUX-FILTER
 - [ ] FX I → FX II send level — Shift + white encoder; gap
 - [x] FX I LFO speed — shared aux M4 word at `+0x38B7`; AUX-LFO
 - [x] FX I LFO amount — shared aux M4 word at `+0x38BB`; AUX-LFO
@@ -440,8 +441,8 @@ filtering, and M4 LFO modulation.
   runtime/UI behavior; persistence likely none
 - [ ] FX II routing mask / send sources from sound-producing tracks — M2; gap
 - [ ] FX II route amount per source track — gap
-- [ ] FX II high-pass cutoff — M3 dark gray encoder; gap
-- [ ] FX II low-pass cutoff — M3 white encoder; gap
+- [x] FX II high-pass cutoff — shared aux M3 word at `+0x3897`; AUX-FILTER
+- [x] FX II low-pass cutoff — shared aux M3 word at `+0x38A3`; AUX-FILTER
 - [x] FX II LFO speed — shared aux M4 word at `+0x38B7`; AUX-LFO
 - [x] FX II LFO amount — shared aux M4 word at `+0x38BB`; AUX-LFO
 - [x] FX II LFO destination module enum — shared aux M4 word at `+0x38BF`;
