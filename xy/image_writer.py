@@ -243,6 +243,10 @@ class ImageProject:
     GLOBAL_VOICES = 0x4D  # per-track voice allocation T1..T8, 0=auto
     GLOBAL_MIDI = 0x55      # per-track channel array (T1=0x55 .. T16=0x64)
     GLOBAL_EQ = (0x68, 0x6C, 0x70)  # master EQ low/mid/high, u32 each (default 0x40)
+    GLOBAL_MASTER_PERC = 0x85
+    GLOBAL_MASTER_MELODY = 0x89
+    GLOBAL_MASTER_COMP = 0x8D
+    GLOBAL_MASTER_VOL = 0x91
 
     @staticmethod
     def _u32(value: int, *, where: str = "value") -> bytes:
@@ -307,6 +311,76 @@ class ImageProject:
         for off, val in zip(self.GLOBAL_EQ, (low, mid, high)):
             if val is not None:
                 self.image[off : off + 4] = self._u32(val, where="master EQ value")
+
+    @staticmethod
+    def _encode_mix_u32_from_byte(byte: int, *, min_u32: int = 0) -> int:
+        if not 0 <= byte <= 0x7F:
+            raise ValueError("mix byte must be in 0..0x7F")
+        if byte == 0:
+            return min_u32
+        if byte == 0x7F:
+            return 0x7FFFFFFF
+        return byte << 24
+
+    def _set_global_u32(self, offset: int, value: int) -> None:
+        if not 0 <= value <= 0xFFFFFFFF:
+            raise ValueError("u32 value must be in 0..0xFFFFFFFF")
+        self.image[offset : offset + 4] = value.to_bytes(4, "little")
+
+    def _set_track_u32(self, track: int, offset: int, value: int) -> None:
+        if not 0 <= value <= 0xFFFFFFFF:
+            raise ValueError("u32 value must be in 0..0xFFFFFFFF")
+        s = self.track_start(track)
+        self.image[s + offset : s + offset + 4] = value.to_bytes(4, "little")
+        self.mark_edited(track)
+
+    def set_track_volume_raw(self, track: int, value: int) -> None:
+        self._set_track_u32(track, 0x38FB, value)
+
+    def set_track_pan_raw(self, track: int, value: int) -> None:
+        self._set_track_u32(track, 0x38F7, value)
+
+    def set_track_send_fx1_raw(self, track: int, value: int) -> None:
+        self._set_track_u32(track, 0x38AF, value)
+
+    def set_track_send_fx2_raw(self, track: int, value: int) -> None:
+        self._set_track_u32(track, 0x38B3, value)
+
+    def set_track_volume_byte(self, track: int, byte: int) -> None:
+        self.set_track_volume_raw(track, self._encode_mix_u32_from_byte(byte))
+
+    def set_track_pan_byte(self, track: int, byte: int) -> None:
+        self.set_track_pan_raw(track, self._encode_mix_u32_from_byte(byte))
+
+    def set_track_send_fx1_byte(self, track: int, byte: int) -> None:
+        self.set_track_send_fx1_raw(track, self._encode_mix_u32_from_byte(byte))
+
+    def set_track_send_fx2_byte(self, track: int, byte: int) -> None:
+        self.set_track_send_fx2_raw(track, self._encode_mix_u32_from_byte(byte))
+
+    def set_master_percussion_raw(self, value: int) -> None:
+        self._set_global_u32(self.GLOBAL_MASTER_PERC, value)
+
+    def set_master_melody_raw(self, value: int) -> None:
+        self._set_global_u32(self.GLOBAL_MASTER_MELODY, value)
+
+    def set_master_compressor_raw(self, value: int) -> None:
+        self._set_global_u32(self.GLOBAL_MASTER_COMP, value)
+
+    def set_master_volume_raw(self, value: int) -> None:
+        self._set_global_u32(self.GLOBAL_MASTER_VOL, value)
+
+    def set_master_percussion_byte(self, byte: int) -> None:
+        self.set_master_percussion_raw(self._encode_mix_u32_from_byte(byte, min_u32=0x00A3D70A))
+
+    def set_master_melody_byte(self, byte: int) -> None:
+        self.set_master_melody_raw(self._encode_mix_u32_from_byte(byte, min_u32=0x00A3D70A))
+
+    def set_master_compressor_byte(self, byte: int) -> None:
+        self.set_master_compressor_raw(self._encode_mix_u32_from_byte(byte, min_u32=0x00A3D70A))
+
+    def set_master_volume_byte(self, byte: int) -> None:
+        self.set_master_volume_raw(self._encode_mix_u32_from_byte(byte, min_u32=0x00A3D70A))
 
     # --- per-track sound / engine (track-relative offsets) ----------------
     TRK_SCALE = 0x06
