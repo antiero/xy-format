@@ -233,8 +233,10 @@ Guide-visible semantics only; storage offsets remain gaps unless cited below.
   gap
 - [ ] Aux routing matrix common format: encoder banks T1–T4 / T5–T8 — guide-visible
   for Brain, External Audio, Tape, FX I/II; storage gap
-- [ ] Aux LFO common block: speed, amount, destination, parameter — guide-visible
-  for External MIDI, External Audio, Tape, FX I/II; storage gap
+- [x] Aux LFO common block: speed, amount, destination, parameter — raw words at
+  `+0x38B7`, `+0x38BB`, `+0x38BF`, `+0x38C3`; device-authored detents
+  confirmed for T13 generic destinations and T11 MIDI destinations; bucket
+  boundaries unverified for PC authoring; AUX-LFO
 - [ ] Aux filter common block: high-pass cutoff, low-pass cutoff — guide-visible
   for External Audio, Tape, FX I/II; storage gap
 - [ ] Aux send levels to FX I / FX II / Tape where applicable — guide-visible;
@@ -313,10 +315,12 @@ speed, amount, destination, and parameter.
 - [ ] External MIDI CC number selection per slot — gap
 - [ ] External MIDI CC current value per slot — gap
 - [ ] External MIDI CC p-lock/automation lanes — guide-visible; storage gap
-- [ ] External MIDI LFO speed — M4 dark gray encoder; gap
-- [ ] External MIDI LFO amount — M4 mid gray encoder; gap
-- [ ] External MIDI LFO destination module enum — M4 light gray encoder; gap
-- [ ] External MIDI LFO destination parameter enum — M4 white encoder; gap
+- [x] External MIDI LFO speed — shared M4 word at T11 `+0x38B7`; AUX-LFO
+- [x] External MIDI LFO amount — shared M4 word at T11 `+0x38BB`; AUX-LFO
+- [x] External MIDI LFO destination module enum — T11 `+0x38BF`, off/cc1/cc2
+  detents confirmed; bucket boundaries unverified; AUX-LFO
+- [x] External MIDI LFO destination parameter enum — shared M4 word at T11
+  `+0x38C3`; T13 generic param-target detents confirmed; AUX-LFO
 - [ ] External MIDI bank/program send timing on project load vs pattern start —
   device-behavior gap
 
@@ -364,10 +368,12 @@ levels. M4 provides LFO speed, amount, destination, and parameter.
 - [ ] External Audio Tape send level — Shift + mid gray encoder; gap
 - [ ] External Audio FX I send level — Shift + light gray encoder; gap
 - [ ] External Audio FX II send level — Shift + white encoder; gap
-- [ ] External Audio LFO speed — M4 dark gray encoder; gap
-- [ ] External Audio LFO amount — M4 mid gray encoder; gap
-- [ ] External Audio LFO destination module enum — M4 light gray encoder; gap
-- [ ] External Audio LFO destination parameter enum — M4 white encoder; gap
+- [x] External Audio LFO speed — T13 `+0x38B7`; AUX-LFO
+- [x] External Audio LFO amount — T13 `+0x38BB`; AUX-LFO
+- [x] External Audio LFO destination module enum — T13 `+0x38BF`,
+  syn/filter/amp detents confirmed; bucket boundaries unverified; AUX-LFO
+- [x] External Audio LFO destination parameter enum — T13 `+0x38C3`, param
+  targets 1-4 confirmed; bucket boundaries unverified; AUX-LFO
 
 ### 12.6 T14 / aux 6 — Tape
 
@@ -387,10 +393,12 @@ amount, destination, and parameter.
 - [ ] Tape low-pass cutoff — M3 white encoder; gap
 - [ ] Tape FX I send level — Shift + light gray encoder; gap
 - [ ] Tape FX II send level — Shift + white encoder; gap
-- [ ] Tape LFO speed — M4 dark gray encoder; gap
-- [ ] Tape LFO amount — M4 mid gray encoder; gap
-- [ ] Tape LFO destination module enum — M4 light gray encoder; gap
-- [ ] Tape LFO destination parameter enum — M4 white encoder; gap
+- [x] Tape LFO speed — shared aux M4 word at `+0x38B7`; AUX-LFO
+- [x] Tape LFO amount — shared aux M4 word at `+0x38BB`; AUX-LFO
+- [x] Tape LFO destination module enum — shared aux M4 word at `+0x38BF`;
+  T13 generic detents confirmed; bucket boundaries unverified; AUX-LFO
+- [x] Tape LFO destination parameter enum — shared aux M4 word at `+0x38C3`;
+  T13 param-target detents confirmed; bucket boundaries unverified; AUX-LFO
 
 ### 12.7 T15 / aux 7 — FX I
 
@@ -411,10 +419,12 @@ and parameter.
 - [ ] FX I high-pass cutoff — M3 dark gray encoder; gap
 - [ ] FX I low-pass cutoff — M3 white encoder; gap
 - [ ] FX I → FX II send level — Shift + white encoder; gap
-- [ ] FX I LFO speed — M4 dark gray encoder; gap
-- [ ] FX I LFO amount — M4 mid gray encoder; gap
-- [ ] FX I LFO destination module enum — M4 light gray encoder; gap
-- [ ] FX I LFO destination parameter enum — M4 white encoder; gap
+- [x] FX I LFO speed — shared aux M4 word at `+0x38B7`; AUX-LFO
+- [x] FX I LFO amount — shared aux M4 word at `+0x38BB`; AUX-LFO
+- [x] FX I LFO destination module enum — shared aux M4 word at `+0x38BF`;
+  T13 generic detents confirmed; bucket boundaries unverified; AUX-LFO
+- [x] FX I LFO destination parameter enum — shared aux M4 word at `+0x38C3`;
+  T13 param-target detents confirmed; bucket boundaries unverified; AUX-LFO
 
 ### 12.8 T16 / aux 8 — FX II
 
@@ -432,10 +442,12 @@ filtering, and M4 LFO modulation.
 - [ ] FX II route amount per source track — gap
 - [ ] FX II high-pass cutoff — M3 dark gray encoder; gap
 - [ ] FX II low-pass cutoff — M3 white encoder; gap
-- [ ] FX II LFO speed — M4 dark gray encoder; gap
-- [ ] FX II LFO amount — M4 mid gray encoder; gap
-- [ ] FX II LFO destination module enum — M4 light gray encoder; gap
-- [ ] FX II LFO destination parameter enum — M4 white encoder; gap
+- [x] FX II LFO speed — shared aux M4 word at `+0x38B7`; AUX-LFO
+- [x] FX II LFO amount — shared aux M4 word at `+0x38BB`; AUX-LFO
+- [x] FX II LFO destination module enum — shared aux M4 word at `+0x38BF`;
+  T13 generic detents confirmed; bucket boundaries unverified; AUX-LFO
+- [x] FX II LFO destination parameter enum — shared aux M4 word at `+0x38C3`;
+  T13 param-target detents confirmed; bucket boundaries unverified; AUX-LFO
 
 ## 13. Players (arpeggio / maestro / hold)
 

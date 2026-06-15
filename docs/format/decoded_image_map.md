@@ -85,6 +85,7 @@ derived from scene row flags, not from `0x06`.
 | +0x3897 | M3 filter/FX knobs: at least eight 4-byte lanes in sampler presets; unique capture maps params 0-4 and 6-7, while lane 5 serialized as `0x7FFFFFFF` | u30, 2026-06-15 unique sampler preset |
 | +0x38B7 | M4/LFO values: eight 4-byte q16 lanes in sampler presets | u32, u33, 2026-06-15 unique sampler preset |
 | +0x3877..+0x3896 | **T11 External MIDI CC map table**: eight u32 words touched by M2/M3 CC assignment captures. Table location and bucket-readable values confirmed; exact CC number vs CC message ownership remains partial. | AUX-T11 |
+| +0x38B7 / +0x38BB / +0x38BF / +0x38C3 | **Aux M4 LFO words**: speed, amount, destination, param-dest. T13 generic captures confirm speed min/default `0x40000000`, max `0x7FFFFFFF`; amount min/zero/max `0x00000000`/`0x40000000`/`0x7FFFFFFF`; generic dest syn/filter/amp `0x00000000`/`0x4AAAAAA9`/`0x75555553`; param targets 1-4 `0x07FFFFFF`/`0x27FFFFFD`/`0x47FFFFFB`/`0x77FFFFF8`. T11 MIDI-only dest off/cc1/cc2 uses `+0x38BF` values `0x00000000`/`0x3AAAAAA7`/`0x7AAAAAA3`. Bucket boundaries remain unverified for PC authoring. | AUX-LFO |
 | +0x38D7 | filter envelope ADSR (16 bytes) | u27 |
 | +0x38FF–0x393B | modulation/performance matrix: modwheel, aftertouch, pitchbend, velocity target/amount, velocity sensitivity, portamento type, width, high-pass | u83, u84, 2026-06-15 unique sampler preset |
 | +0x3917 / +0x392F | velocity sensitivity / track high-pass filter | u82, u40 |
