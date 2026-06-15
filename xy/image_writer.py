@@ -350,6 +350,14 @@ class ImageProject:
     def set_track_send_fx2_raw(self, track: int, value: int) -> None:
         self._set_track_u32(track, 0x38B3, value)
 
+    def set_track_send_ext_raw(self, track: int, value: int) -> None:
+        """Set source-track send to T13 External Audio aux output."""
+        self._set_track_u32(track, 0x38A7, value)
+
+    def set_track_send_tape_raw(self, track: int, value: int) -> None:
+        """Set source-track send to T14 Tape."""
+        self._set_track_u32(track, 0x38AB, value)
+
     def set_track_volume_byte(self, track: int, byte: int) -> None:
         self.set_track_volume_raw(track, self._encode_mix_u32_from_byte(byte))
 
@@ -361,6 +369,12 @@ class ImageProject:
 
     def set_track_send_fx2_byte(self, track: int, byte: int) -> None:
         self.set_track_send_fx2_raw(track, self._encode_mix_u32_from_byte(byte))
+
+    def set_track_send_ext_byte(self, track: int, byte: int) -> None:
+        self.set_track_send_ext_raw(track, self._encode_mix_u32_from_byte(byte))
+
+    def set_track_send_tape_byte(self, track: int, byte: int) -> None:
+        self.set_track_send_tape_raw(track, self._encode_mix_u32_from_byte(byte))
 
     def set_master_percussion_raw(self, value: int) -> None:
         self._set_global_u32(self.GLOBAL_MASTER_PERC, value)
@@ -455,10 +469,46 @@ class ImageProject:
         "pan": 0x38F7,     # CC10 current lane
         "volume": 0x38FB,  # CC7 current lane
     }
+    TRK_MIDI_CC_TABLE = 0x3877
+    TRK_AUX_FILTER = 0x3897
+    TRK_AUX_LFO = 0x38B7
     TRK_STEPCOMP = 0x3057   # 16 B per step
     TRK_PLOCK = 0x2A0       # 84 B per step row, u16 cells
     # encoded track-scale byte (0x01=½× .. 0x0E=16×); pass raw for others.
     SCALE_BYTES = {0.5: 0x01, 1: 0x03, 2: 0x05, 16: 0x0E}
+    EXTERNAL_AUDIO_SOURCES = {
+        "mic": 0x00000000,
+        "headset": 0x1FFFFFFE,
+        "hp": 0x1FFFFFFE,
+        "line": 0x46666662,
+        "usb-c": 0x5FFFFFFA,
+        "usbc": 0x5FFFFFFA,
+        "main": 0x79999992,
+    }
+    FX_TYPES = {
+        "delay": 0x00,
+        "reverb": 0x05,
+        "chorus": 0x0C,
+        "phaser": 0x0D,
+        "distortion": 0x0E,
+        "lofi": 0x0F,
+    }
+    AUX_LFO_DEST_GENERIC = {
+        "syn": 0x00000000,
+        "filter": 0x4AAAAAA9,
+        "amp": 0x75555553,
+    }
+    AUX_LFO_DEST_T11 = {
+        "off": 0x00000000,
+        "cc1": 0x3AAAAAA7,
+        "cc2": 0x7AAAAAA3,
+    }
+    AUX_LFO_PARAM_DEST = {
+        1: 0x07FFFFFF,
+        2: 0x27FFFFFD,
+        3: 0x47FFFFFB,
+        4: 0x77FFFFF8,
+    }
 
     STEP_COMPONENTS = {
         "pulse": 0, "hold": 1, "multiply": 2, "velocity": 3, "ramp_up": 4,
@@ -669,6 +719,165 @@ class ImageProject:
                     value,
                     where=f"track {track} mix {name}",
                 )
+
+    def set_brain_route_mask(self, mask: int) -> None:
+        """Set T9 Brain route mask (`bit0=T1` … `bit7=T8`)."""
+        if not 0 <= mask <= 0xFF:
+            raise ValueError("Brain route mask must be u8")
+        self.image[self.track_start(9) + 0x09] = mask
+        self.mark_edited(9)
+
+    def set_brain_routes(self, tracks: list[int] | tuple[int, ...] | set[int]) -> None:
+        """Set T9 Brain routed instrument tracks from 1-based T1..T8 numbers."""
+        mask = 0
+        for track in tracks:
+            if not 1 <= track <= 8:
+                raise ValueError("Brain routes must be instrument tracks 1..8")
+            mask |= 1 << (track - 1)
+        self.set_brain_route_mask(mask)
+
+    def set_external_midi_m1_raw(
+        self,
+        *,
+        channel: int | None = None,
+        bank: int | None = None,
+        program: int | None = None,
+    ) -> None:
+        """Set confirmed T11 M1 raw words. Bucket boundaries are not implied."""
+        if channel is not None:
+            self.set_engine_param(11, 1, channel)
+        if bank is not None:
+            self.set_engine_param(11, 2, bank)
+        if program is not None:
+            self.set_engine_param(11, 3, program)
+
+    def set_external_midi_cc_word(self, slot: int, value: int) -> None:
+        """Set one raw T11 CC-table word (slot 1..8).
+
+        The table location is confirmed; exact number/message/on-state ownership
+        is still partial, so this stays a raw-word API.
+        """
+        if not 1 <= slot <= 8:
+            raise ValueError("External MIDI CC slot must be 1..8")
+        self._set_track_u32(11, self.TRK_MIDI_CC_TABLE + (slot - 1) * 4, value)
+
+    def set_external_audio_m1_raw(
+        self,
+        *,
+        source: int | None = None,
+        drive: int | None = None,
+        level: int | None = None,
+        mix: int | None = None,
+    ) -> None:
+        """Set confirmed T13 External Audio M1 raw words."""
+        if source is not None:
+            self.set_engine_param(13, 1, source)
+        if drive is not None:
+            self.set_engine_param(13, 2, drive)
+        if mix is not None:
+            self.set_engine_param(13, 4, mix)
+        if level is not None:
+            self.set_track_volume_raw(13, level)
+
+    def set_external_audio_source(self, source: str) -> None:
+        """Set T13 input source from captured labels: mic/headset/line/usb-c/main."""
+        try:
+            raw = self.EXTERNAL_AUDIO_SOURCES[source.lower()]
+        except KeyError as exc:
+            valid = ", ".join(sorted(self.EXTERNAL_AUDIO_SOURCES))
+            raise ValueError(f"unknown external-audio source {source!r}; expected one of {valid}") from exc
+        self.set_external_audio_m1_raw(source=raw)
+
+    def set_tape_m1_raw(
+        self,
+        *,
+        pitch: int | None = None,
+        speed: int | None = None,
+        length: int | None = None,
+        mix: int | None = None,
+    ) -> None:
+        """Set confirmed T14 Tape M1 raw words."""
+        for index, value in enumerate((pitch, speed, length, mix), start=1):
+            if value is not None:
+                self.set_engine_param(14, index, value)
+
+    def set_aux_filter_raw(
+        self,
+        track: int,
+        *,
+        hpf: int | None = None,
+        param2: int | None = None,
+        param3: int | None = None,
+        lpf: int | None = None,
+        enable: bool = True,
+    ) -> None:
+        """Set shared aux M3 filter raw words on T13-T16."""
+        if track not in range(13, 17):
+            raise ValueError("aux filter is confirmed for tracks 13..16")
+        for index, value in enumerate((hpf, param2, param3, lpf)):
+            if value is not None:
+                self._set_track_u32(track, self.TRK_AUX_FILTER + index * 4, value)
+        if enable:
+            self.image[self.track_start(track) + self.TRK_FILTER_ON] = 1
+            self.mark_edited(track)
+
+    def set_aux_lfo_raw(
+        self,
+        track: int,
+        *,
+        speed: int | None = None,
+        amount: int | None = None,
+        destination: int | None = None,
+        param_dest: int | None = None,
+        enable: bool = True,
+    ) -> None:
+        """Set shared aux M4 LFO raw words on T9-T16.
+
+        Device-authored detents are known for T13 generic destinations and T11
+        MIDI destinations; bucket boundaries are deliberately not encoded here.
+        """
+        if track not in range(9, 17):
+            raise ValueError("aux LFO is confirmed for tracks 9..16")
+        for index, value in enumerate((speed, amount, destination, param_dest)):
+            if value is not None:
+                self._set_track_u32(track, self.TRK_AUX_LFO + index * 4, value)
+        if enable:
+            self.image[self.track_start(track) + self.TRK_M4_PAGE] = 1
+            self.mark_edited(track)
+
+    def set_aux_lfo_destination(self, track: int, destination: str) -> None:
+        """Set the captured aux LFO destination label for T11 or generic aux tracks."""
+        key = destination.lower()
+        table = self.AUX_LFO_DEST_T11 if track == 11 else self.AUX_LFO_DEST_GENERIC
+        try:
+            raw = table[key]
+        except KeyError as exc:
+            valid = ", ".join(sorted(table))
+            raise ValueError(f"unknown aux LFO destination {destination!r}; expected one of {valid}") from exc
+        self.set_aux_lfo_raw(track, destination=raw)
+
+    def set_aux_lfo_param_dest(self, track: int, param: int) -> None:
+        """Set captured aux LFO parameter target 1..4."""
+        try:
+            raw = self.AUX_LFO_PARAM_DEST[param]
+        except KeyError as exc:
+            raise ValueError("aux LFO param target must be 1..4") from exc
+        self.set_aux_lfo_raw(track, param_dest=raw)
+
+    def set_fx_type(self, track: int, type_byte: int) -> None:
+        """Set T15/T16 FX engine type byte."""
+        if track not in (15, 16):
+            raise ValueError("FX type setter is confirmed for tracks 15 and 16")
+        self.set_engine(track, type_byte)
+
+    def set_fx_type_name(self, track: int, name: str) -> None:
+        """Set T15/T16 FX type from captured labels."""
+        try:
+            type_byte = self.FX_TYPES[name.lower()]
+        except KeyError as exc:
+            valid = ", ".join(sorted(self.FX_TYPES))
+            raise ValueError(f"unknown FX type {name!r}; expected one of {valid}") from exc
+        self.set_fx_type(track, type_byte)
 
     def set_filter(self, track: int, *, type: int | None = None, enabled: bool | None = None) -> None:
         s = self.track_start(track)
