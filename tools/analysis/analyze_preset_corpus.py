@@ -82,6 +82,9 @@ PRESET_LABEL_OFFSET = 0x453F
 PRESET_LABEL_MAX = 0x30
 SAMPLER_SAMPLE_PATH_OFFSET = 0x395F
 SAMPLER_SAMPLE_PATH_MAX = 0x60
+SAMPLER_SLOT_ROOT_KEY_OFFSET = 0x3957
+SAMPLER_SLOT_GAIN_OFFSET = 0x395C
+SAMPLER_SLOT_DIRECTION_OFFSET = 0x395E
 TRACK1_OCTAVE_OFFSET = 0x003D
 
 PLAYMODE_WORDS = {
@@ -107,7 +110,7 @@ FIELD_COVERAGE = [
     ("engine.velocity.sensitivity", "confirmed", "q16 word at `track+0x3917`."),
     ("engine.portamento.type", "confirmed", "q16 word at `track+0x391B`."),
     ("engine.modulation.*.target/amount", "confirmed", "q16 words at `track+0x38FF..0x3937`."),
-    ("engine.tuning[]", "unresolved", "Observed on some organ/epiano/drum/wavetable presets; no project mapping found yet."),
+    ("engine.tuning[]", "unresolved", "Observed on some organ/epiano/drum/wavetable presets. The paired captures all use the same 12-value table, and no direct float/int/q16 byte table has been found yet."),
     ("envelope.amp.*", "confirmed", "q16 words at `track+0x3877..0x3883`."),
     ("envelope.filter.*", "confirmed", "q16 words at `track+0x38D7..0x38E3`."),
     ("fx.type", "confirmed", "Byte at `track+0x21`: `z lowpass=9`, `svf=10`, `ladder=16`, `z hipass=17`."),
@@ -117,12 +120,14 @@ FIELD_COVERAGE = [
     ("lfo.active", "confirmed", "Boolean byte at `track+0x20`."),
     ("lfo.params[0..7]", "confirmed", "q16 words at `track+0x38B7..0x38D3`."),
     ("regions[0].sample (sampler)", "confirmed", "C string at `track+0x395F`: `/fat32/presets/1/<preset>.preset/<sample>`."),
+    ("regions[0].hikey/pitch.keycenter (sampler)", "confirmed", "Root/keycenter byte at `track+0x3957`; these match each other in the current corpus."),
     ("regions[0].framecount/sample.end/loop.start/loop.end (sampler)", "confirmed", "u32 words at `track+0x393F/0x3947/0x394B/0x394F`."),
     ("regions[0].sample.start (sampler)", "partial", "u32 word at `track+0x3943` when present; absence in JSON means no expectation."),
-    ("regions[0].loop.crossfade (sampler)", "partial", "Low byte at `track+0x3956`; values above 255 need separate encoding work."),
-    ("regions[0].loop.onrelease/reverse/gain/tune (sampler)", "partial", "Known slot fields exist, but this corpus pass does not yet exhaustively validate all encodings."),
-    ("regions[].sample/hikey/reverse/pan/transpose/tune/playmode (drum)", "partial", "Mostly aligns with drum slot table at `track+0x3957 + voice*0x80`; partial kits need stricter alignment checks."),
-    ("regions[].sample.end/framecount/fade.* (drum)", "unresolved", "Current corpus shows shifted/indirect storage for `sample.end`; do not claim direct mapping from this pass."),
+    ("regions[0].loop.crossfade (sampler)", "confirmed", "Byte at `track+0x3956` is `floor(loop.crossfade * 128 / framecount)`."),
+    ("regions[0].reverse/gain (sampler)", "confirmed-for-observed-values", "`reverse=false` maps to `track+0x395E == 0`; observed `gain` values map directly to byte `track+0x395C`."),
+    ("regions[0].loop.onrelease/tune (sampler)", "unresolved", "`loop.onrelease=true` does not map to the current loop-type byte assumption in this corpus. `tune` is always zero, while slot `+0x00` is keycenter/root."),
+    ("regions[].sample/hikey/reverse/pan/transpose/tune/playmode (drum)", "partial", "Mostly aligns with drum slot table at `track+0x3957 + voice*0x80`; current captures only show `oneshot`, mostly as byte `1`."),
+    ("regions[].sample.end/framecount/fade.* (drum)", "candidate", "For most full kits, `sample.end` for voice N is stored at previous slot `+0x70`, similar to fade storage. Voice 0 and suspect kit alignments remain unresolved."),
     ("regions[].lokey/pitch.keycenter", "ignored-or-unresolved", "Often redundant with `hikey`/default keycenter, but no independent project field is confirmed."),
 ]
 
@@ -204,6 +209,7 @@ def analyze(corpus: Path) -> str:
             "- `engine.playmode` maps to the raw word at `track+0x3887` (`poly=0x15555555`, `mono=0x3FFFFFFF`).",
             "- `envelope.amp.*`, `envelope.filter.*`, most `engine.*` lanes, most `fx.params[0..7]`, and `lfo.params[0..7]` map as the high 16 bits of 4-byte words in the known sound-state block.",
             "- Sampler project sample windows store full u32 values at `track+0x393F..0x394F`, not u16 values.",
+            "- Sampler `loop.crossfade` stores a normalized byte: `floor(loop.crossfade * 128 / framecount)` at `track+0x3956`.",
             "",
             "## Mismatches / Exceptions",
             "",
@@ -345,6 +351,37 @@ def _check_sampler_fields(pairs: list[Pair], mismatches: dict[str, list[str]]) -
                 got = _u32(pair.project.image, pair.track_start + offset)
                 if got != expected:
                     mismatches[path].append(f"`{pair.name}`: expected `{expected}`, got `{got}`")
+        keycenter = region.get("pitch.keycenter")
+        hikey = region.get("hikey")
+        expected_key = keycenter if isinstance(keycenter, int) else hikey
+        if isinstance(expected_key, int):
+            got = pair.project.image[pair.track_start + SAMPLER_SLOT_ROOT_KEY_OFFSET]
+            if got != expected_key:
+                mismatches["regions.0.pitch.keycenter"].append(
+                    f"`{pair.name}`: expected `{expected_key}`, got `{got}`"
+                )
+        framecount = region.get("framecount")
+        crossfade = region.get("loop.crossfade")
+        if isinstance(framecount, int) and framecount > 0 and isinstance(crossfade, int):
+            expected_crossfade = min(255, (crossfade * 128) // framecount)
+            got = pair.project.image[pair.track_start + 0x3956]
+            if got != expected_crossfade:
+                mismatches["regions.0.loop.crossfade"].append(
+                    f"`{pair.name}`: expected `{expected_crossfade}` from `{crossfade}`/`{framecount}`, got `{got}`"
+                )
+        reverse = region.get("reverse")
+        if isinstance(reverse, bool):
+            expected_direction = 1 if reverse else 0
+            got = pair.project.image[pair.track_start + SAMPLER_SLOT_DIRECTION_OFFSET]
+            if got != expected_direction:
+                mismatches["regions.0.reverse"].append(
+                    f"`{pair.name}`: expected `{expected_direction}`, got `{got}`"
+                )
+        gain = region.get("gain")
+        if isinstance(gain, int):
+            got = _s8(pair.project.image[pair.track_start + SAMPLER_SLOT_GAIN_OFFSET])
+            if got != gain:
+                mismatches["regions.0.gain"].append(f"`{pair.name}`: expected `{gain}`, got `{got}`")
 
 
 def _lookup(data: dict[str, Any], dotted_path: str) -> Any:

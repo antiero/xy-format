@@ -72,7 +72,9 @@ All preset types:
 | `fx.type` | Byte at `track+0x21`: `z lowpass=9`, `svf=10`, `ladder=16`, `z hipass=17`. |
 | `fx.active` | Boolean byte at `track+0x25`. |
 | sampler sample path | C string at `track+0x395F`, usually `/fat32/presets/1/<preset>.preset/<sample>`. |
+| sampler `hikey` / `pitch.keycenter` | Root/keycenter byte at `track+0x3957`. These two JSON fields match each other in the current sampler corpus. |
 | sampler sample windows | Full u32 values at `track+0x393F/0x3943/0x3947/0x394B/0x394F`. |
+| sampler `loop.crossfade` | Normalized byte at `track+0x3956`: `floor(loop.crossfade * 128 / framecount)`. |
 
 The sampler sample-window finding matters for writer coverage: the current
 patch adapter/writer assumptions must not treat these as u16 fields. Many
@@ -93,16 +95,17 @@ captured `framecount`, `sample.end`, `loop.start`, and `loop.end` values exceed
 | `engine.velocity.sensitivity`, `engine.portamento.type`, `engine.tuning.scale`, `engine.width`, `engine.tuning.root`, `engine.highpass` | confirmed | q16 words in the `track+0x3917..0x392F` block. |
 | `engine.transpose` | candidate | Raw word at `track+0x3927`; observed `0 -> 0x3FFFFFF8`, `12 -> 0x550A8538`. Encoding not generalized. |
 | `engine.modulation.*.target/amount` | confirmed | q16 words at `track+0x38FF..0x3937`. |
-| `engine.tuning[]` | unresolved | Observed on some organ/epiano/drum/wavetable presets; no project mapping found yet. |
+| `engine.tuning[]` | unresolved | Observed on some organ/epiano/drum/wavetable presets. The paired captures all use the same 12-value table, and no direct float/int/q16 byte table has been found yet. |
 | `envelope.amp.*`, `envelope.filter.*` | confirmed | q16 ADSR words in the known envelope blocks. |
 | `fx.type`, `fx.active` | confirmed | Header bytes at `track+0x21` and `track+0x25`. |
 | `fx.params[0..7]` | confirmed-with-exception | q16 words at `track+0x3897..0x38B3`; `params[5]` can serialize as max for some FX/type combinations. |
 | `lfo.type`, `lfo.active` | confirmed | Header bytes at `track+0x1C` and `track+0x20`. |
 | `lfo.params[0..7]` | confirmed | q16 words at `track+0x38B7..0x38D3`. |
-| sampler `regions[0].sample`, `framecount`, `sample.end`, `loop.start`, `loop.end` | confirmed | Sample path string and u32 sample-window fields. |
-| sampler `regions[0].sample.start`, `loop.crossfade`, `loop.onrelease`, `reverse`, `gain`, `tune` | partial | Known slot fields exist, but this corpus pass does not yet exhaustively validate all encodings. |
-| drum `regions[].sample`, `hikey`, `reverse`, `pan`, `transpose`, `tune`, `playmode` | partial | Mostly aligns with drum slot table at `track+0x3957 + voice*0x80`; partial kits need stricter alignment checks. |
-| drum `regions[].sample.end`, `framecount`, `fade.*` | unresolved | Current corpus shows shifted/indirect storage for `sample.end`; do not claim direct mapping from this pass. |
+| sampler `regions[0].sample`, `hikey`, `pitch.keycenter`, `framecount`, `sample.end`, `loop.start`, `loop.end`, `loop.crossfade` | confirmed | Sample path string, root/keycenter byte, u32 sample-window fields, and normalized crossfade byte. |
+| sampler `regions[0].sample.start`, `reverse`, `gain` | confirmed-for-observed-values | `sample.start` maps to the u32 word when present; `reverse=false` maps to direction byte `0`; observed `gain` values map directly to byte `track+0x395C`. |
+| sampler `regions[0].loop.onrelease`, `tune` | unresolved | `loop.onrelease=true` does not match the previous loop-type assumption in this corpus. `tune` is always zero; slot `+0x00` is keycenter/root instead. |
+| drum `regions[].sample`, `hikey`, `reverse`, `pan`, `transpose`, `tune`, `playmode` | partial | Mostly aligns with drum slot table at `track+0x3957 + voice*0x80`; current captures only show `oneshot`, mostly as byte `1`. |
+| drum `regions[].sample.end`, `framecount`, `fade.*` | candidate | For most full kits, `sample.end` for voice N is stored at previous slot `+0x70`, similar to fade storage. Voice 0 and suspect kit alignments remain unresolved. |
 | `regions[].lokey`, `regions[].pitch.keycenter` | ignored-or-unresolved | Often redundant with `hikey`/default keycenter, but no independent project field is confirmed. |
 
 ## Exceptions
@@ -133,6 +136,16 @@ nt-fly kites
 
 This looks like an engine/FX-specific saturation or fixed default lane rather
 than random drift, because all ten project values are exactly `0x7FFFFFFF`.
+
+Drum kit alignment caveats:
+
+- `nt-hard spunch.xy` appears rotated relative to its `patch.json` region order.
+- `nt-cherry.xy` has a missing/empty voice in the middle of the 24-slot table,
+  after which path and end alignment no longer match a simple `hikey - 53`
+  mapping.
+- Clean full-kit captures support the candidate rule that drum `sample.end`
+  for voice N is stored at the previous slot's `+0x70`, but voice 0 still
+  needs a targeted fixture.
 
 ## Tooling
 
