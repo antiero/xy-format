@@ -87,10 +87,8 @@ One tiny probe file + a glance at the device UI each:
 1. **Preset/instrument assignment from structs** (path string + param
    block) — unlocks authoring beyond baseline's default instruments.
 2. **Custom sample kits** (after Tier 1 §4).
-3. **midi_to_xy v2** on the image writer (replace scaffold/transplant
-   paths; drop ghost placeholders and the velocity nudge).
-4. Retire legacy code paths (`xy/writer.py`, descriptor lookups,
-   preamble rules) and close superseded issue docs.
+3. **midi_to_xy polish** on the image writer: richer arrangement controls,
+   preset assignment, and generated-project validation.
 
 ## Done (highlights)
 
@@ -103,6 +101,9 @@ One tiny probe file + a glance at the device UI each:
 4. `xy/image_writer.py`: byte-exact replication of device captures;
    device-verified probes incl. note==velocity; Whitney capstone plays
    end-to-end with scenes + song chain.
+5. 2026-06: legacy raw-byte writer stack removed. The deleted surface
+   included scaffold/project builders, descriptor/profile JSON compiler,
+   event-type note encoders, and preamble/pointer issue docs.
 
 ---
 

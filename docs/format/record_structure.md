@@ -2,9 +2,8 @@
 
 > Established 2026-06-09 from the record-boundary reframe. Narrative and
 > validation detail: `docs/logs/2026-06-09_record_boundary_reframe.md`.
-> This document supersedes the framing in `descriptor_encoding.md`,
-> `pretrack_pattern_directory.md`, and the preamble portions of
-> `track_blocks.md` / `docs/issues/preamble_state_machine.md`.
+> This document supersedes the removed pre-RLE descriptor, pretrack, track
+> block, event-type, and preamble-state-machine references.
 
 ## 0. The Serialization Model (read this first)
 
@@ -131,7 +130,7 @@ rejected file is `bleez34.xy`, which also crashes the device.**
 |----------------|---------|
 | descriptor token `0x1E − track` | trailing zero-run extension count (`32 − track − 2`) |
 | v56 / v57 | first two values of record 0 |
-| Scheme A vs B, short/collapsed forms | RLE output for different selection states |
+| old scheme labels and short/collapsed forms | RLE output for different selection states |
 | `j06` body `06 00 00 16` | T1=8, T2=8, ext×6 (all tracks on P9), zero-run |
 | bleez `08 08` sub-delimiters | RLE pairs of value 8 (tracks selecting P9) |
 | bleez `0x1F` separator | `00 00 1F` = a 33-zero blank record |
@@ -176,18 +175,15 @@ plain `[list][loop_word]` model; exact field still unplaced.
 
 ## 6. Tools
 
-- Decoder: `tools/analysis/pretrack_records.py` — prints scenes as
-  `sel[T3=P2,T4=P3] mute[T1] flags=0x1` per record.
-- Raw block scan: use the scale-tolerant signature regex
-  `00 00 01 [\x00-\x0f] FF 00 FC 00` (note `xy/structs.py`'s
-  `find_track_blocks` currently misses clone/overflow blocks and
-  scale-changed tracks).
+- Scene/song reference: `docs/format/scenes_songs.md`.
+- Authoring: `xy/image_writer.py` (`build_arrangement`).
+- Decoded-image diffing: `tools/analysis/decoded_diff.py`.
+- Human inspection: `tools/inspect_xy.py`.
 
 ## 7. Open Items
 
 - `unnamed 154b` / `unnamed 156` carry one extra pre-track byte beyond
   n×33 (song-coupled / matrix-authored branches).
-- Mute value 2 (1 unobserved — solo?).
-- Song arrangement (scene order, loop) lives in Track 16, not pre-track.
+- Song slot expanded-field details beyond the current writer model.
 - Engine-default trailer internals (codes 0x86/0x83/0x85/0x8A/0x9B).
-- Keyframe slab layout (0x60/0x61 endings; pointer-21 events).
+- Keyframe slab layout (0x60/0x61 endings).

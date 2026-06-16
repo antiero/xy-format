@@ -4,7 +4,7 @@
 
 ## Current Coverage
 - Header summary.
-- Pattern directory/pre-track observations.
+- Decoded pattern and track observations.
 - Structural track preset paths @ `+0x453F` (`xy/preset_path_inspection.py`) —
   short `category/name` strings; works on blank patterns.
 - Active track/pattern preset-reference inference when project bodies expose
@@ -20,8 +20,8 @@
 - Master saturator (`xy/master_saturator_inspection.py`).
 - Project config: transpose, scene length, time signature, groove, T1–T8 voice
   allocation, T1–T16 MIDI channels (`xy/project_config_inspection.py`).
-- P-lock lane summary for standard and known T10 9-byte p-lock headers.
-- Per-track scan and event summaries.
+- P-lock lane summary from decoded-image tables.
+- Per-track decoded state summaries.
 - Legacy EQ/global snippets (older offsets).
 
 ## Usage
@@ -30,6 +30,5 @@
 - `python tools/inspect_xy.py 'src/project-config-probes/2026-06-project-config/prjconf-v-mix-1234.xy'`
 
 ## Notes
-- Pointer-tail and pointer-21 note decode is still incomplete; see `docs/issues/pointer_tail_decoding.md`.
 - Use with `docs/workflows/inspector_sweep.md` for structured corpus validation.
 - Preset reference inference is heuristic — see confidence in `[Pattern Presets]` output.

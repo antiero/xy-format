@@ -48,13 +48,11 @@ Contributor workflow: `docs/workflows/contributor_inspection_workflow.md`.
 | Layer | Read / inspect | Write |
 | --- | --- | --- |
 | Container + RLE | `xy/rle.py` (`decode_project`) | `xy/rle.py` (`encode_project`) |
-| Legacy logical entries | `xy/scaffold_writer.py` (`extract_logical_entries`) | superseded for authoring |
 | RAM image edits | `xy/image_writer.py` (`ImageProject`) | same |
 | Arrangement assembly | `xy/image_writer.py` (`build_arrangement`) | same |
-| Notes (single-pattern read) | `xy/note_reader.py`, `tools/inspect_xy.py` | `ImageProject.add_note` |
+| Notes | decoded note vector (`tools/inspect_xy.py`, `xy/image_writer.py`) | `ImageProject.add_note` |
 | P-locks | `xy/plocks.py` | `ImageProject.set_plock` |
 | Step components | `xy/step_components.py` | `ImageProject.set_step_component` |
-| JSON intent export | `xy/project_to_json.py` | `xy/json_build_spec.py` + profiles |
 | Preset reference inference | `xy/project_inspection.py` (heuristic) | `ImageProject.set_preset` (donor copy) |
 | Track preset path @ `+0x453F` | `xy/preset_path_inspection.py` | gap — donor `set_preset` only |
 | Drum sample path read | `xy/drum_sample_inspection.py` | indirect via `set_preset`; no per-slot path API |
@@ -105,17 +103,16 @@ Field offsets: `docs/format/decoded_image_map.md`.
 - [x] Internal project display name — no decoded-image name field found; project
   list name is external `.xy` filename, HDR decode search
 
-## 3. Pre-track topology & pattern directory
+## 3. Pattern topology
 
-- [x] Multi-pattern descriptor / pre-track length — `docs/format/descriptor_encoding.md`
-- [x] Pattern max slot, track handles, slot descriptors — `xy/structs.py`, `tools/inspect_xy.py`
-- [x] Leader vs clone pattern structs (17,876 B) — `docs/format/multi_pattern_block_rotation.md`
-- [x] Logical track/pattern entry extraction — `xy/scaffold_writer.py` (`extract_logical_entries`)
+- [x] Leader vs clone pattern structs (17,876 B base) — `docs/format/decoded_image_map.md`, `xy/image_writer.py`
+- [x] Pattern count and clone walking in decoded image — `pattern_starts_from_image`, `build_arrangement`
+- [x] Scene/song selection rows over pattern indices — `docs/format/scenes_songs.md`
 
 ## 4. Sequencer: notes, timing, bars
 
-- [x] Quantized note records (tick, gate, note, velocity, flags) — `xy/note_reader.py`
-- [x] Event type 0x25 and preset-native families — `xy/note_events.py`, `docs/format/events.md`
+- [x] Quantized note records (tick, gate, note, velocity, flags) —
+  decoded vector at track+`0x456F`, `ImageProject.add_note`
 - [x] 120-note pattern cap enforced on write — `ImageProject.add_note`
 - [x] Bars per pattern (`bars << 4` @ track+`0x01`) — `set_bars`
 - [x] Track scale byte (subset: 1/2, 1/2, 16 observed) — `set_track_scale`
@@ -142,7 +139,7 @@ Field offsets: `docs/format/decoded_image_map.md`.
 - [x] 64×84-byte table, 42 u16 columns — `xy/plocks.py`
 - [x] Param name → column mapping (vol, params, ADSR, sends, LFO, pan, …) — `PLOCK_PARAMS`, `ImageProject.set_plock`
 - [x] Automation across steps — `ImageProject.automate_param`
-- [~] Static current-value offsets for mix params (vs p-lock-only) — partial — `opxy_user_guide_save_audit.md` § Mix
+- [~] Static current-value offsets for mix params (vs p-lock-only) — partial — `docs/format/opxy_user_guide_save_audit.md` § Mix
 
 ## 7. Instrument, engine, preset
 
@@ -157,7 +154,7 @@ Field offsets: `docs/format/decoded_image_map.md`.
   `0xF7` preset-fragment region is structurally decoded
 - [x] Preset path structural **read** @ track `+0x453F` — `xy/preset_path_inspection.py`,
   `tests/test_preset_path_structural.py`, `src/preset-probes/2026-06-preset-path/`
-- [~] Preset path **write** @ `+0x453F` — not exported in `project_to_json` yet
+- [~] Preset path **write** @ `+0x453F` — no dedicated writer yet
 - [~] Play mode poly/mono/legato current value — partial
 - [~] Portamento amount/type, bend range — partial
 - [~] Preset volume / engine volume current value — partial
@@ -186,7 +183,7 @@ Field offsets: `docs/format/decoded_image_map.md`.
 
 ## 9. One-shot / multisampler slots
 
-- [~] High-level sample table structure — partial — `docs/format/track_blocks.md`
+- [~] High-level sample table structure — partial — `docs/format/decoded_image_map.md`
 - [x] One-shot loop/crossfade/tune/gain/direction per slot — P2-B `g0`–`g14` +
   `g-tune-*`, `decode_sampler_tune_tenths`, `.tune_ui` (header @ `+0x3943`) — gap
 - [ ] Multisampler zone boundaries / root key — gap
@@ -198,7 +195,7 @@ Field offsets: `docs/format/decoded_image_map.md`.
 - [x] Scene mute (device value 2) — scenes 1–8, slot `N−1` — `tests/test_scene_track_mute_inspection.py`, `scene_mute_storage_slot`, `read_scene_muted_tracks`
 - [x] Song footer chain + loop word — `build_arrangement`
 - [x] Multi-pattern clone assembly — `build_arrangement`
-- [~] 14 song slots vs guide “9 songs” — partial reconciliation — `opxy_user_guide_save_audit.md`
+- [~] 14 song slots vs guide “9 songs” — partial reconciliation — `docs/format/opxy_user_guide_save_audit.md`
 - [x] Track mix volume **read** @ track+`0x38FE` (u32 @ `+0x38FB`) —
   `xy/scene_volume_inspection.py`, P2-D `s0b` fixtures; scene routing partial
 - [x] Master mix volume **read** @ global+`0x94` — same module (`s5b`)
@@ -233,9 +230,7 @@ Field offsets: `docs/format/decoded_image_map.md`.
 
 ## 14. JSON / tooling bridges
 
-- [x] Spec → image compiler — `tools/spec_to_xy_image.py`, `tests/test_write_music_showcase_pack.py`
-- [~] Project → JSON intent export — `xy/project_to_json.py` (notes + header; **no** preset refs, clones, scenes)
-- [x] Profile-gated JSON build — `xy/profiles.py`, `tests/test_profiles.py`
+- [x] Spec → image compiler — `tools/spec_to_xy_image.py`, `tests/test_midi_to_xy_json_selection.py`
 - [x] Corpus index/lab — `tools/corpus_lab.py`
 - [x] Round-trip verify — `tools/roundtrip_xy.py`
 - [x] Inspector CLI — presets, paths, drums, sampler, mixer, scenes, EQ, saturator, p-lock lanes, project config —
@@ -243,7 +238,7 @@ Field offsets: `docs/format/decoded_image_map.md`.
 
 ## 15. Outside project `.xy`
 
-- [ ] COM / system / Bluetooth / MTP settings — device-global, not in `.xy` — `opxy_user_guide_save_audit.md` § COM
+- [ ] COM / system / Bluetooth / MTP settings — device-global, not in `.xy` — `docs/format/opxy_user_guide_save_audit.md` § COM
 - [ ] Sample folder WAV/AIFF on disk — filesystem; only paths referenced in project
 
 ---
@@ -253,7 +248,7 @@ Field offsets: `docs/format/decoded_image_map.md`.
 1. Capture one-variable device diff → add fixture under `src/`.
 2. Promote offset/rule to `docs/format/decoded_image_map.md` and
    `docs/format/image_coverage_map.md`.
-3. Add read path (`inspect_xy` / `project_to_json`) and/or write path (`ImageProject`).
+3. Add read path (`inspect_xy`) and/or write path (`ImageProject`).
 4. Check the box here and link the test file.
 5. Update `docs/format/opxy_user_guide_save_audit.md` if guide-visible.
 
@@ -262,7 +257,7 @@ Field offsets: `docs/format/decoded_image_map.md`.
 Use this when promoting a field from decoded → **device-validated**:
 
 1. **Author** — build or edit with `ImageProject` / `tools/spec_to_xy_image.py` /
-   JSON profiles; save `.xy` under `output/` or `src/`.
+   decoded-image spec compiler; save `.xy` under `output/` or `src/`.
 2. **Expect** — write a short expectation file (YAML/JSON/markdown) listing what
    you believe the device should show: preset name, drum path per voice, tempo,
    etc. Keep one variable per probe file when possible.

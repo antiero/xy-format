@@ -10,9 +10,6 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
-from xy.json_build_spec import parse_build_spec
-
-
 def _load_midi_tool_module():
     module_path = REPO_ROOT / "tools" / "midi_to_xy.py"
     spec = importlib.util.spec_from_file_location("midi_to_xy_tool", module_path)
@@ -197,6 +194,9 @@ def test_json_payload_is_schema_valid_for_compiler() -> None:
         num_patterns=2,
     )
 
-    spec = parse_build_spec(payload, base_dir=REPO_ROOT)
-    assert spec.mode == "multi_pattern"
-    assert len(spec.multi_tracks) == 8
+    assert payload["version"] == 1
+    assert payload["template"].endswith("src/one-off-changes-from-default/unnamed 1.xy")
+    assert payload["output"] == "output/from-midi/synth_test.xy"
+    assert "descriptor_strategy" not in payload
+    assert len(payload["tracks"]) == 8
+    assert all(len(track["patterns"]) == 2 for track in payload["tracks"])

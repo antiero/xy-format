@@ -1,99 +1,70 @@
 # Scenes and Songs
 
-> **Flat decoded image (canonical for read/write):** 33-byte scene slots @
-> `GLOBAL+0x95 + slot×33` (`sel[16] + mute[16] + flags`). See
-> [`record_structure.md`](record_structure.md) §4, [`image_coverage_map.md`](image_coverage_map.md),
-> P2-D volumes, P2-E mutes. Sections below on RLE insertions and Track 16
-> tail bytes are **supplemental** (older probe narrative).
+Scenes and songs are decoded-image structs. Do not author them by editing
+pre-track tokens or branch-specific raw bytes.
 
-## Scope
-This document captures stable format findings for scene/song state from
-`unnamed 149/150/151/152/154/155` and follow-up `b/nl/lp` probes.
+## Scene Rows
 
-## Where Scene/Song Data Lives
-Scene/song state is not isolated to a fixed header field.
-Current stable model is split storage:
+Scene rows are 33-byte records in the global header area:
 
-1. Pre-track control bytes/records (before Track 1).
-2. Track 16 control bytes (tail control region in normalized branch).
+```text
+pattern selections[16]  mute values[16]  present flag[1]
+```
 
-## Stable Findings
+`xy/image_writer.py` names the constants used by the current writer:
 
-### 0) Flat Scene Slot Layout
+- `SCENE_SLOT0`: live selection row.
+- `SCENE_SLOT_SIZE = 33`.
+- `GLOBAL_ACTIVE_SCENE`: active scene selector.
+- `SCENE_MUTE_VALUE = 2`: device-verified muted value.
 
-Decoded-image scene rows are 33-byte slots at `GLOBAL+0x95 + slot×33`:
+Slot 0 is the live selection row. Authored scenes start at slot 1.
 
-- `+0..15`: 0-based pattern selection per track.
-- `+16..31`: mute byte per track (`0x00` unmuted, `0x02` muted in device probes).
-- `+32`: row flag. Existing device fixtures and `build_arrangement` use `0x01`
-  for populated/present rows and `0x00` for empty trailing rows.
+## Pattern Selection
 
-Examples: single-scene mute probes flag only slot 0; clean two-scene volume
-probes flag slots 0 and 1; the eight-scene mute baseline flags slots 0..7.
-Use row flags, not global `0x06`, when counting populated scene rows. HDR
-active-scene probes show `0x06` is the active scene slot (zero-based), while
-present scene count is derived from these row flags.
+Each selection byte is a 0-based pattern index for one track. If a track has
+fewer patterns than the scene row asks for, generated specs should clamp to the
+last available pattern rather than create an impossible state.
 
-### 0.1) Active Scene And Song Selectors
+`build_arrangement(...)` writes scene rows from:
 
-Firmware 1.1.4 HDR probes isolate:
+```python
+scenes=[{track: pattern_index, ...}, ...]
+```
 
-- `GLOBAL+0x06`: active scene slot, zero-based (`hdr-arr-act2` changes only
-  `0x06: 00 -> 01`; `hdr-arr-act3` changes only `0x06: 00 -> 02`).
-- `GLOBAL+0x07`: active song slot when explicitly selected. Fresh/default
-  Song 1 reads `0x10`; selecting Song 2 writes `0x01`.
+## Mutes
 
-Adding scenes while staying on scene 1 changes the scene rows, not `0x06`.
+Scene mutes use the second 16-byte region of the scene row. Device tests showed
+value `2` displays and behaves as muted; the image writer emits `2`
+canonically.
 
-### 1) Loop Is Per-Song (Normalized Branch)
-Loop toggles were isolated as Track 16 control-byte changes:
+`build_arrangement(...)` accepts:
 
-- Song 1 (`150 nl` <-> `150 lp`):
-  - `track16+0x0169/+0x016A`: `01 00` (off) <-> `00 01` (on)
-- Song 2 (`154 loop` <-> `154 nl`):
-  - `track16+0x016E`: `00` (on) <-> `01` (off)
-- Song 3 (`151 nl` <-> `151 lp`):
-  - `track16+0x0171/+0x0172`: `00 01` (on) <-> `01 00` (off)
+```python
+scene_mutes=[[muted_track, ...], ...]
+```
 
-Note: Off/on polarity above follows user-confirmed capture intent labels.
+## Song 1 Chain
 
-### 2) Scene Count/List Uses Track 16 Control Bytes
-For Song 2 arrangement captures:
+The song footer stores fixed-size song slots. The current writer supports Song
+1 chaining via:
 
-- `154` (Song2 + Scene2) includes `track16+0x0163 = 0x02` with a short
-  structural payload.
-- `155` (Song2 with 3 arranged scenes) includes `track16+0x0163 = 0x03` with a
-  larger structural payload.
+```python
+song_chain=[scene_id, ...]
+song_loop=True
+```
 
-This strongly indicates scene-count/list control in Track 16 tail bytes.
+The first byte is the chain length, followed by 0-based scene IDs and loop
+control bytes. The user guide advertises fewer visible songs than the footer
+capacity; visible-slot reconciliation remains a minor limit/documentation item.
 
-### 3) Scene Mute State Is Persisted
-Mute probes (`150b/152b/154b/155b`) show:
+## Validation
 
-- Variable-length pre-track record insertions.
-- Coordinated Track `9..16` normalized-branch rewrites.
+Current scene/song authoring is validated by:
 
-So mute state is serialized (not transient UI state).
+- byte-exact j05/j06 replication in `tests/test_image_writer.py`
+- device-passing sparse arrangements
+- the Whitney capstone project with 9 scenes and a Song 1 chain
 
-## Normalized Branch Fingerprint
-Several loop/mute operations enter a shared structural branch where Tracks
-`9..16` are rewritten with `+8` bytes per track. This branch change can mask
-small loop-only diffs unless compared within the same branch.
-
-## Unknowns (Still Open)
-
-1. Full pre-track record schema for scene/song/mute tokens is not fully decoded.
-2. Universal deterministic rewrite rules for normalized-branch transitions are
-   not fully modeled.
-3. Complete scene timeline serialization (all edit orders and corner cases) is
-   still partial.
-4. Song-slot control offsets beyond tested songs (1-3) remain unverified.
-
-## Authoring Guidance (Current)
-Safe approach today: scaffold-driven, topology-constrained writes with
-branch-aware patching. Avoid full free-form scene/song synthesis until the
-unknowns above are closed.
-
-## Related
-- Narrative analysis log: `docs/logs/2026-02-14_scene_song_delta_probe.md`
-- Test-plan tracking: `docs/engineering/known_good_test_plan.md`
+Historical scene-token experiments remain in `docs/logs/*`; they are not the
+current authoring model.

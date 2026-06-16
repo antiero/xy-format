@@ -57,17 +57,16 @@ The current stack can:
   and sampler samples, static mixer state, scene volumes/mutes, master EQ, and
   master saturator.
 
-The latest full test run after merging PR #3 was:
-
-```text
-1759 passed, 32 skipped
-```
+The legacy raw-byte writer stack has been removed; current tests should cover
+decoded-image codec, inspection, and authoring paths.
 
 ## Canonical Tools
 
 - `xy/rle.py` — decode/encode the project image.
 - `xy/image_writer.py` — image-based editing and arrangement assembly.
 - `tools/spec_to_xy_image.py` — JSON/spec to image-authored `.xy`.
+- `tools/midi_to_xy.py` — MIDI selection front end for JSON specs or direct
+  image-authored `.xy` output.
 - `tools/inspect_xy.py` — human-readable project inspection report.
 - `tools/corpus_lab.py` — corpus/device outcome records.
 - `tools/analysis/decoded_diff.py` — decoded-space field diffs.
@@ -80,8 +79,8 @@ in [the capability checklist](docs/parse_capability_checklist.md).
 No structural format mystery remains on the critical authoring path. Remaining
 work is field polish, productization, and edge-case validation:
 
-- `midi_to_xy` v2 should route through `tools/spec_to_xy_image.py` and
-  `xy/image_writer.py`.
+- `midi_to_xy` should keep expanding around the decoded-image writer rather
+  than reintroducing raw-byte patching paths.
 - Some enums and user-facing labels remain partial: track-scale full enum, LFO
   subfunctions, mod-routing destination IDs, aux-track parameter labels, and
   player modes.

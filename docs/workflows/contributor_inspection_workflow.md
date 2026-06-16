@@ -33,16 +33,16 @@ unless the log marks E2/E3 (see checklist evidence tiers).
 
 | Module | Tier touch | Fixtures | Tests | Log |
 | --- | --- | --- | --- | --- |
-| `xy/project_inspection.py` | Tier 1 §3 (partial; heuristic preset refs) | `src/preset-probes/` | `test_project_inspection.py` | `2026-06-09_app_preset_probe_inspection.md` |
-| `xy/bar_menu_inspection.py` | Tier 1 §4 bar-menu fields | `src/bar-menu-probes/2026-06-bar-menu/` | `test_bar_menu_inspection.py` | `2026-06-13_bar_menu_inspection.md` |
-| `xy/preset_path_inspection.py` | Tier 1 §3 (structural path) | `2026-06-preset-path/` | `test_preset_path_structural.py` | `2026-06-12_preset_path_structural.md` |
-| `xy/drum_sample_inspection.py` | Tier 1 §4 | `2026-06-sample-paths/`, pan-fade | `test_drum_sample_inspection*.py`, `test_drum_pan_fade_inspection.py` | `2026-06-12_drum_sample_path_inspection.md`, `2026-06-12_drum_pan_fade_inspection.md` |
-| `xy/mixer_static_inspection.py` | Tier 1 mix static offsets | `2026-06-static/` | `test_mixer_static_inspection.py` | `2026-06-12_mixer_static_inspection.md` |
-| `xy/scene_volume_inspection.py` | Tier 2 scene storage | `2026-06-volumes/` | `test_scene_volume_inspection.py` | `2026-06-12_scene_volume_inspection.md` |
-| scene mutes (`read_scene_muted_tracks`) | Tier 2 §1 (mute=2) | `2026-06-track-mutes/` | `test_scene_track_mute_inspection.py` | `2026-06-12_scene_track_mute_inspection.md` |
-| `xy/master_eq_inspection.py` | header EQ | `2026-06-eq/` | `test_master_eq_inspection.py` | `2026-06-12_master_eq_inspection.md` |
-| `xy/master_saturator_inspection.py` | saturator | `2026-06-saturator/` | `test_master_saturator_inspection.py` | `2026-06-12_master_saturator_inspection.md` |
-| `xy/sampler_sample_inspection.py` | Tier 1 §4 one-shot | `2026-06-oneshot/` | `test_sampler_sample_inspection.py` | `2026-06-12_sampler_oneshot_inspection.md` |
+| `xy/project_inspection.py` | Tier 1 §3 (partial; heuristic preset refs) | `src/preset-probes/` | `test_project_inspection.py` | `docs/logs/2026-06-09_app_preset_probe_inspection.md` |
+| `xy/bar_menu_inspection.py` | Tier 1 §4 bar-menu fields | `src/bar-menu-probes/2026-06-bar-menu/` | `test_bar_menu_inspection.py` | `docs/logs/2026-06-13_bar_menu_inspection.md` |
+| `xy/preset_path_inspection.py` | Tier 1 §3 (structural path) | `2026-06-preset-path/` | `test_preset_path_structural.py` | `docs/logs/2026-06-12_preset_path_structural.md` |
+| `xy/drum_sample_inspection.py` | Tier 1 §4 | `2026-06-sample-paths/`, pan-fade | `test_drum_sample_inspection*.py`, `test_drum_pan_fade_inspection.py` | `docs/logs/2026-06-12_drum_sample_path_inspection.md`, `docs/logs/2026-06-12_drum_pan_fade_inspection.md` |
+| `xy/mixer_static_inspection.py` | Tier 1 mix static offsets | `2026-06-static/` | `test_mixer_static_inspection.py` | `docs/logs/2026-06-12_mixer_static_inspection.md` |
+| `xy/scene_volume_inspection.py` | Tier 2 scene storage | `2026-06-volumes/` | `test_scene_volume_inspection.py` | `docs/logs/2026-06-12_scene_volume_inspection.md` |
+| scene mutes (`read_scene_muted_tracks`) | Tier 2 §1 (mute=2) | `2026-06-track-mutes/` | `test_scene_track_mute_inspection.py` | `docs/logs/2026-06-12_scene_track_mute_inspection.md` |
+| `xy/master_eq_inspection.py` | header EQ | `2026-06-eq/` | `test_master_eq_inspection.py` | `docs/logs/2026-06-12_master_eq_inspection.md` |
+| `xy/master_saturator_inspection.py` | saturator | `2026-06-saturator/` | `test_master_saturator_inspection.py` | `docs/logs/2026-06-12_master_saturator_inspection.md` |
+| `xy/sampler_sample_inspection.py` | Tier 1 §4 one-shot | `2026-06-oneshot/` | `test_sampler_sample_inspection.py` | `docs/logs/2026-06-12_sampler_oneshot_inspection.md` |
 
 Paths above are under the relevant `src/*-probes/` fixture directory unless noted.
 

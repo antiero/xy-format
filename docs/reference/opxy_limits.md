@@ -48,5 +48,5 @@ Sources: [teenage.engineering/products/op-xy](https://teenage.engineering/produc
 
 ## Format Implications
 - 120-note cap defines parser/writer stress-test ceiling.
-- 9-pattern limit should align with descriptor/rotation interpretation.
+- 9-pattern limit drives clone-struct and scene-selection bounds.
 - 8-voice per-track and 24-voice total are hard constraints for chord-generation tests.

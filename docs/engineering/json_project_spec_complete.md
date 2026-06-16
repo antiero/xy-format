@@ -11,7 +11,7 @@ If a field is not a user control, it does not belong in authored JSON.
 Examples of fields that should **not** be in authored JSON:
 - template provenance (`source_template`)
 - static limits/constants (`max_tracks`, `max_scenes`, etc.)
-- binary offsets, descriptor byte blobs, handle tables, preamble bytes
+- binary offsets, RLE artifacts, loader metadata, unknown padding bytes
 - parser/debug internals
 
 Those stay in compiler/runtime black-box logic.
@@ -221,13 +221,14 @@ For tracks 9-16, `role` should be one of:
 ## Black-Box Compiler Responsibilities (Not Authored JSON)
 
 These stay internal:
-1. Template/scaffold selection
-2. Descriptor byte strategy and binary topology mapping
-3. Pre-track handle offsets and track-block packing details
+1. Baseline project selection
+2. Decoded-image clone/scene/song assembly
+3. Struct offsets and vector count maintenance
 4. Unknown-byte preservation and round-trip safety mechanisms
 5. Static device limits and hard validation constants
 
 ## Evolution Plan
 1. Keep this as the user-facing contract target.
 2. Map each field to canonical format docs as decode confidence improves.
-3. Keep binary internals hidden behind compiler profiles, not authored JSON.
+3. Keep binary internals hidden behind decoded-image compiler helpers, not
+   authored JSON.

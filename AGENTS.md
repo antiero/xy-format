@@ -13,8 +13,6 @@
 - One-off corpus + UI deltas: `src/one-off-changes-from-default/op-xy_project_change_log.md`
 - Workflow docs: `docs/workflows/`
 - Tool docs: `docs/tools/`
-- Hypothesis test harness: `docs/tools/hypothesis_tests.md`
-- External tooling candidates: `docs/tools/external_tooling_candidates.md`
 - Stable reference limits: `docs/reference/opxy_limits.md`
 - MIDI CC reference: `docs/reference/opxy_midi_cc_map.md`
 - Format reference (canonical): `docs/format/`
@@ -25,7 +23,6 @@
   - Use its `docs/op-xy-file-map-decoded-vs-mystery.md` for a worked generated-song file map.
   - Use its `docs/op-xy-project-sound-state-capture-plan.md` for sampler/preset project-state capture batches.
   - Keep byte-level format truth here; keep high-level track/preset/drum-generation abstractions there.
-- ImHex + ImHex Patterns brief: `docs/engineering/imhex_imhex_patterns_brief.md`
 - Crash catalog: `docs/debug/crashes.md`
 - Active issues: `docs/issues/index.md`
 - MIDI CC/p-lock discovery log: `docs/logs/2026-02-13_midi_cc_plock_discovery.md`
@@ -69,11 +66,12 @@
   device-test one authored file.
 
 ## Next Actions
-1. `midi_to_xy` v2: route through `tools/spec_to_xy_image.py`; retire the
-   legacy writer stack (`docs/roadmap.md` Tier 3).
+1. Continue field polish on the decoded-image stack (`xy/image_writer.py`,
+   `tools/spec_to_xy_image.py`, `tools/midi_to_xy.py`).
 2. Finish minor field lookups (p-lock columns 13–18; drum pan vs fade at
    slot +0x05/+0x06) — corpus/optional-capture, non-blocking.
-3. Consolidate `MEMORY.md` and prune superseded legacy docs.
+3. Consolidate `MEMORY.md` and keep old-model history confined to
+   `docs/logs/*`.
 
 ## How To Run The Workflow
 - Device naming: `docs/workflows/device_test_naming.md`
@@ -81,7 +79,6 @@
 - Corpus index/query: `docs/tools/corpus_lab.md`
 - Two-file structural diffs: `docs/tools/corpus_compare.md`
 - Opaque-region variance index: `docs/tools/analyze_spatial_variance.md`
-- Hypothesis checks: `docs/tools/hypothesis_tests.md`
 - Inspector usage: `docs/tools/inspect_xy.md`
 - Header reader usage: `docs/tools/read_xy_header.md`
 - Crash capture protocol: `docs/workflows/crash_capture.md`

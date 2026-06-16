@@ -1,10 +1,8 @@
 # Authoring `.xy` Files (Canonical)
 
 > Established 2026-06-09 after the serialization-model breakthrough. This
-> is the authoritative guide for **writing** `.xy` files. It supersedes
-> the pre-RLE writer docs (`writer_alignment_and_type05_type07.md`,
-> `writer_track1.md`, `json_authoring_bridge.md`) and the scaffold/
-> transplant writer modules.
+> is the authoritative guide for **writing** `.xy` files. It replaces the
+> removed pre-RLE scaffold/transplant writer modules.
 
 ## The model in one paragraph
 
@@ -73,13 +71,6 @@ lanes. They do not create automation. To create step automation, use
 `set_plock`/`automate_param`, which also writes the firmware's per-step and
 master automation flags.
 
-`xy/project_to_json.py` now emits an editable `sound_state` section plus
-decoded-image diagnostics under `_decoded_global_state` and
-`_decoded_track_state`. The editable section carries master EQ, engine params,
-envelope blocks, filter knobs, sends, pinned LFO lanes, and mixer pan/volume.
-The underscore-prefixed diagnostics keep byte offsets and candidate regions for
-inspection; they are ignored by the BuildSpec parser.
-
 ### `build_arrangement` (multi-pattern / scenes / songs)
 
 ```python
@@ -126,20 +117,9 @@ The only authoring rule that matters: **build a coherent machine state**
 *impossible* state, not bad syntax). Start from a real baseline, apply
 edits, keep counts/selections/scene state consistent.
 
-## Legacy writers (superseded, retained)
+## Removed Legacy Writers
 
-These modules predate the RLE model. They produce valid output for their
-**validated scopes** but encode the format via the old mental model
-(manual byte patching, scaffolds, preamble/descriptor rules, the velocity
-nudge). They remain for the tools/tests that still import them; **new work
-should use `image_writer`.**
-
-- `xy/writer.py` — Track 1 single-trig writer (known bugs)
-- `xy/project_builder.py` — event-insertion recipe (type 05→07, pure-append / insert-before-tail)
-- `xy/scaffold_writer.py` — scaffold-driven multi-pattern writer
-- `xy/scene_patcher.py`, `xy/scene_records.py` — scene byte-patching
-- `xy/json_build_spec.py` — JSON→bytes via the legacy path
-- `xy/note_events.py`, `xy/step_components.py`, `xy/profiles.py` — legacy payload encoders
-
-Migration target (`docs/roadmap.md` Tier 3): route `midi_to_xy` through
-`spec_to_xy_image`, then retire the legacy stack.
+The old scaffold, descriptor, preamble, event-type, profile, and velocity-nudge
+writer stack has been deleted. If a feature cannot be expressed through
+`ImageProject`, add a decoded-image method backed by byte-exact fixture
+replication instead of restoring raw-byte patching.

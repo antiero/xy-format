@@ -6,8 +6,12 @@
 - Default path: `output/corpus_lab.sqlite`
 
 ## Indexed Data
-- File-level: `path`, `source`, `size`, `sha1`, `pre_track_len`, `pre56_hex`, `ff_table_start`, `descriptor_var_hex`, `logical_entries`, parse status/error.
-- Logical-entry level: `track`, `pattern`, `pattern_count`, clone/leader/last flags, `pre0..pre3`, `body_len`, `type_byte`, `engine_id`, `active`, `prev_active`, tail-event metadata.
+- File-level: `path`, `source`, `size`, `sha1`, parse status/error, and
+  historical raw-scan columns kept for old database compatibility.
+- Legacy raw-scan columns such as `pre_track_len`, `pre56_hex`,
+  `ff_table_start`, `descriptor_var_hex`, `logical_entries`, `pre0..pre3`,
+  `body_len`, `type_byte`, and tail-event metadata are **not** canonical
+  decoded-image format fields.
 - Test outcomes: `status` (`pass|crash|untested`), optional `error_class`, note, timestamp.
 
 ## Common Commands
@@ -18,4 +22,10 @@
 - `python tools/corpus_lab.py record output/k04_song_safefix2_12347.xy pass --note "device OK"`
 - `python tools/corpus_lab.py results --where "f.name LIKE 'k0%'"`
 - `python tools/corpus_lab.py report result-summary`
-- `python tools/corpus_lab.py report signal-clone-pre1`
+
+## Current Use
+
+Use this tool primarily for corpus inventory and device outcome tracking. For
+new decoded-image field analysis, prefer `tools/analyze_spatial_variance.py`,
+`tools/analysis/decoded_diff.py`, and the inspection modules listed in
+`docs/parse_capability_checklist.md`.
