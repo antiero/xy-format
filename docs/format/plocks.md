@@ -1,39 +1,33 @@
 # P-Locks (Parameter Locks)
 
-## Region Location
-- P-lock region appears after engine-config tail bytes:
-  - `40 1F 00 00 0C 40 1F 00 00`
-- Exact offsets vary by engine/type; locate by signature, not fixed absolute offsets.
-- Documented offsets (type-05): T1/T2/T3 = `body[0x26]`, T4 = `body[0x23]`, T5-T8 = `body[0x27]`.
-- For type-07 bodies, subtract 2 from the type-05 offset.
+> **Model superseded (2026-06-09).** The byte-level facts here remain
+> useful, but the format is RLE-compressed C structs; the canonical
+> references are `docs/format/record_structure.md` and
+> `docs/format/decoded_image_map.md`. See `docs/state_of_understanding.md`.
 
-## Core Encoding — Standard 5-Byte (T2-T8, Aux T9-T16)
-- 48 entries total as 3 lanes x 16 steps.
-- Empty entry: `FF 00 00` (3 bytes).
-- Value entry: `[param_id] [val_lo] [val_hi] 00 00` (5 bytes per entry).
-- First non-empty in a lane carries real `param_id`; follow-on entries use continuation marker `0x50`.
-- Activation triggers type 0x05 → 0x07 transition.
-- T2 with Drum engine (0x03) uses this standard 5-byte format, same as all other non-T1 tracks.
 
-## Core Encoding — T1 Slot Only (18-Byte / 17-Byte)
-- The T1 slot is special: it uses a **wider entry format** regardless of which engine is loaded.
-  This is a property of the **slot**, not the engine — T2 Drum uses standard 5-byte entries above.
-  - **Drum engine (0x03) on T1**: 18-byte entries
-    - Empty: `FF 00 00` (3 bytes)
-    - Header: `[param_id] [40 00 40 00 40 00 40 00 00 0a ff 7f e8 03 00 00 3a]` (18 bytes)
-    - Value: `[val_lo] [val_hi] [00 40 00 40 00 40 00 00 0a ff 7f e8 03 00 00 3a]` (18 bytes)
-  - **Swapped engine (e.g. 0x06) on T1**: 11-byte header + 17-byte value entries (two-lane interleaved)
-- T1 may stay type 0x05 even with p-lock data (observed: +350B growth without type change).
-- T1 param_ids are in a **separate address space** from synth tracks (see table below).
+## Decoded-Image Location
 
-## T10 9-Byte Entry Format
-- T10 (Punch-in aux) uses 9-byte entries instead of standard 5-byte:
-  - Header: `[param_id] [initial_lo] [initial_hi] [00] [51] [meta_lo] [meta_hi] [00] [1c]` (9 bytes)
-  - Value: `[val_lo] [val_hi] [00] [00] [31] [meta_lo] [meta_hi] [00] [1c]` (9 bytes)
-  - Empty: `FF 00 00` (3 bytes, same)
-- Header byte4=0x51 vs value byte4=0x31 (possibly header/continuation markers for second lane).
-- Values correctly extracted from bytes 0-1 as u16 LE.
-- Observed only on T10 with CC10 (Pan). Other aux tracks (T9, T11-T16) use standard 5-byte format.
+Current authoring uses the fixed decoded-image track struct, not raw event
+body offsets:
+
+- P-lock table base: track struct `+0x3057`.
+- Shape/smoothing byte: track struct `+0x3056`.
+- Table shape: 64 steps × 84 bytes.
+- Per step: 42 little-endian u16 parameter columns.
+
+Helpers:
+
+- Read/write table cells: `xy/plocks.py`.
+- Authoring API: `ImageProject.set_plock(...)` and
+  `ImageProject.automate_param(...)`.
+- Human report: `tools/inspect_xy.py`.
+
+## Current Value Model
+
+The decoded image stores p-lock values as direct u16 cells. Older 3/5/9/17/18
+byte "entry formats" were compressed-space observations and should not be used
+for authoring.
 
 ## Value Mapping
 - Value field: `u16 LE`, range `0..32767` (0x0000..0x7FFF).
@@ -138,13 +132,6 @@ parameter table layout.
 - `0x31`: continuation for T10 9-byte entries.
 - `0x1E`: continuation for T1 swapped-engine 17-byte entries.
 
-## Sentinel / Metadata Bytes
-- Sentinel byte follows trailing empties in the p-lock region.
-- Known baseline values: Prism T3 = `0xDE`, Drum T1/T2 = `0xDF`.
-- Sentinel changes when p-locks present: filter cutoff = `0xCE`, macro 1 = `0xEC`.
-- After the sentinel, a step-component directory (16 x 4B records) appears when p-locks exist.
-- Entries [53-54] (past the main table) contain per-track metadata — observed as `[byte] [val_lo] [00] [00]` + `[byte] [00] [00]`.
-
 ## Recording Methods
 - **Grid-entered**: hold step on device, turn knob. Produces p-lock data directly.
 - **MIDI hold-record** (discovered 2026-02-13): hold record button on device, send MIDI CCs externally.
@@ -156,15 +143,9 @@ parameter table layout.
   - Sending notes alongside CCs causes device to enter clock-synced recording mode, which suppresses CC capture. CC mapping experiments must be CC-only.
 
 ## Additional Structures
-- Additional metadata bytes may appear before synth parameter slabs.
 - Full byte-level examples live in `docs/logs/2026-02-13_agents_legacy_snapshot.md`.
-- Shared parser helpers live in `xy/plocks.py` (`find_plock_start`, standard table decode, T1/T10 helpers).
-- Shared authoring helpers also live in `xy/plocks.py` (`rewrite_standard_nonempty_values`, `rewrite_standard_values_for_param_groups`).
-- Project-level writer helpers live in `xy/project_builder.py`:
-  - `transplant_track(...)` for donor topology transplant
-  - `rewrite_track_standard_plock_values(...)` for single-lane/non-empty-order rewrites
-  - `rewrite_track_standard_plock_groups(...)` for multi-lane grouped rewrites
-  - default guardrails enforce known-safe standard value floor `>= 256`
+- Shared parser helpers live in `xy/plocks.py`.
+- `tools/inspect_xy.py` prints a compact `[P-Locks]` summary.
 
 ## Open Questions
 - Why does CC32 have param_id 0x7C (grid) vs 0xD0 (MIDI)? Are these different address spaces?

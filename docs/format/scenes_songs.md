@@ -1,67 +1,70 @@
 # Scenes and Songs
 
-## Scope
-This document captures stable format findings for scene/song state from
-`unnamed 149/150/151/152/154/155` and follow-up `b/nl/lp` probes.
+Scenes and songs are decoded-image structs. Do not author them by editing
+pre-track tokens or branch-specific raw bytes.
 
-## Where Scene/Song Data Lives
-Scene/song state is not isolated to a fixed header field.
-Current stable model is split storage:
+## Scene Rows
 
-1. Pre-track control bytes/records (before Track 1).
-2. Track 16 control bytes (tail control region in normalized branch).
+Scene rows are 33-byte records in the global header area:
 
-## Stable Findings
+```text
+pattern selections[16]  mute values[16]  present flag[1]
+```
 
-### 1) Loop Is Per-Song (Normalized Branch)
-Loop toggles were isolated as Track 16 control-byte changes:
+`xy/image_writer.py` names the constants used by the current writer:
 
-- Song 1 (`150 nl` <-> `150 lp`):
-  - `track16+0x0169/+0x016A`: `01 00` (off) <-> `00 01` (on)
-- Song 2 (`154 loop` <-> `154 nl`):
-  - `track16+0x016E`: `00` (on) <-> `01` (off)
-- Song 3 (`151 nl` <-> `151 lp`):
-  - `track16+0x0171/+0x0172`: `00 01` (on) <-> `01 00` (off)
+- `SCENE_SLOT0`: live selection row.
+- `SCENE_SLOT_SIZE = 33`.
+- `GLOBAL_ACTIVE_SCENE`: active scene selector.
+- `SCENE_MUTE_VALUE = 2`: device-verified muted value.
 
-Note: Off/on polarity above follows user-confirmed capture intent labels.
+Slot 0 is the live selection row. Authored scenes start at slot 1.
 
-### 2) Scene Count/List Uses Track 16 Control Bytes
-For Song 2 arrangement captures:
+## Pattern Selection
 
-- `154` (Song2 + Scene2) includes `track16+0x0163 = 0x02` with a short
-  structural payload.
-- `155` (Song2 with 3 arranged scenes) includes `track16+0x0163 = 0x03` with a
-  larger structural payload.
+Each selection byte is a 0-based pattern index for one track. If a track has
+fewer patterns than the scene row asks for, generated specs should clamp to the
+last available pattern rather than create an impossible state.
 
-This strongly indicates scene-count/list control in Track 16 tail bytes.
+`build_arrangement(...)` writes scene rows from:
 
-### 3) Scene Mute State Is Persisted
-Mute probes (`150b/152b/154b/155b`) show:
+```python
+scenes=[{track: pattern_index, ...}, ...]
+```
 
-- Variable-length pre-track record insertions.
-- Coordinated Track `9..16` normalized-branch rewrites.
+## Mutes
 
-So mute state is serialized (not transient UI state).
+Scene mutes use the second 16-byte region of the scene row. Device tests showed
+value `2` displays and behaves as muted; the image writer emits `2`
+canonically.
 
-## Normalized Branch Fingerprint
-Several loop/mute operations enter a shared structural branch where Tracks
-`9..16` are rewritten with `+8` bytes per track. This branch change can mask
-small loop-only diffs unless compared within the same branch.
+`build_arrangement(...)` accepts:
 
-## Unknowns (Still Open)
+```python
+scene_mutes=[[muted_track, ...], ...]
+```
 
-1. Full pre-track record schema for scene/song/mute tokens is not fully decoded.
-2. Universal deterministic rewrite rules for normalized-branch transitions are
-   not fully modeled.
-3. Complete scene timeline serialization (all edit orders and corner cases) is
-   still partial.
-4. Song-slot control offsets beyond tested songs (1-3) remain unverified.
+## Song 1 Chain
 
-## Authoring Guidance (Current)
-Safe approach today: scaffold-driven, topology-constrained writes with
-branch-aware patching. Avoid full free-form scene/song synthesis until the
-unknowns above are closed.
+The song footer stores fixed-size song slots. The current writer supports Song
+1 chaining via:
 
-## Related
-- Narrative analysis log: `docs/logs/2026-02-14_scene_song_delta_probe.md`
-- Test-plan tracking: `docs/engineering/known_good_test_plan.md`
+```python
+song_chain=[scene_id, ...]
+song_loop=True
+```
+
+The first byte is the chain length, followed by 0-based scene IDs and loop
+control bytes. The user guide advertises fewer visible songs than the footer
+capacity; visible-slot reconciliation remains a minor limit/documentation item.
+
+## Validation
+
+Current scene/song authoring is validated by:
+
+- byte-exact j05/j06 replication in `tests/test_image_writer.py`
+- device-passing sparse arrangements
+- the Whitney capstone project with 9 scenes and a Song 1 chain
+
+Historical scene-token experiments remain in `docs/logs/*`; they are not the
+current authoring model.

@@ -8,22 +8,28 @@
 
 ## Repo Map
 - Docs index: `docs/index.md`
+- State of understanding (dated belief ledger — read before modeling work): `docs/state_of_understanding.md`
 - Manual breakdown text: `docs/OP-XY_project_breakdown.txt`
 - One-off corpus + UI deltas: `src/one-off-changes-from-default/op-xy_project_change_log.md`
 - Workflow docs: `docs/workflows/`
 - Tool docs: `docs/tools/`
-- Hypothesis test harness: `docs/tools/hypothesis_tests.md`
-- External tooling candidates: `docs/tools/external_tooling_candidates.md`
 - Stable reference limits: `docs/reference/opxy_limits.md`
 - MIDI CC reference: `docs/reference/opxy_midi_cc_map.md`
 - Format reference (canonical): `docs/format/`
+- Spatial coverage ledger: `docs/format/spatial_coverage_ledger.md`
+  (contiguous decoded-vs-opaque map of global, track, and sample-slot regions)
 - Engineering implementation notes: `docs/engineering/`
-- ImHex + ImHex Patterns brief: `docs/engineering/imhex_imhex_patterns_brief.md`
+- Companion musical-generation repo: `/Users/kevinmorrill/Documents/op-xy-live`
+  - Use its `docs/op-xy-file-map-decoded-vs-mystery.md` for a worked generated-song file map.
+  - Use its `docs/op-xy-project-sound-state-capture-plan.md` for sampler/preset project-state capture batches.
+  - Keep byte-level format truth here; keep high-level track/preset/drum-generation abstractions there.
 - Crash catalog: `docs/debug/crashes.md`
 - Active issues: `docs/issues/index.md`
 - MIDI CC/p-lock discovery log: `docs/logs/2026-02-13_midi_cc_plock_discovery.md`
 - Prior long-form notebook snapshot: `docs/logs/2026-02-13_agents_legacy_snapshot.md`
-- Current roadmap: `docs/roadmap.md`
+- **Roadmap (phases, missions, exit criteria): `docs/roadmap.md`**
+- Parse & author checklist: `docs/parse_capability_checklist.md`
+- Contributor inspection workflow: `docs/workflows/contributor_inspection_workflow.md`
 
 ## Operating Norms
 - Keep generated device test filenames short and sortable.
@@ -35,36 +41,44 @@
 - Add or update the corresponding entry in `docs/debug/crashes.md` for every crash and every verified fix.
 - Do not grow this file with chronology; keep this file as index + operating rules.
 
-## Working Assumption: Compositional Serializer
-- Treat firmware save behavior as **baseline scaffold serialization + a small set of feature-driven structural edits**, not full-byte recomputation.
-- For pre-track specifically, assume most files are explained by zero-to-few edit atoms (commonly insert/replace near `0x56-0x58`) until evidence disproves it.
-- Prefer hypotheses that can be expressed as deterministic operation scripts (`insert`, `replace`, rare `delete`) over opaque heuristic byte patching.
-- When a file does not fit the current operation catalog, treat it as a high-value outlier and isolate the minimal structural delta before adding new rules.
-- Keep undecoded regions opaque for round-trip safety; only promote rules to `docs/format/*` after corpus-backed checks (and device validation when possible).
+## The Model (SOLVED 2026-06-09)
+- The `.xy` file is the firmware's ~290 KB project struct, **byte-level
+  RLE-compressed** (two consecutive equal bytes → next byte = extension
+  count). Decoded, it is plain little-endian C structs with
+  count-prefixed vectors. See `docs/format/record_structure.md` §0.
+- Codec `xy/rle.py` round-trips 245/246 corpus files byte-exact.
+- Decoded field map: `docs/format/decoded_image_map.md` (global header,
+  16 track structs, scene structs, song-table footer, drum-voice slots).
+- Decoded spatial ledger: `docs/format/spatial_coverage_ledger.md` (which
+  contiguous regions are decoded, partial, or still opaque).
+- The whole "compositional serializer / descriptor scheme / preamble
+  state machine / event type" apparatus was RLE artifacts; the full arc
+  is in `docs/state_of_understanding.md`.
 
-## Hypothesis-Driven Modeling Loop
-1. Start with the compositional assumption and test against corpus before proposing new global structure theories.
-2. Use `python tools/hypothesis_tests.py h7-compositional` to measure whether a proposed pre-track model is explained by repeated structural ops.
-3. Use `python tools/hypothesis_tests.py event-models` / `event-dispatch` to score serializer hypotheses against wild files.
-4. Prefer the smallest model family that explains the largest corpus share; keep unresolved buckets explicit as tracked issues, not silent heuristics.
+## Authoring Rules (device-verified)
+- Author via the decoded image: `docs/engineering/authoring.md`
+  (`xy/rle.py` + `xy/image_writer.py`). Decode baseline → edit fields/
+  vectors → `encode_project`. No scaffolds, descriptors, event types,
+  preamble propagation, or velocity nudge.
+- A valid file is a **reachable machine state** (the firmware asserts,
+  not validates): build coherent state; never invent byte layouts.
+- Validation standard: replicate a device capture byte-exact, then
+  device-test one authored file.
 
-## Current Known-Safe Authoring Rules
-- Multi-pattern writing: use scaffold-driven `strict` mode; treat descriptor bytes as topology-specific, not synthesized.
-- For multi-pattern leader writes, activate/append in full-body space first; trim only where the validated branch requires it.
-- Event types are preset-driven with slot constraints; Track 1 remains constrained to `0x25` in known-good authoring paths.
-- Type transitions (`0x05` -> `0x07`) must preserve structural alignment rules (no stale padding).
-
-## Top 3 Next Actions
-1. Complete pointer-tail / pointer-21 decode so inspector can emit trustworthy `step` and `gate` for all event forms.
-2. Consolidate remaining open descriptor/handle questions for non-`T1` topologies and expand scaffold captures.
-3. Continue promoting stable findings from logs into canonical subsystem docs (`header`, `events`, `pretrack`, `track_blocks`).
+## Next Actions
+1. Continue field polish on the decoded-image stack (`xy/image_writer.py`,
+   `tools/spec_to_xy_image.py`, `tools/midi_to_xy.py`).
+2. Finish minor field lookups (p-lock columns 13–18; drum pan vs fade at
+   slot +0x05/+0x06) — corpus/optional-capture, non-blocking.
+3. Consolidate `MEMORY.md` and keep old-model history confined to
+   `docs/logs/*`.
 
 ## How To Run The Workflow
 - Device naming: `docs/workflows/device_test_naming.md`
 - Inspector sweep: `docs/workflows/inspector_sweep.md`
 - Corpus index/query: `docs/tools/corpus_lab.md`
 - Two-file structural diffs: `docs/tools/corpus_compare.md`
-- Hypothesis checks: `docs/tools/hypothesis_tests.md`
+- Opaque-region variance index: `docs/tools/analyze_spatial_variance.md`
 - Inspector usage: `docs/tools/inspect_xy.md`
 - Header reader usage: `docs/tools/read_xy_header.md`
 - Crash capture protocol: `docs/workflows/crash_capture.md`
