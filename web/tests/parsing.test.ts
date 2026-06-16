@@ -14,8 +14,6 @@ describe('.xy parsing', () => {
             expect(notes).toHaveLength(1);
             const note = notes[0];
 
-            // Parse filename to get expected step and gate
-            // e.g. 01_pt_s01_g01.xy -> step 1, gate 1
             const match = file.match(/_s(\d+)_g(\d+)/);
             expect(match).not.toBeNull();
 
@@ -28,10 +26,6 @@ describe('.xy parsing', () => {
 
                 const expectedTick = (step - 1) * 480;
 
-                // G01 = 240 ticks (half step) based on the test files.
-                // G02 = 540
-                // G04 = 1920
-                // G08 = 3840
                 let expectedGate = 0;
                 if (gateSteps === 1) expectedGate = 240;
                 else if (gateSteps === 2) expectedGate = 540;
@@ -42,5 +36,30 @@ describe('.xy parsing', () => {
                 expect(note.gate, `File ${file} gate mismatch`).toBe(expectedGate);
             }
         }
+    });
+
+    it('correctly parses multiple patterns', () => {
+        const fileBytes = readFileSync(`../output/mp2_v7_diag_t1both_dense_t3clone.xy`);
+        const proj = ImageProject.fromBytes(new Uint8Array(fileBytes));
+
+        // Track 1 has 2 patterns
+        const patternCountTrack1 = proj.getPatternCount(1);
+        expect(patternCountTrack1).toBe(2);
+
+        const notesT1P0 = proj.getNotes(1, 0);
+        expect(notesT1P0.length).toBe(8);
+
+        const notesT1P1 = proj.getNotes(1, 1);
+        expect(notesT1P1.length).toBe(11);
+
+        // Track 3 has 2 patterns
+        const patternCountTrack3 = proj.getPatternCount(3);
+        expect(patternCountTrack3).toBe(2);
+
+        const notesT3P0 = proj.getNotes(3, 0);
+        expect(notesT3P0.length).toBe(0);
+
+        const notesT3P1 = proj.getNotes(3, 1);
+        expect(notesT3P1.length).toBe(6);
     });
 });

@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { projectStore, activeTrackStore } from '../stores/project';
+  import { projectStore, activeTrackStore, activePatternStore } from '../stores/project';
   import { STEP_TICKS } from '../lib/xy/image_writer';
   import { Midi } from '@tonejs/midi';
 
@@ -13,9 +13,14 @@
 
   let notes: {tick: number, gate: number, note: number, velocity: number}[] = [];
 
-  $: if ($projectStore && $activeTrackStore) {
+  $: if ($projectStore && $activeTrackStore && $activePatternStore !== undefined) {
     try {
-        notes = $projectStore.getNotes($activeTrackStore);
+        const patternCount = $projectStore.getPatternCount($activeTrackStore);
+        if ($activePatternStore >= patternCount) {
+           activePatternStore.set(0);
+        } else {
+           notes = $projectStore.getNotes($activeTrackStore, $activePatternStore);
+        }
     } catch(e) {
         notes = [];
     }
@@ -53,14 +58,15 @@
                 tick,
                 gate,
                 note: note.midi,
-                velocity: Math.floor(note.velocity * 127)
+                velocity: Math.floor(note.velocity * 127),
+                patternIndex: $activePatternStore
              });
            } catch(e: any) {
              console.warn("Could not add note:", e.message);
            }
         }
         projectStore.set($projectStore); // Trigger reactivity
-        alert(`Imported ${track.notes.length} notes into Track ${$activeTrackStore}.`);
+        alert(`Imported ${track.notes.length} notes into Track ${$activeTrackStore}, Pattern P${$activePatternStore + 1}.`);
       }
     }
   }
@@ -78,7 +84,7 @@
       alert("Note removal not fully implemented in byte-level codec yet. For MVP, please only add notes.");
     } else {
       try {
-        $projectStore.addNote($activeTrackStore, { step: stepIndex + 1, note: noteValue });
+        $projectStore.addNote($activeTrackStore, { step: stepIndex + 1, note: noteValue, patternIndex: $activePatternStore });
         projectStore.set($projectStore); // Trigger reactivity
       } catch (e: any) {
         alert(e.message);
@@ -90,12 +96,12 @@
 <div class="flex flex-col h-full bg-neutral-900 border border-neutral-700 rounded-lg overflow-hidden">
 
   <!-- Toolbar -->
-  <div class="flex justify-between items-center bg-neutral-800 p-2 border-b border-neutral-700">
+  <div class="flex flex-wrap justify-between items-center bg-neutral-800 p-2 border-b border-neutral-700 gap-4">
     <!-- Track Selector -->
     <div class="flex overflow-x-auto no-scrollbar">
     {#each Array(16) as _, i}
       <button
-        class="flex-shrink-0 w-12 h-12 flex items-center justify-center font-bold text-lg rounded-md mx-1 transition-all"
+        class="flex-shrink-0 w-12 h-12 flex items-center justify-center font-bold text-lg rounded-md mx-1 transition-all cursor-pointer"
         style="
           background-color: {$activeTrackStore === i + 1 ? trackColors[i] : 'transparent'};
           color: {$activeTrackStore === i + 1 ? '#000' : trackColors[i]};
@@ -106,6 +112,25 @@
         {i + 1}
       </button>
     {/each}
+    </div>
+
+    <!-- Pattern Selector -->
+    <div class="flex overflow-x-auto no-scrollbar bg-neutral-900 rounded-md p-1 border border-neutral-700">
+      {#if $projectStore}
+        {@const patternCount = $projectStore.getPatternCount($activeTrackStore)}
+        {#each Array(patternCount) as _, p}
+          <button
+            class="flex-shrink-0 px-3 py-1 text-sm font-bold rounded mx-[2px] transition-all cursor-pointer"
+            style="
+              background-color: {$activePatternStore === p ? trackColors[$activeTrackStore - 1] : 'transparent'};
+              color: {$activePatternStore === p ? '#000' : '#888'};
+            "
+            on:click={() => activePatternStore.set(p)}
+          >
+            P{p + 1}
+          </button>
+        {/each}
+      {/if}
     </div>
 
     <!-- MIDI Import -->

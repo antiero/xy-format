@@ -67,11 +67,50 @@ export function leaderStartsFromImage(image: Uint8Array): number[] {
   return leaders;
 }
 
+export function patternStartsFromImage(image: Uint8Array): number[][] {
+  const trackPatterns: number[][] = [];
+  let pos = TRACK_BASE0;
+  for (let i = 0; i < TRACK_COUNT; i++) {
+    const patternStarts: number[] = [];
+    if (pos < 0 || pos + TRACK_STRIDE > image.length) {
+      return trackPatterns;
+    }
+    let patternCount = image[pos];
+    if (patternCount < 1 || patternCount > 9) {
+      patternCount = 1;
+    }
+    patternStarts.push(pos);
+    if (pos + OFF_NOTE_COUNT >= image.length) {
+      return trackPatterns;
+    }
+    let noteCount = image[pos + OFF_NOTE_COUNT];
+    if (noteCount > 120) {
+      return trackPatterns;
+    }
+    pos += TRACK_STRIDE + noteCount * NOTE_SIZE;
+    for (let pattern = 1; pattern < patternCount; pattern++) {
+      const cloneStart = pos - 1;
+      if (cloneStart + OFF_NOTE_COUNT >= image.length) {
+        return trackPatterns;
+      }
+      patternStarts.push(cloneStart);
+      noteCount = image[cloneStart + OFF_NOTE_COUNT];
+      if (noteCount > 120) {
+        return trackPatterns;
+      }
+      pos = cloneStart + TRACK_STRIDE + noteCount * NOTE_SIZE;
+    }
+    trackPatterns.push(patternStarts);
+  }
+  return trackPatterns;
+}
+
 // Basic implementation of the ImageProject functionality
 export class ImageProject {
   public header: Uint8Array;
   public image: Uint8Array;
   private starts: number[] = [];
+  private patternStarts: number[][] = [];
 
   constructor(header: Uint8Array, image: Uint8Array) {
     this.header = header;
@@ -89,13 +128,32 @@ export class ImageProject {
     if (starts.length > 0) {
       this.starts = starts;
     } else {
-        // Find SIG_RE matches roughly if needed
         this.starts = [];
+    }
+
+    const pStarts = patternStartsFromImage(this.image);
+    if (pStarts.length > 0) {
+      this.patternStarts = pStarts;
+    } else {
+      this.patternStarts = [];
     }
   }
 
   public trackStart(track: number): number {
     return this.starts[track - 1];
+  }
+
+  public trackPatternStart(track: number, patternIndex: number): number {
+      const patternsForTrack = this.patternStarts[track - 1];
+      if (!patternsForTrack || patternIndex >= patternsForTrack.length) {
+          throw new Error(`Pattern ${patternIndex} not found on track ${track}`);
+      }
+      return patternsForTrack[patternIndex];
+  }
+
+  public getPatternCount(track: number): number {
+      const patternsForTrack = this.patternStarts[track - 1];
+      return patternsForTrack ? patternsForTrack.length : 0;
   }
 
   public markEdited(track: number): void {
@@ -112,13 +170,13 @@ export class ImageProject {
     this.markEdited(track);
   }
 
-  public noteCount(track: number): number {
-    return this.image[this.trackStart(track) + OFF_NOTE_COUNT];
+  public noteCount(track: number, patternIndex: number = 0): number {
+    return this.image[this.trackPatternStart(track, patternIndex) + OFF_NOTE_COUNT];
   }
 
   public addNote(
     track: number,
-    { step, tick, note, velocity = 100, gate = 240 }: { step?: number; tick?: number; note: number; velocity?: number; gate?: number }
+    { step, tick, note, velocity = 100, gate = 240, patternIndex = 0 }: { step?: number; tick?: number; note: number; velocity?: number; gate?: number; patternIndex?: number }
   ): void {
     if (tick === undefined) {
       if (step === undefined) {
@@ -127,7 +185,7 @@ export class ImageProject {
       tick = (step - 1) * STEP_TICKS;
     }
 
-    const s = this.trackStart(track);
+    const s = this.trackPatternStart(track, patternIndex);
     const cpos = s + OFF_NOTE_COUNT;
     const count = this.image[cpos];
     if (count >= 120) {
@@ -153,8 +211,8 @@ export class ImageProject {
     this.rescan();
   }
 
-  public getNotes(track: number): {tick: number, gate: number, note: number, velocity: number}[] {
-    const s = this.trackStart(track);
+  public getNotes(track: number, patternIndex: number = 0): {tick: number, gate: number, note: number, velocity: number}[] {
+    const s = this.trackPatternStart(track, patternIndex);
     const cpos = s + OFF_NOTE_COUNT;
     const count = this.image[cpos];
     const notes = [];
