@@ -193,3 +193,31 @@ def test_cross_track_edits_are_isolated_on_target_struct(
         if base_img[i] != var_img[i] and i not in allowed
     ]
     assert not outside
+
+
+def test_static_mixer_writer_sets_track_fields() -> None:
+    project = ImageProject.from_file(str(BASELINE))
+    project.set_track_volume_byte(2, 0)
+    project.set_track_pan_byte(4, 0)
+    project.set_track_send_fx1_byte(6, 0x7F)
+    project.set_track_send_fx2_byte(8, 0x7F)
+
+    mixer = inspect_static_mixer_bytes(project.to_bytes())
+    assert mixer.tracks[1].volume.u32 == MIX_U32_MIN
+    assert mixer.tracks[3].pan.u32 == MIX_U32_MIN
+    assert mixer.tracks[5].send_fx1.u32 == MIX_U32_MAX
+    assert mixer.tracks[7].send_fx2.u32 == MIX_U32_MAX
+
+
+def test_static_mixer_writer_sets_master_fields() -> None:
+    project = ImageProject.from_file(str(BASELINE))
+    project.set_master_percussion_byte(0)
+    project.set_master_melody_byte(0x7F)
+    project.set_master_compressor_byte(0)
+    project.set_master_volume_byte(0x7F)
+
+    mixer = inspect_static_mixer_bytes(project.to_bytes())
+    assert mixer.master.percussion.u32 == MASTER_GROUP_MIN_U32
+    assert mixer.master.melody.u32 == MIX_U32_MAX
+    assert mixer.master.compressor.u32 == MASTER_GROUP_MIN_U32
+    assert mixer.master.master.u32 == MIX_U32_MAX

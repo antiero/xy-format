@@ -192,3 +192,32 @@ def test_tune_probe_diffs_are_isolated(filename: str, allowed_rel: set[int]) -> 
     _, var = decode_project((PROBES / filename).read_bytes())
     rel = {i - track_base for i in _track_region_diffs(base, var, track_base)}
     assert rel == allowed_rel, rel
+
+
+def test_sampler_sample_edit_writer_roundtrips_through_reader() -> None:
+    project = ImageProject.from_file(str(BASELINE))
+    project.set_sampler_sample_edit(
+        1,
+        sample_start=100,
+        sample_end=200,
+        loop_start=120,
+        loop_end=180,
+        loop_crossfade=96,
+        tune_tenths=-5,
+        loop_type=LOOP_TYPE_OFF,
+        gain=0x7F,
+        direction=1,
+    )
+
+    reread = ImageProject(project.header, bytearray(decode_project(project.to_bytes())[1]))
+    reread._rescan()
+    sample = read_sampler_sample_edit(reread)
+    assert sample.sample_start == 100
+    assert sample.sample_end == 200
+    assert sample.loop_start == 120
+    assert sample.loop_end == 180
+    assert sample.loop_crossfade == 96
+    assert sample.tune_tenths == -5
+    assert sample.loop_type_byte == LOOP_TYPE_OFF
+    assert sample.gain == 0x7F
+    assert sample.direction == 1

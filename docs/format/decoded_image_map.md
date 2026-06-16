@@ -64,12 +64,15 @@ derived from scene row flags, not from `0x06`.
 | +0x02 | default step length, u16 LE ticks (`240` = UI 50, min capture `4`, max `480`) | BAR `bar-l-*` |
 | +0x03–0x0A | early header bytes; formerly used as a signature, but BAR fields can mutate this range | BAR |
 | +0x06 | **track scale** (0x01=½, 0x03=1, 0x05=2, 0x0E=16) | u20–u22 |
-| +0x07 | bar-page quantization raw byte (`0x00` UI 0, `0xFF` default/UI 100; middle captures include UI 25/50/75 = `0x41`/`0x81`/`0xC0`; exact scaling partial) | BAR `bar-q-*` |
+| +0x07 | bar-page quantization raw byte; UI display is `floor(raw * 100 / 255)` (`0x00` UI 0, `0x80/0x81` UI 50, `0xFE` UI 99, `0xFF` UI 100) | BAR `bar-q-*` |
 | +0x08 | per-track groove override index byte (`signed_raw = 3 * index` into the UI sequence, saturated to signed i8 at ±99) | BAR `bar-g*` |
+| +0x09 | **T9 Brain route mask** (`bit0=T1` … `bit7=T8`; default `0xFC` routes T3–T8, `0x00` none, `0xFF` all) | AUX-BRAIN |
 | +0x11 | u16: **8 = pristine, 0 = edited** — the raw "type 0x05/0x07 + `08 00` padding" was this field's RLE shadow; sticky (never returns to 8) | u51, u53, every edit file |
 | +0x1C | M4/LFO type selector (5 bytes change on LFO swap) | u32 |
 | +0x20 | M4 page on/off | u31, u33 |
 | +0x21 | filter type (SVF/Ladder) | u28 |
+| +0x38A7 | **send to T13 External Audio aux output** u32, stored on the source track | AUX-T13 |
+| +0x38AB | **send to T14 Tape** u32, stored on the source track | AUX-T14 |
 | +0x38AF | **send FX I** u32 (byte @ +0x38B2) | P2-A `f6`/`f7` |
 | +0x38B3 | **send FX II** u32 (byte @ +0x38B6) | P2-A `f8`/`f9` |
 | +0x38F7 | **track pan** u32 (byte @ +0x38FA; center `0x40`) | P2-A `f3`–`f5` |
@@ -78,15 +81,22 @@ derived from scene row flags, not from `0x06`.
 | +0x3056 | bar-page p-lock interpolation/shape raw byte (`0x00` default/min, `0x04`/`0x08` min+1/+2, `0xFF` max) | BAR `bar-s-*` |
 | +0x3057 + 16×(step−1) | **step-component slot, 16 bytes per step**, one byte per component type within the slot (portamento +9, bend +10, tonality +11, jump +12, param +13, conditional +14, …) | u8/u9, u59–u77 |
 | +0x3857 | engine parameter block: eight 4-byte q16-ish values for synth engines; tonal sampler keeps these centered at `0x40000000` even when preset `engine.params` are unique | u23–u25, u96, 2026-06-15 unique sampler preset |
+| +0x3857 / +0x385B / +0x385F / +0x3863 | **T9 Brain parameter words**: raw key/mode/scale/link fields are located; candidate bucket interpretations for `+0x385B` and `+0x385F` fit device-authored captures but still need PC-generated → device-verified confirmation | AUX-BRAIN |
+| +0x3857 / +0x385B / +0x385F | **T11 External MIDI M1**: channel, bank, program u32 words. Channel uses 16 buckets (index+1 = channel); bank/program use 129 buckets (0=off, 1-128=value). Device detents fit the hypothesized `floor(raw*N/0x80000000)` mapping, but bucket boundaries are unverified and not boundary-safe for PC authoring. | AUX-T11 |
+| +0x3857 / +0x385B / +0x3863 / +0x38FB | **T13 External Audio M1**: source, drive, mix, level. Source detents confirmed for mic/headset/line/USB-C/main; drive/level/mix endpoints or anchors captured. Display/bucket boundaries remain unverified. | AUX-T13 |
+| +0x3857 / +0x385B / +0x385F / +0x3863 | **T14 Tape M1**: pitch, speed, length, mix. Device-authored anchors captured; display/bucket boundaries remain unverified. | AUX-T14 |
 | +0x3877 | M2 amp envelope ADSR (16 bytes) | u26 |
 | +0x3897 | M3 filter/FX knobs: at least eight 4-byte lanes in sampler presets; unique capture maps params 0-4 and 6-7, while lane 5 serialized as `0x7FFFFFFF` | u30, 2026-06-15 unique sampler preset |
 | +0x38B7 | M4/LFO values: eight 4-byte q16 lanes in sampler presets | u32, u33, 2026-06-15 unique sampler preset |
+| +0x3877..+0x3896 | **T11 External MIDI CC map table**: eight u32 words touched by M2/M3 CC assignment captures. Table location and bucket-readable values confirmed; exact CC number vs CC message ownership remains partial. | AUX-T11 |
+| +0x3897 / +0x389B / +0x389F / +0x38A3 | **Aux M3 filter words**: HPF, param 2, param 3, LPF for T13–T16. T13 captures confirm HPF min/default `0x00000000`, HPF max `0x7FFFFFFF`; LPF min `0x00000000`, LPF max/default `0x7FFFFFFF`; param 2 mid `0x7C28F2FF`; param 3 mid `0x3570CA40`. Param 2/3 semantics remain unknown. | AUX-FILTER |
+| +0x38B7 / +0x38BB / +0x38BF / +0x38C3 | **Aux M4 LFO words**: speed, amount, destination, param-dest. T13 generic captures confirm speed min/default `0x40000000`, max `0x7FFFFFFF`; amount min/zero/max `0x00000000`/`0x40000000`/`0x7FFFFFFF`; generic dest syn/filter/amp `0x00000000`/`0x4AAAAAA9`/`0x75555553`; param targets 1-4 `0x07FFFFFF`/`0x27FFFFFD`/`0x47FFFFFB`/`0x77FFFFF8`. T11 MIDI-only dest off/cc1/cc2 uses `+0x38BF` values `0x00000000`/`0x3AAAAAA7`/`0x7AAAAAA3`. Bucket boundaries remain unverified for PC authoring. | AUX-LFO |
 | +0x38D7 | filter envelope ADSR (16 bytes) | u27 |
 | +0x38FF–0x393B | modulation/performance matrix: modwheel, aftertouch, pitchbend, velocity target/amount, velocity sensitivity, portamento type, width, high-pass | u83, u84, 2026-06-15 unique sampler preset |
 | +0x3917 / +0x392F | velocity sensitivity / track high-pass filter | u82, u40 |
 | +0x38F2 / +0x38F6 | T9–T16 project-config save side-effect (`0x00`→`0x40` in every PCFG variant; not the edited setting) | PCFG |
 | +0x3CBF | 2-byte UI-state (last-touched?) — co-changes with edits | u40, u66, u82 |
-| ~+0x456F | **note event area**: `[count u8]` + 12-byte note records `{u32 tick; u32 gate; u8 note; u8 vel; u8 flags[2]}` (tick 480/16th, gate 240 = default). Micro-timing lives in `tick` (non-grid values, u79/u87), not the flags. `flags[1]` always 0 in corpus; `flags[0]` 0 for programmed notes, 2 on some MIDI-recorded drum notes (n110); firmware **does** read them (device probe 07: `flags[0]=127` caused a note retrigger), but out-of-range values misbehave — writer emits 0,0 (device default). | u81 decode; corpus scan; probe 07 |
+| ~+0x456F | **note event area**: `[count u8]` + 12-byte note records `{u32 tick; u32 gate; u8 note; u8 vel; u8 flags[2]}` (tick 480/16th, gate 240 = default). Micro-timing lives in `tick` (non-grid values, u79/u87), not the flags. `flags[1]` always 0 in corpus; `flags[0]` 0 for programmed notes, 2 on some MIDI-recorded drum notes (n110); firmware **does** read them (device probe 07: `flags[0]=127` caused a note retrigger), but out-of-range values misbehave — writer emits 0,0 (device default). Confirmed on T9 Brain, T10 Punch-in FX, and T12 External CV probes. | u81 decode; corpus scan; probe 07; AUX-BRAIN; AUX-T10; AUX-T12 |
 | end | trailing zero region (raw-space "tail byte" = its run extension) | — |
 
 **Aux tracks**: T15 = FX1, T16 = FX2 — FX type changes substitute in the

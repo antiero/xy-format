@@ -225,3 +225,17 @@ def test_max_probes_set_level_byte(filename: str, byte_offset: int) -> None:
         GLOBAL_SAT_MIX_BYTE_OFFSET: sat.mix,
     }[byte_offset]
     assert band.byte == SAT_BYTE_MAX
+
+
+def test_master_saturator_writer_sets_u32_lanes() -> None:
+    project = ImageProject.from_file(str(BASELINE))
+    project.set_master_saturator_gain_byte(SAT_BYTE_MIN)
+    project.set_master_saturator_clip_byte(SAT_BYTE_MAX)
+    project.set_master_saturator_tone_byte(SAT_BYTE_MIN)
+    project.set_master_saturator_mix_byte(SAT_BYTE_MAX)
+
+    sat = read_master_saturator(ImageProject(project.header, bytearray(decode_project(project.to_bytes())[1])))
+    assert sat.gain.u32 == SAT_U32_MIN
+    assert sat.clip.u32 == SAT_U32_MAX
+    assert sat.tone.u32 == SAT_U32_MIN
+    assert sat.mix.u32 == SAT_U32_MAX

@@ -31,14 +31,26 @@ p = ImageProject.from_file("src/one-off-changes-from-default/unnamed 1.xy")
 # global project settings
 p.set_tempo(121.2)                       # BPM
 p.set_groove(groove_type)                # groove enum
+p.set_groove_amount(-4)                  # signed amount
 p.set_click_volume(0)
+p.set_project_transpose(-12)
+p.set_time_signature(0x11)               # raw enum
+p.set_voice_allocation(1, 4)             # T1..T8; None/0 = auto
 p.set_midi_channel(track, channel)       # 1..16, or None = off
+p.set_active_scene(1)
+p.set_active_song(1)
 p.set_master_eq(low=..., mid=..., high=...)
 
 # sequencer content
 p.set_bars(track, bars)                  # 1..4
+p.set_pattern_steps(track, steps)        # total active steps, incl. partial final bar
 p.add_note(track, step=9, note=60, velocity=100, gate=240)   # tick optional
 p.set_track_scale(track, 2)              # 0.5 / 1 / 2 / 16 (or raw byte)
+p.set_default_step_length_ticks(track, 240)
+p.set_track_quantization_ui(track, 99)
+p.set_track_quantization_raw(track, 0xFF)
+p.set_track_groove_ui(track, 14)         # displayed BAR groove value
+p.set_plock_shape_raw(track, 0)
 
 # instrument / sound
 p.set_engine(track, engine_id)
@@ -62,9 +74,10 @@ p.set_drum_voice(track, voice, tune=+7, play_mode=4, start=..., loop_start=..., 
 p.save("out.xy")
 ```
 
-Every method above is validated by byte-exact replication of its device
-capture (`tests/test_image_writer.py`). Component names:
-`STEP_COMPONENTS`; p-lock param names: `PLOCK_PARAMS`.
+The core image-authoring paths are validated by byte-exact replication and
+probe-specific regression tests (`tests/test_image_writer.py`,
+`tests/test_project_config_inspection.py`, `tests/test_bar_menu_inspection.py`).
+Component names: `STEP_COMPONENTS`; p-lock param names: `PLOCK_PARAMS`.
 
 The M2 shift, send, LFO-current, and mix helpers write static/current u32
 lanes. They do not create automation. To create step automation, use
