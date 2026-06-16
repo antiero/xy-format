@@ -82,6 +82,7 @@ PRESET_LABEL_OFFSET = 0x453F
 PRESET_LABEL_MAX = 0x30
 SAMPLER_SAMPLE_PATH_OFFSET = 0x395F
 SAMPLER_SAMPLE_PATH_MAX = 0x60
+TRACK1_OCTAVE_OFFSET = 0x003D
 
 PLAYMODE_WORDS = {
     "poly": 0x15555555,
@@ -92,7 +93,7 @@ FIELD_COVERAGE = [
     ("platform", "metadata", "Preset file marker; not expected to be stored as track sound state."),
     ("version", "metadata", "Preset schema version; not expected to be stored as track sound state."),
     ("type", "confirmed", "Engine byte at `track+0x14`."),
-    ("octave", "unresolved", "No stable byte/u32 location found across current paired captures."),
+    ("octave", "confirmed-for-track-1", "Signed byte at decoded-image `0x003D` for T1 in this corpus. Manual testing confirms octave is track-global, not pattern-local; T2-T16 table offsets still need a multi-track fixture."),
     ("engine.params[0..7]", "confirmed", "q16 words at `track+0x3857..0x3873`."),
     ("engine.playmode", "confirmed", "Raw word at `track+0x3887`: `poly=0x15555555`, `mono=0x3FFFFFFF`."),
     ("engine.portamento.amount", "confirmed", "q16 word at `track+0x388B`."),
@@ -178,6 +179,7 @@ def analyze(corpus: Path) -> str:
 
     mismatches: dict[str, list[str]] = defaultdict(list)
     _check_engine_ids(pairs, mismatches)
+    _check_track1_octave(pairs, mismatches)
     _check_playmode(pairs, mismatches)
     _check_preset_labels(pairs, mismatches)
     _check_q16_fields(pairs, mismatches)
@@ -196,6 +198,7 @@ def analyze(corpus: Path) -> str:
             "## Confirmed Direct Mappings",
             "",
             "- `patch.json.type` maps to the track engine byte at `track+0x14` for all paired captures.",
+            "- `patch.json.octave` maps to decoded-image `0x003D` for T1 as a signed byte. Manual device testing confirms octave is track-global, not pattern-local.",
             "- The short preset label at `track+0x453F` is `1/<preset folder name>` for all paired captures except the duplicate/mismatched sample noted below.",
             "- `engine.params[0..7]` map directly as q16 values to `track+0x3857..0x3873`.",
             "- `engine.playmode` maps to the raw word at `track+0x3887` (`poly=0x15555555`, `mono=0x3FFFFFFF`).",
@@ -260,6 +263,16 @@ def _check_preset_labels(pairs: list[Pair], mismatches: dict[str, list[str]]) ->
         got = _cstr(pair.project.image, pair.track_start + PRESET_LABEL_OFFSET, PRESET_LABEL_MAX)
         if got != expected:
             mismatches["preset label"].append(f"`{pair.name}`: expected `{expected}`, got `{got}`")
+
+
+def _check_track1_octave(pairs: list[Pair], mismatches: dict[str, list[str]]) -> None:
+    for pair in pairs:
+        expected = _lookup(pair.patch, "octave")
+        if not isinstance(expected, int):
+            continue
+        got = _s8(pair.project.image[TRACK1_OCTAVE_OFFSET])
+        if got != expected:
+            mismatches["octave"].append(f"`{pair.name}`: expected `{expected}`, got `{got}`")
 
 
 def _check_playmode(pairs: list[Pair], mismatches: dict[str, list[str]]) -> None:
@@ -373,6 +386,10 @@ def _q16(image: bytearray, offset: int) -> int:
 
 def _cstr(image: bytearray, offset: int, max_len: int) -> str:
     return bytes(image[offset : offset + max_len]).split(b"\x00", 1)[0].decode("utf-8", "replace")
+
+
+def _s8(value: int) -> int:
+    return value - 0x100 if value >= 0x80 else value
 
 
 def _counter_table(counter: Counter[str], columns: tuple[str, str]) -> str:

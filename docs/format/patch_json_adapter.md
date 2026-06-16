@@ -13,7 +13,7 @@ them into a decoded `.xy` project image.
 | `version` | patch schema version, observed as `4`. | Ignored; not project sound state. |
 | `name` | Preset display/export name. | Ignored; project stores short preset identity separately. |
 | `type` | Preset engine family such as `drum`, `sampler`, `axis`, etc. | `drum` and `sampler` are writable; other types are rejected. |
-| `octave` | Keyboard octave metadata. | Ignored; no confirmed project slot mapping. |
+| `octave` | Track keyboard octave. | Confirmed readable for T1 at decoded-image `0x003D` as a signed byte; manual device testing shows this is track-global, not pattern-local. The adapter does not write it yet. |
 | `engine` | Engine-level settings and params. | Not written by this adapter. |
 | `envelope` | Amp/filter envelope blocks. | Not written by this adapter. |
 | `fx` | Preset-local FX state. | Not written by this adapter. |

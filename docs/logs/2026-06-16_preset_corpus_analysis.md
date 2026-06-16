@@ -49,6 +49,7 @@ All preset types:
 | `patch.json` field | Project image mapping |
 | --- | --- |
 | `type` | Track engine byte at `track+0x14`. |
+| `octave` | Signed byte at decoded-image `0x003D` for T1 in this corpus. Manual device testing confirms octave is track-global, not pattern-local; T2-T16 table offsets still need a multi-track fixture. |
 | preset folder name | Short preset label at `track+0x453F`, encoded as `1/<preset folder name>`. |
 | `engine.params[0..7]` | q16 values at `track+0x3857..0x3873`. |
 | `engine.playmode` | Raw word at `track+0x3887`: `poly=0x15555555`, `mono=0x3FFFFFFF`. |
@@ -85,7 +86,7 @@ captured `framecount`, `sample.end`, `loop.start`, and `loop.end` values exceed
 | `platform` | metadata | Preset file marker; not expected to be stored as track sound state. |
 | `version` | metadata | Preset schema version; not expected to be stored as track sound state. |
 | `type` | confirmed | Engine byte at `track+0x14`. |
-| `octave` | unresolved | No stable byte/u32 location found across current paired captures. |
+| `octave` | confirmed-for-track-1 | Signed byte at decoded-image `0x003D` for T1 in this corpus. Manual testing confirms octave is track-global, not pattern-local; T2-T16 table offsets still need a multi-track fixture. |
 | `engine.params[0..7]` | confirmed | q16 words at `track+0x3857..0x3873`. |
 | `engine.playmode` | confirmed | Raw word at `track+0x3887`. |
 | `engine.portamento.amount`, `engine.bendrange`, `engine.volume` | confirmed | q16 words at `track+0x388B/0x388F/0x3893`. |
