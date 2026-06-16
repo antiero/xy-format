@@ -1,152 +1,130 @@
 # OP-XY Project Format Lab
 
-This project helps you edit OP-XY `.xy` project files outside the device.
+This repo reverse-engineers Teenage Engineering OP-XY `.xy` project files and
+builds tools for reading, editing, and generating them off-device.
 
-The goal is simple: make safe, repeatable edits to real projects without breaking them.
+The key breakthrough: an `.xy` project is the firmware's decoded project image
+compressed with a simple byte-level RLE scheme. Once decoded, the data is mostly
+little-endian C-style structs with count-prefixed vectors.
 
-For the full format story and byte-level mental model, read
-[`docs/human-explainer.md`](docs/human-explainer.md). This README stays high-level.
+Start here:
 
-## What This Is
+- [State of understanding](docs/state_of_understanding.md)
+- [Parse and author capability checklist](docs/parse_capability_checklist.md)
+- [Decoded image map](docs/format/decoded_image_map.md)
+- [Authoring guide](docs/engineering/authoring.md)
+- [Docs index](docs/index.md)
 
-Think of this repo as a research + tooling workspace:
-- We collected many real OP-XY project files with one small change each.
-- We compare those files to learn what each part of the format means.
-- We use that knowledge to build tools that can read files and make limited safe edits.
+## Current Format Model
 
-## `.xy` Mental Model (High-Level)
-
-At a practical level, an OP-XY project file is:
-
-1. Header (global settings)
-2. Pre-track descriptor region (topology/index metadata)
-3. Track blocks (per-track/per-pattern payloads)
+The project body is one RLE stream:
 
 ```text
-[header][pre-track region][track block 1][track block 2]...[track block N]
+.xy file = 8-byte wrapper + RLE(project image)
 ```
 
-Track blocks are variable-length serialized units, not fixed-size structs.
-Each block begins with a 4-byte preamble and then a variable body.
+The baseline decoded image layout is:
 
-### What The Pre-Track Descriptor Is Doing
+```text
+global header      3,449 bytes
+track structs      16 logical tracks, 17,876 bytes each before vector growth
+clone structs      inserted for extra patterns
+footer             56-byte song table
+```
 
-Think of descriptor bytes as topology metadata for firmware. They mostly describe:
+That reframes the old raw-byte model:
 
-- Which tracks have multiple patterns
-- How many pattern slots are active for those tracks
-- Which descriptor branch/family firmware should use
+- Descriptor and preamble theories were artifacts of viewing compressed bytes.
+- Former "event type" bytes before notes were RLE extension counts.
+- The old note==velocity crash was an unescaped equal-byte pair in our writer,
+  not an OP-XY musical rule.
+- Current authoring should edit the decoded image, then re-encode.
 
-They do not hold note-by-note musical data.
+## What Works Now
 
-### Leader vs Clone (Multi-Pattern Tracks)
+The current stack can:
 
-When a track has multiple patterns:
+- Decode and re-encode the corpus byte-exactly, except documented
+  non-canonical RLE specimens.
+- Reproduce many device-saved captures byte-exactly from semantic edits.
+- Author notes, gates, velocities, pattern length, bars, step components,
+  p-locks, engine params, preset donor copies, drum voice params, scenes, mutes,
+  and song chains.
+- Build multi-pattern arrangements through decoded track/pattern structs.
+- Generate device-passing projects, including the note==velocity probe, sparse
+  topology probes, preset transfer probes, and the Whitney capstone song.
+- Inspect fixture-backed project state for project config, preset paths, drum
+  and sampler samples, static mixer state, scene volumes/mutes, master EQ, and
+  master saturator.
 
-- Pattern 1 is the leader block
-- Pattern 2+ are clone blocks
+The latest full test run after merging PR #3 was:
 
-Leader and clone are serialization roles. In some corpora they are nearly identical;
-in others they differ in preamble/state/trim behavior. Treat them as related-but-not-always-identical.
+```text
+1759 passed, 32 skipped
+```
 
-### What Lives Inside Block Bodies
+## Canonical Tools
 
-Block bodies contain typed, variable-length payload families, including:
+- `xy/rle.py` — decode/encode the project image.
+- `xy/image_writer.py` — image-based editing and arrangement assembly.
+- `tools/spec_to_xy_image.py` — JSON/spec to image-authored `.xy`.
+- `tools/inspect_xy.py` — human-readable project inspection report.
+- `tools/corpus_lab.py` — corpus/device outcome records.
+- `tools/analysis/decoded_diff.py` — decoded-space field diffs.
 
-- Core track/engine settings
-- Note event payloads
-- Step component payloads
-- P-lock payloads
-- Tail/pointer-like regions (partially decoded)
+Read-only inspection modules added by the 2026-06 contributor pass are indexed
+in [the capability checklist](docs/parse_capability_checklist.md).
 
-This is why strict branch-safe authoring and device validation still matter.
+## What Still Needs Work
 
-For deeper explanations and examples, continue in
-[`docs/human-explainer.md`](docs/human-explainer.md).
+No structural format mystery remains on the critical authoring path. Remaining
+work is field polish, productization, and edge-case validation:
 
-## Why Off-Device Editing Is Useful
+- `midi_to_xy` v2 should route through `tools/spec_to_xy_image.py` and
+  `xy/image_writer.py`.
+- Some enums and user-facing labels remain partial: track-scale full enum, LFO
+  subfunctions, mod-routing destination IDs, aux-track parameter labels, and
+  player modes.
+- Scene-stored volume bytes are mapped, but playback semantics on firmware
+  1.1.4 need a focused retest.
+- Multisampler zones/slicing and user `.preset` file format are not fully
+  decoded.
+- Limits certification remains for max scenes, visible song slots, full
+  9-pattern topology, and 120-note edge cases.
 
-Editing `.xy` files on a computer is interesting because it can unlock workflows
-that are slow or awkward on the hardware alone:
+For the live status, use [the roadmap](docs/roadmap.md) and
+[the capability checklist](docs/parse_capability_checklist.md).
 
-- **MIDI -> OP-XY conversion**: turn MIDI clips into OP-XY-ready project data.
-- **OP-XY -> DAW export**: move patterns back out to Ableton (or other DAWs) for arranging, mixing, or collaboration.
-- **Whole-pattern visibility**: see an entire pattern at once instead of paging through bars on the device.
-- **At-a-glance modulation view**: inspect all parameter locks and step components affecting a pattern in one place.
+## Recommended Authoring Workflow
 
-The long-term goal is to make these workflows reliable enough for real music production, not just reverse-engineering experiments.
+1. Start from a known-good `.xy` project close to the target state.
+2. Decode with `xy/rle.py`.
+3. Make semantic image edits with `xy/image_writer.py`.
+4. Re-encode with `xy/rle.py`.
+5. Inspect and decoded-diff the result.
+6. Device-test new feature surfaces and record outcomes with
+   `tools/corpus_lab.py`.
 
-## Who This Is For
+If a generated file crashes the device, follow
+[the crash capture workflow](docs/workflows/crash_capture.md).
 
-- Musicians who want to batch-edit projects or generate project variations.
-- Technical users who want to script OP-XY edits instead of clicking everything by hand.
+## Repo Guide
 
-You do not need to understand byte offsets to use the safer workflows.
-
-## What You Can Expect To Work (As of 2026-02-13)
-
-- Open and re-save project files while preserving unknown data.
-- Read key project info reliably (including core note/event data in common cases).
-- Change transport settings like tempo/groove/metronome with high confidence.
-- Build edited `.xy` files from a simple JSON "edit recipe" in constrained modes.
-- Do tested multi-pattern edits for known-safe track combinations:
-  - Track 1 only, Track 2 only, Track 3 only, Track 4 only, Track 7 only
-  - Track 1 + Track 2
-  - Track 1 + Track 3
-  - Track 1 + Track 4
-  - Track 1 + Track 2 + Track 3
-  - Any T3+-only combination via Scheme A encoder (T5, T6, T8, T3+T7, etc.)
-- In the `n110` 9-pattern x 8-track specimen, clone bodies are byte-identical to
-  leaders except note event bytes. Treat this as a validated branch behavior, not
-  a global rule for every topology.
-
-Current automated test status in this repo:
-- `909 passed, 14 skipped` (`pytest -q`)
-
-## What Is Risky
-
-- Using older "general writer" scripts as if they can safely generate any project.
-- Making multi-pattern edits outside the known-safe combinations above.
-- Assuming every note timing/gate value is fully decoded in all advanced event types.
-- Large edits that combine many changes at once before device-testing.
-
-Risk here means: file may still load, may load with wrong behavior, or may crash on device.
-
-## What Is Not Ready Yet
-
-- Arbitrary pattern counts on arbitrary track combinations (descriptor Scheme B
-  is not fully generalized — only known topologies are safe).
-- Fully reliable from-scratch project generation for every OP-XY feature.
-- Reliable scene/song authoring coverage.
-- Reliable sample-path and related asset-directory authoring.
-- Full firmware package manipulation workflows.
-
-## Recommended Real-World Workflow
-
-1. Start from a real OP-XY project file that is close to what you want.
-2. Make small edits (tempo first, then notes, then multi-pattern if needed).
-3. For multi-pattern edits, keep strict/safe mode enabled.
-4. Inspect the result and diff against the source before device load.
-5. Test on hardware in small steps and log pass/crash outcomes.
-
-If your main goal is "make music, not reverse engineer," this workflow is the safest path.
-
-## Repo Guide (Plain English)
-
-- `docs/index.md`: map of all docs.
-- `docs/human-explainer.md`: full narrative format model for new contributors.
-- `docs/roadmap.md`: what we are working on now.
-- `docs/issues/index.md`: current known problems.
-- `docs/format/`: stable format knowledge (deeper technical detail).
-- `docs/workflows/crash_capture.md`: what to do if a file crashes on device.
-- `tools/inspect_xy.py`: inspect what a file currently contains.
-- `tools/build_xy_from_json.py`: build a file from a JSON edit recipe.
-- `tools/capture_9pat.py`: interactive MIDI harness for multi-pattern device captures.
-- `tools/analysis/`: research scripts and one-off probes. See `tools/analysis/README.md`.
-- `src/one-off-changes-from-default/`: the key fixture files used for learning and testing.
+- `docs/format/` — stable byte-level format truth.
+- `docs/logs/` — dated investigation history and contributor probe notes.
+- `docs/engineering/` — implementation and authoring notes.
+- `docs/workflows/` — repeatable capture, test, and crash procedures.
+- `docs/reference/` — OP-XY limits and MIDI/CC references.
+- `src/*-probes/` — device probe fixtures added by focused capture campaigns.
+- `src/one-off-changes-from-default/` — original fixture corpus.
+- `tests/` — regression coverage.
+- `tools/` — user-facing and research CLIs.
+- `xy/` — Python library code.
 
 ## House Rules
 
-- Do not delete fixture `.xy` files in `src/one-off-changes-from-default/`.
-- Keep edits deterministic and easy to diff.
-- Record crashes with artifacts and notes so regressions can be prevented.
+- Keep stable format knowledge in `docs/format/*`.
+- Keep chronology and disproven paths in `docs/logs/*`.
+- Preserve unknown decoded bytes until mapped.
+- Prefer byte-exact replication of device captures over heuristics.
+- Record device outcomes and every crash with artifacts and notes.

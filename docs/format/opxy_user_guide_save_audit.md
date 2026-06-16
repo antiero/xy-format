@@ -38,16 +38,16 @@ Primary repo references:
 | Guide area | Save-relevant controls | Current status |
 |---|---|---|
 | Project file/container | save, save-as, duplicate, history files | Decoded at `.xy` project-file level; filesystem history/backups are outside one `.xy`. |
-| Project settings | global transpose, time signature, voice allocation, per-track MIDI channel | MIDI channel decoded; other project-setting pages are gaps or partial. |
-| Tempo | BPM, groove type/amount, metronome level/on-off | BPM/type/level decoded; groove amount and metronome on/off are partial. |
+| Project settings | global transpose, time signature, voice allocation, per-track MIDI channel | Core project settings decoded by PCFG/HDR probes. |
+| Tempo | BPM, groove type/amount, metronome level/on-off | BPM, groove type/amount, time signature, click volume, and metronome persistence decoded. |
 | Patterns/sequencer | notes, chords, gate, microtiming, bars, track scale, p-locks, step components | Decoded. |
-| Bar page | quantization, default length, per-track groove, lock smoothing, final-bar length | Track scale and bars decoded; the rest are partial/gaps. |
+| Bar page | quantization, default length, per-track groove, lock smoothing, final-bar length | Decoded; quantization scaling and p-lock shape UI labels remain partial. |
 | Players | arpeggio, maestro, hold | Gap. |
 | Instrument | engine, preset, M1 params, envelopes, filter, LFO, preset settings | Main regions decoded; several shift/subfunction values are partial. |
 | Auxiliary tracks | Brain, Punch-in FX, External MIDI/CV/Audio, Tape, FX I/II | Track structs exist; many aux-specific parameter labels/enums are gaps. |
-| Arrange | pattern switching/copying, scenes, mutes, song chains, loop | Core scenes/songs decoded; scene-stored volumes are a gap. |
-| Mix | track levels, pans, sends, EQ, saturator, master/compressor | Many p-lock/current-value columns known; master EQ and likely master mix/saturator cluster are partial. |
-| Sample | one-shot, drum sampler, multisampler, sample folder assignments | Drum voice table mostly decoded; one-shot/multisampler and slicing internals are gaps. |
+| Arrange | pattern switching/copying, scenes, mutes, song chains, loop | Core scenes/songs decoded; scene-stored volume bytes mapped, playback semantics need retest. |
+| Mix | track levels, pans, sends, EQ, saturator, master/compressor | Static mixer, master volume/compressor, master EQ, and master saturator decoded by P2 probes; some aux labels remain partial. |
+| Sample | one-shot, drum sampler, multisampler, sample folder assignments | Drum and one-shot sampler state mostly decoded; multisampler zones and slicing internals remain gaps. |
 | COM/system | multi-out, Bluetooth MIDI, system settings, devices, controller mode | Mostly outside `.xy`; any project-specific MIDI channel overlaps project settings. |
 | MIDI CC | CC 7/9/10/12-47/80-86/90 | Reference labels documented; storage coverage varies by target. |
 
@@ -61,9 +61,9 @@ Guide refs: section 10.1 p.36; section 10.2 p.36; section 10.3 p.37; section 22.
 |---|---|---|
 | Save / save-as / duplicate | Current project image and filesystem copy/history. | Decoded as whole `.xy`: 8-byte header + one RLE stream over the decoded RAM image. History/backups are filesystem policy, not an internal field. |
 | Rename | Project name / filename. | Gap for any internal display-name field. The MTP instructions also allow direct filename rename, so the name may be external to the `.xy` body. |
-| Project general transpose | Global transposition including drums. | Gap. No stable offset promoted. |
-| Project tempo/time signature | Time signatures 3/4, 4/4, 5/4, 6/8, 7/8, 12/8 plus groove type view/edit. | Partial. Tempo/groove type are decoded globally; time-signature enum is not pinned. |
-| Project voices | Per-track voice allocation/priority within 24-voice total. | Gap. Limits are documented, but storage is not decoded. |
+| Project general transpose | Global transposition including drums. | Decoded: signed i8 at global `0x1B`, range −24..+24 (PCFG). |
+| Project tempo/time signature | Time signatures 3/4, 4/4, 5/4, 6/8, 7/8, 12/8 plus groove type view/edit. | Decoded: tempo at global `0x00`, groove type/amount at `0x03`/`0x02`, time-signature enum at global `0x1C` (`0x10`–`0x15`). |
+| Project voices | Per-track voice allocation/priority within 24-voice total. | Decoded: global `0x4D-0x54` for T1-T8, `0` auto / `1`-`8` fixed (PCFG). |
 | Project MIDI | MIDI channel for each of 16 tracks. | Decoded: global header `0x55-0x64`, one byte per track. |
 
 ### Tempo
@@ -245,16 +245,13 @@ These are the guide-visible features that should be prioritized if the goal is
 
 | Priority | Gap | Guide reference | Why it matters | Suggested capture |
 |---|---|---|---|---|
-| P0 | Scene-stored track volumes | section 12.1 p.41, section 16.3 p.67 | The guide explicitly says scenes store track volumes; current scene struct only names pattern selections, mutes, flags. | Baseline with two scenes; change only one scene's track volume; save; decoded diff. |
-| P0 | Project settings: transpose, time signature, voice allocation | section 10.3 p.37 | Core project config page; only per-track MIDI channels are decoded. | Four one-off saves from same baseline, one setting each. |
-| P0 | Bar-page quantization, default step length, per-track groove, p-lock shape/smoothing, final-bar length | section 7.4 p.26-27 | These affect authoring/playback but are not in note records themselves. | One track, no notes except sentinel; save each bar-page knob at distinct non-default value. |
+| P0 | Scene-stored track volume playback semantics | section 12.1 p.41, section 16.3 p.67 | Storage bytes are mapped from P2-D captures, but operator playback on firmware 1.1.4 sounded global. | Retest one two-scene project on device: scene 2 T1 volume only, then A/B scene playback without rebuilding the file. |
 | P1 | Players: arpeggio/maestro/hold | section 9.1-section 9.3 p.33-34 | Entire guide chapter with persistent per-track behavior; no canonical offsets. | Three captures: enable Hold; Arp with non-default all knobs; Maestro with a two-note recorded chord. |
 | P1 | Aux-specific parameter maps for T9-T14 and exact FX I/II enums | section 15.1-section 15.7 p.54-63 | Aux tracks are first-class sequenceable tracks; current struct map is generic. | One capture per aux track with all four visible knobs moved; one per shift page. |
-| P1 | One-shot sampler and multisampler slot internals | section 18.1 p.77-78, section 18.3 p.83-84 | Sample-path table is known, but loop/zone/root/slicing fields are not. | Assign one known sample; change one edit-screen field at a time; include multisampler two-zone capture. |
-| P1 | Drum pan/fade disambiguation | section 18.2 p.80 | Drum voice table is otherwise decoded; `+0x05/+0x06` are provisional. | Two clean drum captures: pan only, fade only, same voice. |
+| P1 | Multisampler zone internals | section 18.3 p.83-84 | One-shot sampler fields and drum slot paths/params are mapped, but multisampler zone/root/fill-down behavior is not. | Assign two zones; change one edit-screen field at a time; include root/key-boundary captures. |
 | P1 | Preset settings tuning/root/transpose/width/portamento type | section 14.5 p.51 | Visible preset settings not fully mapped. | Same track/preset, one setting per save. |
 | P1 | Mod-routing destination enum and signed scaling | section 14.5 p.51, section 22.9 p.118 | Region known, but target IDs/amount scaling incomplete. | Pitchbend/modwheel/aftertouch/velocity target+amount matrix with fixed nonzero amounts. |
-| P2 | Mix static level/pan/send/mute and master saturator/compressor/output | section 17.1-section 17.4 p.70-73 | P-lock columns cover many parameters, but static mixer/master current values are not fully named. | One save per mix control from initialized project; use decoded diff against baseline. |
+| P2 | Aux/static mix labels beyond P2-A fields | section 17.1-section 17.4 p.70-73 | Main static mixer, master compressor/output, EQ, and saturator are mapped; aux-specific labels and some send semantics remain partial. | One save per aux-visible control from initialized project; use decoded diff against baseline. |
 | P2 | LFO type/subfunction enum table | section 14.4 p.45-50 | Region known; user-facing labels incomplete. | LFO type sweep and one capture per shift/click subfunction. |
 | P2 | External MIDI engine channel/bank/program and CC assignment fields | section 20.4 p.96, section 15.3 p.56 | Needed for external-device authoring. | External engine track with channel/bank/program set to unusual values; then CC assignment on/off values. |
 | P2 | Active song/scene/project selector and guide 9-song vs decoded 14-slot footer reconciliation | section 12.1 p.41, section 16.4 p.68, section 23 p.122 | Core model works for Song 1 chains, but selector/count semantics and unused footer slots need cleanup. | Create songs 1-9 with unique one-scene chains; save after selecting each. |

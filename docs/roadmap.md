@@ -111,8 +111,9 @@ One tiny probe file + a glance at the device UI each:
 Per-field read/write/inspect status with evidence links lives in
 [`parse_capability_checklist.md`](parse_capability_checklist.md).
 
-Recent contributor work (2026-06, pending upstream review) adds
-read-only inspection modules and device probe fixtures. That progress is
-tracked in the checklist and dated logs — not by rewriting this tier
-list. See [`workflows/contributor_inspection_workflow.md`](workflows/contributor_inspection_workflow.md)
-for how those contributions map back to Tier 1–3 items.
+Contributor work merged in PR #3 (2026-06) adds read-only inspection
+modules, device probe fixtures, the capability checklist, and a contributor
+inspection workflow. That progress is tracked in the checklist and dated logs
+instead of by rewriting this tier list. See
+[`workflows/contributor_inspection_workflow.md`](workflows/contributor_inspection_workflow.md)
+for how future contributions map back to Tier 1–3 items.
