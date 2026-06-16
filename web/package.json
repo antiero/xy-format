@@ -24,6 +24,8 @@
     "vitest": "^4.1.9"
   },
   "dependencies": {
-    "@tonejs/midi": "^2.0.28"
+    "@tonejs/midi": "^2.0.28",
+    "spessasynth_core": "^4.3.10",
+    "spessasynth_lib": "^4.3.7"
   }
 }
