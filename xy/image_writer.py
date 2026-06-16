@@ -133,9 +133,37 @@ class ImageProject:
         """1-based track number -> struct base offset (header byte 0)."""
         return self._starts[track - 1]
 
+    def pattern_start(self, track: int, pattern: int = 1) -> int:
+        """1-based track/pattern -> physical pattern struct base offset."""
+        if not 1 <= track <= TRACK_COUNT:
+            raise ValueError("track must be 1..16")
+        if not 1 <= pattern <= 9:
+            raise ValueError("pattern must be 1..9")
+        starts = pattern_starts_from_image(self.image)
+        if not starts:
+            raise ValueError("could not locate pattern structs")
+        index = 0
+        for current_track in range(1, TRACK_COUNT + 1):
+            if index >= len(starts):
+                raise ValueError("pattern struct table ended early")
+            leader = starts[index]
+            count = self.image[leader]
+            if not 1 <= count <= 9:
+                count = 1
+            if current_track == track:
+                if pattern > count:
+                    raise ValueError(f"track {track} only has {count} pattern(s)")
+                return starts[index + pattern - 1]
+            index += count
+        raise ValueError("track must be 1..16")
+
     # --- field edits -----------------------------------------------------
     def mark_edited(self, track: int) -> None:
         s = self.track_start(track)
+        self.image[s + OFF_PRISTINE : s + OFF_PRISTINE + 2] = b"\x00\x00"
+
+    def mark_pattern_edited(self, track: int, pattern: int = 1) -> None:
+        s = self.pattern_start(track, pattern)
         self.image[s + OFF_PRISTINE : s + OFF_PRISTINE + 2] = b"\x00\x00"
 
     def set_pattern_steps(self, track: int, steps: int) -> None:
@@ -620,25 +648,65 @@ class ImageProject:
 
     # --- drum-voice parameters (decoded from device capture + manual) -----
     # 24 voice slots, 128 B each, at track+0x3957 (the drum sampler table).
+    PRESET_PATH = 0x453F
+    PRESET_PATH_MAX = 64
     DRUM_TABLE = 0x3957
     DRUM_SLOT = 0x80
     DRUM_TUNE = 0x00       # u8 root note, default 0x3c, ±48 semitones
+    DRUM_KEY = 0x02        # u8 MIDI key assignment
     DRUM_PLAY_MODE = 0x03  # u8: 1=key, 2=oneshot, 3=mute group, 4=loop
     DRUM_DIRECTION = 0x07  # u8: 0=forward, 1=backward
+    DRUM_PATH = 0x08       # 72 B latin-1 sample path
     DRUM_START = 0x68      # u32 sample start, default 0
     DRUM_LOOP_START = 0x6C  # u32 candidate sample loop-start lane, default 0
     DRUM_END = 0x70        # u32 sample end, default 0xFFFFFFFF
     DRUM_PAN = 0x06        # signed byte pan (−100..+100 observed on device)
     DRUM_GAIN = 0x7C       # u32 sample gain / loop-crossfade, default 0 (max 0x7FFFFFFF)
+    SAMPLER_ENGINE = 0x02
+    DRUM_ENGINE = 0x03
+    SAMPLER_SAMPLE_START = 0x3943
+    SAMPLER_SAMPLE_END = 0x3947
+    SAMPLER_LOOP_START = 0x394B
+    SAMPLER_LOOP_END = 0x394F
+    SAMPLER_LOOP_CROSSFADE = 0x3956
+    SAMPLER_SLOT_TUNE = 0x00
+    SAMPLER_SLOT_LOOP_TYPE = 0x03
+    SAMPLER_SLOT_TUNE_AUX = 0x04
+    SAMPLER_SLOT_GAIN = 0x05
+    SAMPLER_SLOT_DIRECTION = 0x07
+    SAMPLER_SLOT_PATH = 0x08
+
+    @staticmethod
+    def _latin1_bytes(value: str, max_len: int, *, where: str) -> bytes:
+        raw = value.encode("latin1")
+        if len(raw) >= max_len:
+            raise ValueError(f"{where} must be shorter than {max_len} bytes")
+        return raw + b"\x00" * (max_len - len(raw))
+
+    def _write_latin1(self, offset: int, value: str, max_len: int, *, where: str) -> None:
+        self.image[offset : offset + max_len] = self._latin1_bytes(value, max_len, where=where)
+
+    def set_preset_path(self, track: int, path: str, *, pattern: int = 1) -> None:
+        s = self.pattern_start(track, pattern)
+        self._write_latin1(
+            s + self.PRESET_PATH,
+            path,
+            self.PRESET_PATH_MAX,
+            where=f"track {track} pattern {pattern} preset path",
+        )
+        self.mark_pattern_edited(track, pattern)
 
     def set_drum_voice(
         self,
         track: int,
         voice: int,
         *,
+        pattern: int = 1,
         tune: int | None = None,
         play_mode: int | None = None,
         direction: int | None = None,
+        key_assignment: int | None = None,
+        path: str | None = None,
         pan: int | None = None,
         fade: int | None = None,
         start: int | None = None,
@@ -653,20 +721,35 @@ class ImageProject:
         **preceding** voice slot's +0x7C u32 (e.g. pad voice 23 → slot 22)."""
         from .drum_sample_inspection import drum_fade_storage_voice, encode_drum_fade_ui
 
-        s = self.track_start(track) + self.DRUM_TABLE + voice * self.DRUM_SLOT
+        if not 0 <= voice < 24:
+            raise ValueError("drum voice must be 0..23")
+        base = self.pattern_start(track, pattern)
+        self.image[base + self.TRK_ENGINE] = self.DRUM_ENGINE
+        s = base + self.DRUM_TABLE + voice * self.DRUM_SLOT
         if tune is not None:
             self.image[s + self.DRUM_TUNE] = (0x3C + tune) & 0xFF
         if play_mode is not None:
             self.image[s + self.DRUM_PLAY_MODE] = play_mode
         if direction is not None:
             self.image[s + self.DRUM_DIRECTION] = 1 if direction else 0
+        if key_assignment is not None:
+            if not 0 <= key_assignment <= 0xFF:
+                raise ValueError("drum key assignment must be 0..255")
+            self.image[s + self.DRUM_KEY] = key_assignment
+        if path is not None:
+            self._write_latin1(
+                s + self.DRUM_PATH,
+                path,
+                72,
+                where=f"track {track} drum voice {voice} path",
+            )
         if pan is not None:
             self.image[s + self.DRUM_PAN] = pan & 0xFF
         if fade is not None:
             storage = drum_fade_storage_voice(voice)
             if storage < 0:
                 raise ValueError(f"fade storage voice for drum voice {voice} is invalid")
-            gain_s = self.track_start(track) + self.DRUM_TABLE + storage * self.DRUM_SLOT
+            gain_s = base + self.DRUM_TABLE + storage * self.DRUM_SLOT
             encoded = encode_drum_fade_ui(fade)
             self.image[gain_s + self.DRUM_GAIN : gain_s + self.DRUM_GAIN + 4] = encoded.to_bytes(
                 4, "little"
@@ -693,7 +776,74 @@ class ImageProject:
                 gain,
                 where=f"track {track} drum voice {voice} gain",
             )
-        self.mark_edited(track)
+        self.mark_pattern_edited(track, pattern)
+
+    def set_sampler_sample_edit(
+        self,
+        track: int,
+        *,
+        pattern: int = 1,
+        preset_path: str | None = None,
+        path: str | None = None,
+        sample_start: int | None = None,
+        sample_end: int | None = None,
+        loop_start: int | None = None,
+        loop_end: int | None = None,
+        loop_crossfade: int | None = None,
+        tune_tenths: int | None = None,
+        loop_type: int | None = None,
+        gain: int | None = None,
+        direction: int | None = None,
+    ) -> None:
+        """Set one-shot Sampler sample-edit fields for a track/pattern slot."""
+        from .sampler_sample_inspection import encode_sampler_tune_tenths
+
+        s = self.pattern_start(track, pattern)
+        self.image[s + self.TRK_ENGINE] = self.SAMPLER_ENGINE
+        if preset_path is not None:
+            self._write_latin1(
+                s + self.PRESET_PATH,
+                preset_path,
+                self.PRESET_PATH_MAX,
+                where=f"track {track} pattern {pattern} preset path",
+            )
+        for offset, value, label in (
+            (self.SAMPLER_SAMPLE_START, sample_start, "sample start"),
+            (self.SAMPLER_SAMPLE_END, sample_end, "sample end"),
+            (self.SAMPLER_LOOP_START, loop_start, "loop start"),
+            (self.SAMPLER_LOOP_END, loop_end, "loop end"),
+        ):
+            if value is not None:
+                if not 0 <= value <= 0xFFFF:
+                    raise ValueError(f"sampler {label} must be u16")
+                self.image[s + offset : s + offset + 2] = value.to_bytes(2, "little")
+        if loop_crossfade is not None:
+            if not 0 <= loop_crossfade <= 0xFF:
+                raise ValueError("sampler loop crossfade must be u8")
+            self.image[s + self.SAMPLER_LOOP_CROSSFADE] = loop_crossfade
+
+        slot = s + self.DRUM_TABLE
+        if path is not None:
+            self._write_latin1(
+                slot + self.SAMPLER_SLOT_PATH,
+                path,
+                72,
+                where=f"track {track} sampler path",
+            )
+        if tune_tenths is not None:
+            tune_byte, tune_aux = encode_sampler_tune_tenths(tune_tenths)
+            self.image[slot + self.SAMPLER_SLOT_TUNE] = tune_byte
+            self.image[slot + self.SAMPLER_SLOT_TUNE_AUX] = tune_aux
+        for offset, value, label in (
+            (self.SAMPLER_SLOT_LOOP_TYPE, loop_type, "loop type"),
+            (self.SAMPLER_SLOT_GAIN, gain, "gain"),
+            (self.SAMPLER_SLOT_DIRECTION, direction, "direction"),
+        ):
+            if value is not None:
+                if not 0 <= value <= 0xFF:
+                    raise ValueError(f"sampler {label} must be u8")
+                self.image[slot + offset] = value
+        self.mark_pattern_edited(track, pattern)
 
     # --- preset / instrument assignment -----------------------------------
     # Loading a kit/preset copies the donor's preset-identity regions into

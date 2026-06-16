@@ -195,7 +195,9 @@ def test_json_payload_is_schema_valid_for_compiler() -> None:
     )
 
     assert payload["version"] == 1
-    assert payload["template"].endswith("src/one-off-changes-from-default/unnamed 1.xy")
+    assert payload["template"].replace("\\", "/").endswith(
+        "src/one-off-changes-from-default/unnamed 1.xy"
+    )
     assert payload["output"] == "output/from-midi/synth_test.xy"
     assert "descriptor_strategy" not in payload
     assert len(payload["tracks"]) == 8
