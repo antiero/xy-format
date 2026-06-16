@@ -5,8 +5,8 @@ from collections import Counter
 from dataclasses import dataclass
 from typing import Literal
 
-from .container import XYProject
-from .scaffold_writer import LogicalEntry, extract_logical_entries
+from .image_writer import TRACK_STRIDE, pattern_starts_from_image
+from .rle import decode_project
 
 
 PresetKind = Literal["drum", "synth", "multi", "sample", "sampler", "unknown"]
@@ -83,40 +83,60 @@ class ProjectInspection:
 
 
 def inspect_project_bytes(data: bytes) -> ProjectInspection:
-    return inspect_project(XYProject.from_bytes(data))
+    _header, image = decode_project(data)
+    return inspect_project_image(image)
 
 
-def inspect_project(project: XYProject) -> ProjectInspection:
-    entries = extract_logical_entries(project)
+def inspect_project_image(image: bytes) -> ProjectInspection:
+    starts = pattern_starts_from_image(image)
     tracks: list[TrackInspection] = []
+    cursor = 0
 
     for track_number in range(1, 17):
+        if cursor >= len(starts):
+            tracks.append(TrackInspection(track=track_number, patterns=()))
+            continue
+
+        leader_start = starts[cursor]
+        pattern_count = image[leader_start] if leader_start < len(image) else 0
+        if not 1 <= pattern_count <= 9:
+            pattern_count = 1
+
+        track_starts = starts[cursor : cursor + pattern_count]
         patterns = tuple(
-            _inspect_pattern(entry)
-            for entry in entries
-            if entry.track == track_number
+            _inspect_pattern(image, start, pattern_index, pattern_count)
+            for pattern_index, start in enumerate(track_starts, start=1)
         )
         tracks.append(TrackInspection(track=track_number, patterns=patterns))
+        cursor += pattern_count
 
     return ProjectInspection(tracks=tuple(tracks))
 
 
-def _inspect_pattern(entry: LogicalEntry) -> PatternInspection:
-    body = entry.body
-    type_byte = body[9] if len(body) > 9 else -1
-    engine_id = _engine_id(body, type_byte)
+def inspect_project(image: bytes) -> ProjectInspection:
+    """Compatibility alias for decoded-image project inspection."""
+
+    return inspect_project_image(image)
+
+
+def _inspect_pattern(
+    image: bytes, start: int, pattern: int, pattern_count: int
+) -> PatternInspection:
+    body = image[start : start + TRACK_STRIDE]
+    engine_id = body[0x14] if len(body) > 0x14 else None
     engine_name = ENGINE_NAMES.get(engine_id) if engine_id is not None else None
-    active = type_byte == 0x07
+    preset_refs = tuple(_scan_preset_refs(body, engine_name))
+    pristine = int.from_bytes(body[0x11:0x13], "little") if len(body) >= 0x13 else 8
 
     return PatternInspection(
-        pattern=entry.pattern,
-        active=active,
-        pattern_count=entry.pattern_count,
-        type_byte=type_byte,
+        pattern=pattern,
+        active=bool(preset_refs) and pristine != 8,
+        pattern_count=pattern_count,
+        type_byte=-1,
         engine_id=engine_id,
         engine_name=engine_name,
         body_length=len(body),
-        preset_refs=tuple(_scan_preset_refs(body, engine_name)) if active else (),
+        preset_refs=preset_refs,
     )
 
 
@@ -146,14 +166,25 @@ def _scan_full_preset_paths(body: bytes, engine_name: str | None) -> list[Preset
         raw = match.group(0).decode("latin1")
         category = match.group(1).decode("latin1")
         folder = _clean_preset_folder(raw)
-        counts[(folder, _normalize_kind(category, engine_name))] += 1
+        kind = _normalize_kind(category, engine_name)
+        if kind == "drum":
+            folder = _normalize_short_drum_fixture_name(folder)
+        elif kind == "sampler":
+            folder = _preset_stem(folder)
+        counts[(folder, kind)] += 1
 
     return [
         PresetReference(
             folder=folder,
             kind=kind,
             hit_count=count,
-            confidence="strong" if kind == "drum" and count >= 24 else "medium" if count > 1 else "weak",
+            confidence=(
+                "strong"
+                if kind == "drum" and count >= 24
+                else "medium"
+                if count > 1 or kind == "sampler"
+                else "weak"
+            ),
         )
         for (folder, kind), count in counts.items()
     ]
@@ -189,7 +220,7 @@ def _scan_fragmented_preset_names(body: bytes, engine_name: str | None) -> list[
             folder=folder,
             kind=kind,
             hit_count=count,
-            confidence="medium" if count > 1 else "weak",
+            confidence="medium",
         )
         for (folder, kind), count in counts.items()
     ]
@@ -200,6 +231,21 @@ def _clean_preset_folder(raw: str) -> str:
     if preset_idx >= 0:
         return raw[: preset_idx + len(".preset")]
     return re.sub(r"[/.][A-Za-z0-9 #\-()_]+-(?:[a-g](?:#|b)?\d+)-\d+.*$", "", raw, flags=re.I)
+
+
+def _normalize_short_drum_fixture_name(folder: str) -> str:
+    suffix = ".preset"
+    if not folder.endswith(suffix):
+        return folder
+    stem = folder[: -len(suffix)].rsplit("/", 1)[-1]
+    if len(stem) <= 2:
+        return folder[: -len(suffix)]
+    return folder
+
+
+def _preset_stem(folder: str) -> str:
+    stem = folder.rsplit("/", 1)[-1]
+    return stem.removesuffix(".preset")
 
 
 def _read_fragmented_path(buf: bytes, start: int, limit: int = 140) -> str:

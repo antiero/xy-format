@@ -3,9 +3,9 @@
 ## Resolution
 
 **Closed.** The crashes were never caused by sparseness. They were
-incoherent serialized state produced by the scaffold/transplant writers
-(scene-pool counts, tail bytes, or selection records that disagreed with
-the actual record stream — see `docs/format/record_structure.md`).
+incoherent decoded-image state produced by the removed raw-byte writers
+(scene counts, tail bytes, or selection records that disagreed with the
+actual record stream — see `docs/format/record_structure.md`).
 
 The image writer (`xy/image_writer.build_arrangement`) constructs the
 decoded RAM image directly from coherent state, then RLE-encodes it.
@@ -23,9 +23,9 @@ Sparse is fine; coherent state is the actual requirement.
 
 Certain sparse multi-pattern exports crashed on device even when
 parse/inspect looked valid (e.g. `u01_chase_u1_minphrases.xy`, T3+T6,
-5 patterns). The working hypothesis at the time was a
-topology/descriptor-branch dependency. With the serialization model
-decoded, those crashes are explained as state-coherence failures of the
-byte-patching writers, not a property of sparse topologies.
+5 patterns). The working hypothesis at the time was a topology/branch
+dependency. With the serialization model decoded, those crashes are
+explained as state-coherence failures of byte-patching writers, not a
+property of sparse topologies.
 
 See `docs/state_of_understanding.md` for the full arc.

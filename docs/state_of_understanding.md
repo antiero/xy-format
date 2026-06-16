@@ -251,10 +251,9 @@ breakthrough, not yet a writing one.
 
 ### Practical capability check
 
-"Can we generate files now?" — **Same capability as before this work,
-transformed prospects.** Writers still use validated scaffold paths.
-What changed is that we now know *why* those paths work and why the
-others crashed.
+Historical note: at this point in the investigation, generation still used
+validated raw-byte paths. The later 2026-06-09 entries supersede this with
+decoded-image authoring.
 
 ### Next decisive test
 
@@ -268,7 +267,7 @@ note==velocity with the proper `00` extension byte.
 
 - Canonical model: `docs/format/record_structure.md`
 - Full narrative + validation: `docs/logs/2026-06-09_record_boundary_reframe.md`
-- Decoder tool: `tools/analysis/pretrack_records.py`
+- Current authoring/inspection: `xy/image_writer.py`, `tools/inspect_xy.py`
 
 ---
 
@@ -292,9 +291,10 @@ What we thought before the reframe (preserved so the shift is legible):
   (scaffolds, transplants, strict-mode lookups) — effective, but every
   new topology required new device probes.
 
-The legacy docs (`descriptor_encoding.md`, `preamble_state_machine.md`,
-`scenes_songs.md` §§5–23) remain useful as device-outcome ledgers even
-though their *models* are superseded.
+The detailed legacy docs have been removed from active reference. Historical
+device outcomes and wrong-turn context remain in `docs/logs/*`, especially
+`docs/logs/2026-02-13_agents_legacy_snapshot.md`, but their models are
+superseded.
 
 ---
 
@@ -347,7 +347,8 @@ semantics for scene-stored volumes remain open.
 
 1. Scene volume **playback** retest: multi-scene project, change scene 2 T1 vol only,
    confirm audible difference vs scene 1 on device.
-2. Promote preset refs into `project_to_json` once golden export fixtures exist.
+2. Decide whether a decoded-image project-to-intent exporter is still useful
+   after the legacy JSON compiler removal.
 3. `corpus_lab record` on representative probe per pack for traceability.
 
 ### References

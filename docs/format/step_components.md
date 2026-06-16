@@ -6,35 +6,35 @@
 > `docs/format/decoded_image_map.md`. See `docs/state_of_understanding.md`.
 
 
-## Single-Step Model (Validated)
-- Components serialize into a slot table within active track bodies.
-- Empty sentinel in common drum/synth captures: `FF 00 00`.
-- Header packs step and component bank bitmasks.
-- Standard component param block format (most types): `00 <type_id> <param> 00 00`.
+## Decoded-Image Location
 
-## Allocation Marker
-- Component activation requires updating an allocation byte/marker.
-- Working formula (known caveats for random-mode variants):
-  - `alloc = 0xF7 - step_0 * 0x10 - component_global_index`
-- Wrong allocation bytes are crash-prone.
+Current authoring uses the fixed decoded-image track struct:
 
-## Multi-Step Stream Model (unnamed 118/118b/119)
-- Full 16-step component captures use a contiguous variable-length block stream at `body[0xB1]`.
-- `0xE4` header, 16 variable-length records (5-9B), 15 separator bytes between them.
-- Separator formula: **runs_adjusted** (counts type_id runs in suffix). See `docs/step_component_notes.md`.
-- Verified 45/45 against all three ground-truth specimens.
-- Bank-2 type `0x20` is confirmed as a distinct 14th component type.
+- Step component slots start at track struct `+0x3057`.
+- There are 16 step slots.
+- Each slot is 16 bytes.
+- The first bytes are an enabled/component mask; following bytes hold component
+  values.
 
-## Authoring Recipe (Current)
-1. Activate track body layout correctly.
-2. Insert component payload at correct component-region position.
-3. Update allocation marker.
-4. Preserve unrelated body bytes and preamble semantics.
+`ImageProject.set_step_component(track, step, component, value)` writes this
+table directly. It does not activate raw body layouts, compute allocation
+markers, or emit compressed-space sentinels.
+
+## Component Names
+
+The canonical authoring names live in `ImageProject.STEP_COMPONENTS`:
+
+```text
+pulse, hold, multiply, velocity, ramp_up, ramp_down, random, portamento,
+bend, tonality, jump, parameter, conditional, trigger
+```
+
+Bank-2 type `0x20` is confirmed as the 14th component type.
 
 ## Validation Status
-- Multiple component types are device-verified.
+- Multiple component types are byte-exact and device-verified through
+  `tests/test_image_writer.py`.
 - Some type-specific repeat/sub-parameter semantics remain open.
 
 ## Detailed Notes
-- Legacy deep notes: `docs/step_component_notes.md`
 - Historical section dump: `docs/logs/2026-02-13_agents_legacy_snapshot.md`

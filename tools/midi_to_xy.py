@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Convert MIDI into OP-XY authoring artifacts.
 
-Default mode writes a JSON build spec compatible with `tools/build_xy_from_json.py`.
+Default mode writes a JSON spec compatible with `tools/spec_to_xy_image.py`.
 
 Examples
 --------
@@ -9,7 +9,7 @@ JSON spec (default):
     python tools/midi_to_xy.py input.mid
     python tools/midi_to_xy.py input.mid -o specs/midi-to-xy/song.json --patterns 9
 
-Legacy direct XY build:
+Direct XY build:
     python tools/midi_to_xy.py input.mid --format xy -o output/song.xy --patterns 9
 
 Analysis only:
@@ -21,7 +21,6 @@ from __future__ import annotations
 import argparse
 import json
 import math
-import struct
 import sys
 from dataclasses import dataclass
 from pathlib import Path
@@ -32,9 +31,10 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import mido
 
-from xy.container import XYProject
-from xy.note_events import Note, STEP_TICKS
-from xy.project_builder import append_notes_to_tracks, build_multi_pattern_project
+from xy.image_writer import ImageProject, build_arrangement
+
+STEP_TICKS = 480
+Note = dict[str, int]
 
 # ── GM Drum → OP-XY Drum mapping ──────────────────────────────────────
 
@@ -629,7 +629,7 @@ def midi_to_xy_notes(
     is_drum: bool = False,
     quantize: bool = True,
 ) -> List[Note]:
-    """Convert MIDI notes to OP-XY Note objects.
+    """Convert MIDI notes to image-writer note dictionaries.
 
     Timing conversion:
         MIDI tick → OP-XY tick = midi_tick_in_pattern * (1920 / midi_tpb)
@@ -668,35 +668,31 @@ def midi_to_xy_notes(
         vel = max(1, min(127, mn.velocity))
 
         xy_notes.append(
-            Note(
-                step=step,
-                note=note_num,
-                velocity=vel,
-                tick_offset=tick_offset,
-                gate_ticks=gate_ticks,
-            )
+            {
+                "step": step,
+                "note": note_num,
+                "velocity": vel,
+                "tick_offset": tick_offset,
+                "gate_ticks": gate_ticks,
+            }
         )
 
     if not xy_notes:
         return []
 
-    xy_notes.sort(key=lambda n: (n.step - 1) * STEP_TICKS + n.tick_offset)
+    xy_notes.sort(key=lambda n: (n["step"] - 1) * STEP_TICKS + n["tick_offset"])
     first = xy_notes[0]
-    if first.step != 1 or first.tick_offset != 0:
-        placeholder_note = first.note
-        placeholder_vel = 1
-        # Avoid firmware note==velocity crash edge.
-        if placeholder_note == placeholder_vel:
-            placeholder_vel = 2
+    if first["step"] != 1 or first["tick_offset"] != 0:
+        placeholder_note = first["note"]
         xy_notes.insert(
             0,
-            Note(
-                step=1,
-                note=placeholder_note,
-                velocity=placeholder_vel,
-                tick_offset=0,
-                gate_ticks=STEP_TICKS,
-            ),
+            {
+                "step": 1,
+                "note": placeholder_note,
+                "velocity": 1,
+                "tick_offset": 0,
+                "gate_ticks": STEP_TICKS,
+            },
         )
 
     return xy_notes
@@ -864,11 +860,11 @@ def show_info(mid: mido.MidiFile, start_bar: int, num_patterns: int) -> None:
 def _notes_to_json(notes: List[Note]) -> List[dict]:
     return [
         {
-            "step": n.step,
-            "note": n.note,
-            "velocity": n.velocity,
-            "tick_offset": n.tick_offset,
-            "gate_ticks": n.gate_ticks,
+            "step": n["step"],
+            "note": n["note"],
+            "velocity": n["velocity"],
+            "tick_offset": n["tick_offset"],
+            "gate_ticks": n["gate_ticks"],
         }
         for n in notes
     ]
@@ -945,14 +941,12 @@ def build_json_payload(
     xy_output_path: str,
     num_patterns: int,
 ) -> dict:
-    """Build a schema-valid JSON payload for tools/build_xy_from_json.py."""
+    """Build a schema-valid JSON payload for tools/spec_to_xy_image.py."""
 
     payload = {
         "version": 1,
-        "mode": "multi_pattern",
         "template": template_path,
         "output": xy_output_path,
-        "descriptor_strategy": "strict",
         "tracks": [],
     }
 
@@ -1004,49 +998,49 @@ def convert_to_xy(
     num_patterns: int,
     track_patterns: Dict[int, List[Optional[List[Note]]]],
 ) -> None:
-    """Legacy path: emit .xy directly from selected track patterns."""
+    """Emit .xy directly via decoded-image arrangement assembly."""
 
     print(f"Loading baseline: {baseline_path}")
-    proj = XYProject.from_bytes(Path(baseline_path).read_bytes())
+    image_patterns: dict[int, list[list[dict] | dict]] = {}
+    total_notes = 0
+    for slot in range(1, 9):
+        patterns = track_patterns.get(slot, [None] * num_patterns)
+        normalized: list[list[dict] | dict] = []
+        for notes in patterns:
+            concrete = _notes_to_json(notes) if notes else []
+            total_notes += len(concrete)
+            normalized.append(concrete)
+        if any(normalized):
+            image_patterns[slot] = normalized
 
-    # Set tempo
-    tempo_tenths = round(bpm * 10)
-    pre_track = bytearray(proj.pre_track)
-    pre_track[0x08:0x0A] = struct.pack("<H", tempo_tenths)
-    proj = XYProject(pre_track=bytes(pre_track), tracks=proj.tracks)
+    if not image_patterns:
+        raise ValueError("no notes after conversion")
 
-    if num_patterns == 1:
-        track_note_map: Dict[int, List[Note]] = {}
-        for slot in range(1, 9):
-            patterns = track_patterns.get(slot, [None])
-            notes = patterns[0] if patterns else None
-            if notes:
-                track_note_map[slot] = notes
+    scenes = None
+    song_chain = None
+    if num_patterns > 1:
+        scenes = [
+            {
+                track: min(pattern_idx, len(patterns) - 1)
+                for track, patterns in image_patterns.items()
+            }
+            for pattern_idx in range(num_patterns)
+        ]
+        song_chain = list(range(num_patterns))
 
-        if not track_note_map:
-            raise ValueError("no notes after conversion")
-
-        result = append_notes_to_tracks(proj, track_note_map)
-        total_notes = sum(len(n) for n in track_note_map.values())
-        print(f"Converted: {total_notes} notes across {len(track_note_map)} tracks")
-    else:
-        # In multi-pattern mode keep all slots explicit for consistent topology.
-        multi = {slot: track_patterns[slot] for slot in range(1, 9)}
-        result = build_multi_pattern_project(proj, multi, descriptor_strategy="strict")
-
-        total_notes = 0
-        for slot in range(1, 9):
-            counts = [len(p) if p else 0 for p in multi[slot]]
-            active = _count_active_patterns(multi[slot])
-            if active:
-                print(f"  T{slot}: {active}/{num_patterns} patterns active, notes/pat={counts}")
-                total_notes += sum(counts)
-        print(f"Total notes: {total_notes}")
-
-    data = result.to_bytes()
+    data = build_arrangement(
+        baseline_path,
+        image_patterns,
+        scenes=scenes,
+        song_chain=song_chain,
+    )
+    project = ImageProject.from_bytes(data)
+    project.set_tempo(bpm)
+    data = project.to_bytes()
     out = Path(output_path)
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_bytes(data)
+    print(f"Converted: {total_notes} notes across {len(image_patterns)} tracks")
     print(f"Wrote {len(data)} bytes -> {out}")
 
 

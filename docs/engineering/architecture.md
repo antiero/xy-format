@@ -34,9 +34,6 @@ image (~290 KB) = global header (3,449 B)
 
 ## Historical Mental-Model Resources
 
-- The original C++ reconstruction (directionally right — "the serialized
-  format may BE the runtime format" — but missing the RLE layer):
-  `docs/cpp_hypotheses.md`.
 - Legacy synthesis snapshot: `docs/logs/2026-02-13_agents_legacy_snapshot.md`.
 - The full arc from heuristics to the struct model:
   `docs/state_of_understanding.md`.

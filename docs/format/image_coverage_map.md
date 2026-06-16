@@ -92,7 +92,7 @@ block-beta
 | `0x89`–`0x8C` | 4 | **x** | Master melody vol (byte @ `0x8C`) | P2-A `f12`/`f13` |
 | `0x8D`–`0x90` | 4 | **x** | Master compressor (byte @ `0x90`) | P2-A `f14`/`f15` |
 | `0x91`–`0x94` | 4 | **x** | Master output vol (byte @ `0x94`) | P2-D `s5b` |
-| `0x95`–`0x0D78` | 3300 | **~** | **Pre-track / scene region** — 33-byte scene slots @ `0x95 + n×33` (`sel[16]+mute[16]+flags`). Fills to track base in max layout; handle table + loader tail semantics in flat image still partial | P2-E mutes; `pretrack_records.py` |
+| `0x95`–`0x0D78` | 3300 | **~** | **Scene/global remainder** — 33-byte scene slots @ `0x95 + n×33` (`sel[16]+mute[16]+flags`). Fills to track base in max layout; surrounding loader/state bytes still partial | P2-E mutes; `scenes_songs.md` |
 
 ### Scene slot record (33 bytes each @ `0x95 + slot×33`)
 
@@ -171,7 +171,7 @@ track unless noted.
 | slot `+0x7C` | **x** | Gain / fade (fade on **preceding** slot for pad voices) | M3 |
 | `+0x3B3F` / `+0x3CBF` / `+0x3DBF` / `+0x423F` | **ui** | Last-touched / UI session families | ignore for decode |
 | `+0x453F` | **x** | Preset path string (64 B) | P1-B |
-| `+0x456F` | **x** | Note count + 12-byte note records | `note_reader` |
+| `+0x456F` | **x** | Note count + 12-byte note records | `ImageProject.add_note` |
 | `+0x4570`–end | **~** | Trailing zero / record tail byte semantics | `record_structure.md` |
 
 ### 2e. Track-specific gaps (guide-visible, no pin yet)
@@ -204,7 +204,7 @@ Counts are **order-of-magnitude** for planning, not exact byte percentages.
 | Region | Approx. size | Mostly mapped? | Notes |
 | --- | ---: | --- | --- |
 | Global pinned fields | ~120 B | **x** | Many **?** bytes in `0x08`–`0x54` |
-| Global scene/pre-track | ~3.3 KB | **~** | Slot *structure* known; full flat layout open |
+| Global scene/remainder | ~3.3 KB | **~** | Scene slot structure known; surrounding state bytes partial |
 | Per-track pinned | ~4 KB × 16 | **~** | Large preset blobs copied, not itemized |
 | Per-track unknown middle | ~10 KB × 16 | **?** | Between known anchors |
 | Footer | 56 B | **~** | Song chain partial; size vs older 53 B note |

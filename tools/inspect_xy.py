@@ -48,7 +48,6 @@ from xy.scene_volume_inspection import (  # noqa: E402
     inspect_scene_volumes_bytes,
     read_scene_muted_tracks,
 )
-from xy.note_reader import read_event as _unified_read_event  # noqa: E402
 from xy.preset_path_inspection import inspect_preset_paths_bytes  # noqa: E402
 from xy.project_config_inspection import inspect_project_config_bytes  # noqa: E402
 from xy.project_inspection import inspect_project_bytes  # noqa: E402
@@ -1164,24 +1163,6 @@ def decode_quantised_event(
     else:
         variant = "inline"
 
-    # Unified decode: for multi-note events, the legacy fixed-record +
-    # tail-heuristic parser frequently mis-assigns step and gate. The
-    # unified sequential parser in xy/note_reader.read_event decodes
-    # the same bytes correctly for all event types (0x21/0x25/etc.)
-    # that use the standard continuation-byte layout. Try it first; if
-    # it succeeds and returns the expected count, replace the
-    # legacy-parsed note list. Fall back to the legacy result only when
-    # the unified parser can't decode (e.g., variable-length native
-    # tick encoding not yet supported).
-    if count >= 1 and (variant in ("hybrid-tail", "inline") or use_fine):
-        unified_notes = _try_unified_decode(data, offset, count)
-        if unified_notes is not None:
-            notes = unified_notes
-            # If the unified parser accepted this, it's a standard
-            # sequential event — reclassify to reflect that.
-            if variant == "hybrid-tail":
-                variant = "sequential"
-
     event = QuantisedEvent(
         offset=offset,
         event_type=event_type,
@@ -1209,49 +1190,6 @@ def decode_quantised_event(
                 ((event.grid_step - 1) // 4) + 1 if event.grid_step else None
             )
     return event, signature_idx
-
-
-def _try_unified_decode(
-    data: bytes, offset: int, expected_count: int
-) -> List[NoteDetail] | None:
-    """Attempt to decode an event with the unified sequential parser.
-
-    Returns a fresh list of NoteDetail entries on success, or None if
-    the parser couldn't handle the bytes, the note count didn't match,
-    or the decoded notes failed a plausibility check.
-
-    The plausibility check guards against the unified parser silently
-    walking off-format for device-native encodings it doesn't yet
-    support (e.g. the variable-length tick form in ``unnamed 3``).
-    A single vel=0 or >127 in the decoded stream means we almost
-    certainly read pad/metadata bytes as note data.
-    """
-    try:
-        notes = _unified_read_event(data[offset:])
-    except Exception:
-        return None
-    if not notes or len(notes) != expected_count:
-        return None
-    for n in notes:
-        if n.velocity is None or n.velocity == 0 or n.velocity > 127:
-            return None
-        if n.note is None or n.note < 0 or n.note > 127:
-            return None
-        if n.step is None or n.step < 1 or n.step > 4096:
-            return None
-    out: List[NoteDetail] = []
-    for n in notes:
-        beat_val = ((n.step - 1) // 4) + 1 if n.step and n.step > 0 else None
-        out.append(
-            NoteDetail(
-                note=n.note,
-                velocity=n.velocity,
-                gate=n.gate_ticks if n.gate_ticks > 0 else None,
-                step=n.step,
-                beat=beat_val,
-            )
-        )
-    return out
 
 
 def decode_pointer21_event(
