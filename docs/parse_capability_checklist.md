@@ -265,8 +265,8 @@ also participate in automatic key detection.
 - [~] Brain manual vs automatic key detection mode — raw word located at T9
   `+0x3857`; semantic state mapping still partial; AUX-BRAIN
 - [~] Brain key enum — raw word located at T9 `+0x385B`; device-authored detents
-  fit a 12-bucket hypothesis, but PC-generated boundary probes falsified the
-  naive boundary formula; AUX-BRAIN
+  fit the 12 displayed key names, but exact raw boundaries remain unresolved;
+  AUX-BRAIN
 - [~] Brain scale enum — raw word located at T9 `+0x385F`; device-authored
   detents fit a 7-bucket hypothesis, but true boundaries remain open;
   AUX-BRAIN

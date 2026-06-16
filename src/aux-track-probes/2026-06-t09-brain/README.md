@@ -77,14 +77,13 @@ Route is decoded as a T1-low bitmask at T9 track-relative `+0x09`:
 `0x00` none, `0x01` T1, `0x02` T2, ..., `0x80` T8, `0xFF` all.
 The baseline/default route is `0xFC`, i.e. T3-T8.
 
-Brain key/root appears to be a 12-bucket encoder word at T9 `+0x385B`:
-`floor(raw * 12 / 0x80000000)` gives C, C#, D, D#, E, F, F#, G, G#,
-A, A#, B. This still needs PC-generated -> device-verified confirmation.
+Brain key/root appears at T9 `+0x385B`. Device-authored detents are consistent
+with the 12 displayed key names C, C#, D, D#, E, F, F#, G, G#, A, A#, B, but
+the exact raw boundary formula is not confirmed.
 
-Brain scale appears to be a 7-bucket encoder word at T9 `+0x385F`:
-`floor(raw * 7 / 0x80000000)` gives major, dorian, phrygian, lydian,
-mixolydian, minor, locrian. This still needs PC-generated -> device-verified
-confirmation.
+Brain scale appears at T9 `+0x385F`. Device-authored detents are consistent
+with the 7 displayed scale names major, dorian, phrygian, lydian, mixolydian,
+minor, locrian, but the exact raw boundary formula is not confirmed.
 
 Recorded Brain notes use the generic note vector at T9 `+0x456F`.
 `t09-brain-seq-two-notes.xy` decodes as C4 on step 1 and G4 on step 9.
@@ -92,6 +91,3 @@ Recorded Brain notes use the generic note vector at T9 `+0x456F`.
 Link selection is located at T9 `+0x3863`, but the current captures show
 encoder-bucket jitter; treat it as raw until a tighter probe isolates the
 off/T1-T8 bucket boundaries.
-
-`pc-generated-validation/` contains a small PC-generated -> device-inspection
-set for confirming or falsifying the key/scale bucket hypothesis.

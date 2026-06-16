@@ -24,8 +24,8 @@ indices as adjacent raw steps (`±3` raw increments, with endpoint behavior).
 
 | Area | Current evidence | Status |
 | --- | --- | --- |
-| T9 Brain key (`+0x385B`) | Device-authored key detents fit a 12-bucket candidate mapping at mid-bucket values. | Provisional. Phase-A PC-generated edge probes falsified the naive `floor(raw*N/0x80000000)` boundary table; true boundaries remain in progress. |
-| T9 Brain scale (`+0x385F`) | Device-authored scale detents fit a 7-bucket candidate mapping at mid-bucket values. | Provisional. Phase-A edge probes falsified naive boundaries; later phases are still validation data, not a closed writer rule. |
+| T9 Brain key (`+0x385B`) | Device-authored key detents fit the 12 displayed key names. | Provisional. Exact raw boundaries are unresolved, so this is not a boundary-safe decoder or writer rule. |
+| T9 Brain scale (`+0x385F`) | Device-authored scale detents fit the 7 displayed scale names. | Provisional. Exact raw boundaries are unresolved, so this is not a boundary-safe decoder or writer rule. |
 | T9 Brain link (`+0x3863`) | Field located from device-authored link captures. | Provisional. Treat as raw until boundary and enum ownership are isolated. |
 | T11 External MIDI channel/bank/program (`+0x3857/+0x385B/+0x385F`) | Returned detents fit 16/129/129 bucket hypotheses. | Provisional. Needs PC-generated boundary probes before using as a boundary-safe decoder or writer rule. |
 | T11 External MIDI CC table (`+0x3877..+0x3896`) | Table localized; returned words bucket-decode to named capture values. | Provisional. Exact word ownership and all bucket boundaries need cleaner captures/PC-gen validation. |

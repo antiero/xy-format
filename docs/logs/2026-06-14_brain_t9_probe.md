@@ -88,15 +88,11 @@ scale_index = floor(raw * 7 / 0x80000000)
 | key D major | `0x2FFFFFFE` | `0x17FFFFFE` | `0x00000000` | `0x00000000` |
 | scale C minor | `0x0FFFFFFF` | `0x00000000` | `0x69249247` | `0x00000000` |
 
-The second and third words are strong key/scale candidates, but these formulas
-are not promoted until PC-generated fixtures are verified on-device. The first
-word appears to be mode/session state, but the current captures are not enough
-to name all states confidently.
-
-PC-generated validation files live in
-`src/aux-track-probes/2026-06-t09-brain/pc-generated-validation/`. The pack
-covers lo/hi raw edge cases for all 12 key and 7 scale buckets (38 files),
-regenerated from the analytic boundary formulas in that README.
+The second and third words are strong key/scale candidates from device-authored
+detents, but their exact raw boundaries are not proven. Treat the decoded names
+as observational labels, not boundary-safe writer rules. The first word appears
+to be mode/session state, but the current captures are not enough to name all
+states confidently.
 
 Link selection lands in the fourth parameter word at `+0x3863`, but the
 device-authored captures show bucket/noise behavior from encoder detents.
