@@ -64,6 +64,7 @@ raw/
 # Local scratch/generated reverse-engineering outputs
 .tmp/
 output/
+output/multistep/
 
 # Local device/cloud config snapshots
 config.json

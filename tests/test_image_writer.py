@@ -7,6 +7,7 @@ event types, or preamble rules involved.
 from __future__ import annotations
 
 import re
+from pathlib import Path
 
 import pytest
 
@@ -55,6 +56,20 @@ def _track_u32(image: bytes, track: int, offset: int) -> int:
 def test_replicates_unnamed_2_single_note_step1():
     out = build(lambda p: p.add_note(1, step=1, note=60))
     assert out == real("unnamed 2.xy")
+
+
+def test_decoded_track_scanner_accounts_for_inserted_note_records():
+    p = ImageProject.from_file(BASE)
+    t1 = p.track_start(1)
+    t2 = p.track_start(2)
+
+    p.add_note(1, step=1, note=60)
+    assert p.track_start(1) == t1
+    assert p.track_start(2) == t2 + 12
+
+    reloaded = ImageProject.from_bytes(p.to_bytes())
+    assert reloaded.track_start(1) == t1
+    assert reloaded.track_start(2) == t2 + 12
 
 
 def test_replicates_unnamed_81_single_note_step9():
@@ -150,10 +165,13 @@ def test_set_preset_matches_device_kit_load():
 
 def test_spec_to_xy_image_reproduces_whitney_probe():
     import subprocess, sys, tempfile, os
+    spec = Path("specs/midi-to-xy/Whitney Houston - I Wanna Dance With Somebody song.json")
+    if not spec.exists():
+        pytest.skip(f"local spec fixture is not tracked: {spec}")
     out = os.path.join(tempfile.mkdtemp(), "w.xy")
     subprocess.run(
         [sys.executable, "tools/spec_to_xy_image.py",
-         "specs/midi-to-xy/Whitney Houston - I Wanna Dance With Somebody song.json",
+         str(spec),
          "-o", out],
         check=True, capture_output=True,
     )
