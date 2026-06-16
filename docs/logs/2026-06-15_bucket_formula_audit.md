@@ -12,9 +12,8 @@ This pass separates three different levels of confidence:
 
 ## Boundary-confirmed
 
-| Area | Formula | Evidence |
-| --- | --- | --- |
-| Bar quantization, track `+0x07` | `ui = floor(raw * 100 / 255)` | `src/bar-menu-probes/2026-06-quant-generated/` loaded on device; all listed raw files matched expected UI, including top-end boundary probes `0xFD -> 99`, `0xFE -> 99`, `0xFF -> 100`. |
+No discrete bucket formulas in this PR carry their PC-authored near-boundary
+fixture pack. Keep exact boundary evidence with the probe pack that proves it.
 
 Bar groove is also now decoded, but it is **not** a bucket formula: it uses the
 handwritten UI sequence from device observations and stores adjacent sequence
