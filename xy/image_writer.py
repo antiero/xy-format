@@ -980,6 +980,7 @@ class ImageProject:
     DRUM_GAIN = 0x7C       # u32 sample gain / loop-crossfade, default 0 (max 0x7FFFFFFF)
     SAMPLER_ENGINE = 0x02
     DRUM_ENGINE = 0x03
+    SAMPLER_FRAMECOUNT = 0x393F
     SAMPLER_SAMPLE_START = 0x3943
     SAMPLER_SAMPLE_END = 0x3947
     SAMPLER_LOOP_START = 0x394B
@@ -1112,6 +1113,7 @@ class ImageProject:
         pattern: int = 1,
         preset_path: str | None = None,
         path: str | None = None,
+        framecount: int | None = None,
         sample_start: int | None = None,
         sample_end: int | None = None,
         loop_start: int | None = None,
@@ -1135,15 +1137,17 @@ class ImageProject:
                 where=f"track {track} pattern {pattern} preset path",
             )
         for offset, value, label in (
+            (self.SAMPLER_FRAMECOUNT, framecount, "framecount"),
             (self.SAMPLER_SAMPLE_START, sample_start, "sample start"),
             (self.SAMPLER_SAMPLE_END, sample_end, "sample end"),
             (self.SAMPLER_LOOP_START, loop_start, "loop start"),
             (self.SAMPLER_LOOP_END, loop_end, "loop end"),
         ):
             if value is not None:
-                if not 0 <= value <= 0xFFFF:
-                    raise ValueError(f"sampler {label} must be u16")
-                self.image[s + offset : s + offset + 2] = value.to_bytes(2, "little")
+                self.image[s + offset : s + offset + 4] = self._u32(
+                    value,
+                    where=f"track {track} sampler {label}",
+                )
         if loop_crossfade is not None:
             if not 0 <= loop_crossfade <= 0xFF:
                 raise ValueError("sampler loop crossfade must be u8")

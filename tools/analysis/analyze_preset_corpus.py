@@ -232,7 +232,7 @@ def analyze(corpus: Path) -> str:
             "## Immediate Follow-Ups",
             "",
             "- Treat `nt-dx analog.xy` as suspect: it appears to contain the `nt-dx legend` sample path/window even though the matching `patch.json` is `nt-dx analog.preset`.",
-            "- Update writer assumptions for sampler sample window fields before claiming patch.json write completeness: this corpus shows u32-sized sample positions/counts, and many exceed 65535.",
+            "- Sampler sample-window readers/writers must use u32 positions/counts; many preset-loaded values exceed 65535.",
             "- Use this script after adding more project captures; it is corpus-size independent and should scale to the planned 300+ files.",
         ]
     )

@@ -85,11 +85,12 @@ def test_maps_sampler_patch_region_to_one_shot_sampler_patch_shape() -> None:
 
     assert patch.preset_path == "bass/nt bass"
     assert patch.path == "/fat32/presets/bass/nt bass.preset/bass-c3-0.wav"
+    assert patch.framecount == 5000
     assert patch.sample_start == 12
     assert patch.sample_end == 5000
     assert patch.loop_start == 123
     assert patch.loop_end == 2345
-    assert patch.loop_crossfade == 55
+    assert patch.loop_crossfade == 1
     assert patch.tune_tenths == -5
     assert patch.loop_type == LOOP_TYPE_INFINITE
     assert patch.gain == 99
@@ -117,6 +118,7 @@ def test_reads_patch_json_text_and_file(tmp_path) -> None:
     file_patch = sound_patch_from_patch_json_file(file_path)
 
     assert text_patch.path == "one.wav"
+    assert text_patch.framecount == 99
     assert text_patch.sample_end == 99
     assert file_patch == text_patch
 
@@ -198,11 +200,12 @@ def test_apply_sampler_patch_json_writes_readable_project_fields() -> None:
     sampler = read_sampler_sample_edit(project, 3)
     assert preset.path == "bass/nt bass"
     assert sampler.path == "/fat32/presets/bass/nt bass.preset/bass.wav"
+    assert sampler.framecount == 4321
     assert sampler.sample_start == 12
     assert sampler.sample_end == 4321
     assert sampler.loop_start == 123
     assert sampler.loop_end == 2345
-    assert sampler.loop_crossfade == 55
+    assert sampler.loop_crossfade == 1
     assert sampler.tune_tenths == 4
     assert sampler.loop_type_byte == LOOP_TYPE_OFF
     assert sampler.gain == 88

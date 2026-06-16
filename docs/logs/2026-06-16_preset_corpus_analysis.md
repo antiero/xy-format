@@ -76,10 +76,9 @@ All preset types:
 | sampler sample windows | Full u32 values at `track+0x393F/0x3943/0x3947/0x394B/0x394F`. |
 | sampler `loop.crossfade` | Normalized byte at `track+0x3956`: `floor(loop.crossfade * 128 / framecount)`. |
 
-The sampler sample-window finding matters for writer coverage: the current
-patch adapter/writer assumptions must not treat these as u16 fields. Many
-captured `framecount`, `sample.end`, `loop.start`, and `loop.end` values exceed
-65535.
+The sampler sample-window finding matters for writer coverage: these must be
+read and written as u32 fields. Many captured `framecount`, `sample.end`,
+`loop.start`, and `loop.end` values exceed 65535.
 
 ## Field coverage ledger
 

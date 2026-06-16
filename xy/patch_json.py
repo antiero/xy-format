@@ -52,6 +52,7 @@ class DrumKitPatch:
 class SamplerPatch:
     preset_path: str | None = None
     path: str | None = None
+    framecount: int | None = None
     sample_start: int | None = None
     sample_end: int | None = None
     loop_start: int | None = None
@@ -151,6 +152,7 @@ def apply_sound_patch(
         pattern=pattern,
         preset_path=patch.preset_path,
         path=patch.path,
+        framecount=patch.framecount,
         sample_start=patch.sample_start,
         sample_end=patch.sample_end,
         loop_start=patch.loop_start,
@@ -239,14 +241,16 @@ def sampler_patch_from_region(
     options: PatchJsonSoundPatchOptions,
 ) -> SamplerPatch:
     sample_end = _integer_value(region.get("sample.end"))
+    framecount = _integer_value(region.get("framecount"))
     return SamplerPatch(
         preset_path=_preset_path(options),
         path=_sample_path(region, options),
+        framecount=framecount,
         sample_start=_integer_value(region.get("sample.start")),
-        sample_end=sample_end if sample_end is not None else _integer_value(region.get("framecount")),
+        sample_end=sample_end if sample_end is not None else framecount,
         loop_start=_integer_value(region.get("loop.start")),
         loop_end=_integer_value(region.get("loop.end")),
-        loop_crossfade=_integer_value(region.get("loop.crossfade")),
+        loop_crossfade=_sampler_loop_crossfade(region, framecount),
         tune_tenths=_integer_value(region.get("tune")),
         loop_type=_sampler_loop_type(region),
         gain=_integer_value(region.get("gain")),
@@ -280,6 +284,15 @@ def _sampler_loop_type(region: dict[str, Any]) -> int:
     if _boolean_value(region.get("loop.onrelease")) is True:
         return LOOP_TYPE_UNTIL_RELEASE
     return LOOP_TYPE_INFINITE
+
+
+def _sampler_loop_crossfade(region: dict[str, Any], framecount: int | None) -> int | None:
+    crossfade = _integer_value(region.get("loop.crossfade"))
+    if crossfade is None:
+        return None
+    if not framecount:
+        return crossfade
+    return min(255, (crossfade * 128) // framecount)
 
 
 def _drum_play_mode(value: Any) -> int | None:

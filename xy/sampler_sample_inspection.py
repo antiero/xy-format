@@ -2,10 +2,12 @@
 
 Sampler (engine ``0x02``) stores sample path in voice-0 of the shared
 24×128 B table @ ``track+0x3957``. Start/end/loop points live in a
-**per-track** header immediately before that table (``0x3943``–``0x3956``),
+**per-track** header immediately before that table (``0x393F``–``0x3956``),
 not at drum offsets ``+0x68`` / ``+0x70`` inside the slot.
 
 Firmware 1.1.4; validated on ``nt-acidic`` one-shot captures ``g0``–``g14``.
+Preset-corpus captures confirm these sample-window fields are full u32 frame
+positions/counts; the original P2-B probes only changed the low two bytes.
 """
 
 from __future__ import annotations
@@ -20,10 +22,11 @@ SAMPLER_ENGINE_ID = 0x02
 ENGINE_ID_OFFSET = 0x14
 
 # Per-track sample header (before voice table)
-TRACK_SAMPLE_START_U16 = 0x3943
-TRACK_SAMPLE_END_U16 = 0x3947
-TRACK_LOOP_START_U16 = 0x394B
-TRACK_LOOP_END_U16 = 0x394F
+TRACK_FRAMECOUNT_U32 = 0x393F
+TRACK_SAMPLE_START_U32 = 0x3943
+TRACK_SAMPLE_END_U32 = 0x3947
+TRACK_LOOP_START_U32 = 0x394B
+TRACK_LOOP_END_U32 = 0x394F
 TRACK_LOOP_CROSSFADE_U8 = 0x3956
 
 VOICE_TABLE_OFFSET = 0x3957
@@ -58,6 +61,7 @@ class SamplerSampleEdit:
     track: int
     engine_id: int
     path: str
+    framecount: int
     sample_start: int
     sample_end: int
     loop_start: int
@@ -104,8 +108,8 @@ class ProjectSamplerSamples:
     tracks: tuple[SamplerSampleEdit, ...]
 
 
-def _u16_le(img: bytes, offset: int) -> int:
-    return img[offset] | (img[offset + 1] << 8)
+def _u32_le(img: bytes, offset: int) -> int:
+    return int.from_bytes(img[offset : offset + 4], "little")
 
 
 def decode_sampler_tune_tenths(tune_byte: int, tune_aux_byte: int) -> int:
@@ -167,10 +171,11 @@ def read_sampler_sample_edit(project: ImageProject, track: int = 1) -> SamplerSa
         track=track,
         engine_id=engine_id,
         path=_read_path(slot),
-        sample_start=_u16_le(img, base + TRACK_SAMPLE_START_U16),
-        sample_end=_u16_le(img, base + TRACK_SAMPLE_END_U16),
-        loop_start=_u16_le(img, base + TRACK_LOOP_START_U16),
-        loop_end=_u16_le(img, base + TRACK_LOOP_END_U16),
+        framecount=_u32_le(img, base + TRACK_FRAMECOUNT_U32),
+        sample_start=_u32_le(img, base + TRACK_SAMPLE_START_U32),
+        sample_end=_u32_le(img, base + TRACK_SAMPLE_END_U32),
+        loop_start=_u32_le(img, base + TRACK_LOOP_START_U32),
+        loop_end=_u32_le(img, base + TRACK_LOOP_END_U32),
         loop_crossfade=img[base + TRACK_LOOP_CROSSFADE_U8],
         tune_byte=slot[SLOT_TUNE],
         tune_aux_byte=slot[SLOT_TUNE_AUX],

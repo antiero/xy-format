@@ -83,12 +83,12 @@ first region. Multi-zone behavior is intentionally not claimed here.
 | Region field | `.xy` write status |
 | --- | --- |
 | `sample` | Written to the sampler slot path. If `preset_device_path` is supplied, it is prefixed as `<preset_device_path>/<sample>`. |
-| `sample.start` | Corpus-confirmed as a u32 sampler sample-start word at `track+0x3943` when present. Current writer support needs to be widened from earlier u16 assumptions. |
-| `sample.end` | Corpus-confirmed as a u32 sampler sample-end word at `track+0x3947`. Current writer support needs to be widened from earlier u16 assumptions. |
-| `framecount` | Corpus-confirmed as a u32 framecount word at `track+0x393F`; used as sample end only when `sample.end` is absent. |
-| `loop.start` | Corpus-confirmed as a u32 sampler loop-start word at `track+0x394B`. Current writer support needs to be widened from earlier u16 assumptions. |
-| `loop.end` | Corpus-confirmed as a u32 sampler loop-end word at `track+0x394F`. Current writer support needs to be widened from earlier u16 assumptions. |
-| `loop.crossfade` | Corpus-confirmed as normalized byte `floor(loop.crossfade * 128 / framecount)` at `track+0x3956`; the current adapter does not yet apply that normalization. |
+| `sample.start` | Corpus-confirmed as a u32 sampler sample-start word at `track+0x3943` when present. |
+| `sample.end` | Corpus-confirmed as a u32 sampler sample-end word at `track+0x3947`. |
+| `framecount` | Corpus-confirmed as a u32 framecount word at `track+0x393F`; also used as sample end when `sample.end` is absent. |
+| `loop.start` | Corpus-confirmed as a u32 sampler loop-start word at `track+0x394B`. |
+| `loop.end` | Corpus-confirmed as a u32 sampler loop-end word at `track+0x394F`. |
+| `loop.crossfade` | Corpus-confirmed as normalized byte `floor(loop.crossfade * 128 / framecount)` at `track+0x3956`; the adapter writes this normalized storage value when `framecount` is available. |
 | `loop.enabled` | Adapter currently writes loop type from this boolean, but preset-corpus validation is still incomplete. |
 | `loop.onrelease` | Unresolved for preset loads: current corpus has `loop.onrelease=true` while the project slot stores the same loop-type byte as ordinary infinite looping. |
 | `tune` | Unresolved for preset loads: current sampler corpus has only `0`, while slot `+0x00` is confirmed to store keycenter/root instead. |

@@ -326,10 +326,11 @@ Sampler are **not** at drum `slot+0x68`/`+0x70`; they precede the table:
 
 | track offset | field | probes |
 |---|---|---|
-| `+0x3943` | sample start u16 LE | `g3` |
-| `+0x3947` | sample end u16 LE | `g4` |
-| `+0x394B` | loop start u16 LE | `g5` |
-| `+0x394F` | loop end u16 LE | `g6` |
+| `+0x393F` | framecount u32 LE | `g0`, preset corpus |
+| `+0x3943` | sample start u32 LE | `g3`, preset corpus |
+| `+0x3947` | sample end u32 LE | `g4`, preset corpus |
+| `+0x394B` | loop start u32 LE | `g5`, preset corpus |
+| `+0x394F` | loop end u32 LE | `g6`, preset corpus |
 | `+0x3956` | loop crossfade u8 | `g11` (`96` ≈ 75% UI) |
 | `+0x3957` | tune u8 | `0x3C` + aux=`N×10` (≥0); `0x3D` + aux=`100−N×10` (<0); `g-tune-*` |
 | `+0x395B` | tune aux u8 | paired with `+0x3957`; see tune table in P2-B log |
