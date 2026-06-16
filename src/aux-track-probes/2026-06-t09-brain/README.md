@@ -1,7 +1,8 @@
 # 2026-06 T9 Brain Probe Plan
 
-Baseline: `t09-brain-baseline.xy`, copied from
-`src/bar-menu-probes/2026-06-bar-menu/bar0.xy`.
+> **Status:** captured/analyzed · Firmware **1.1.4**
+> **Baseline source:** `src/bar-menu-probes/2026-06-bar-menu/bar0.xy`
+> **Probe vehicle:** Track **9** (Brain).
 
 Goal: isolate Brain track settings, routing, linked-track state, and any
 recorded Brain sequence storage.

@@ -1,25 +1,40 @@
 from pathlib import Path
 
+from tests.decoded_image_layout import (
+    EDITED_FLAG_OFFSET,
+    NOTE_VECTOR_OFFSET,
+    SAVE_SIDE_EFFECT_A_OFFSET,
+    SAVE_SIDE_EFFECT_B_OFFSET,
+    track_base_from_project,
+)
 from xy.rle import decode_project
 
 PROBES = Path("src/aux-track-probes/2026-06-t10-punch-in-fx")
 
-TRACK_BASE0 = 0x0D79
-TRACK_STRIDE = 0x45D4
-T10_BASE = TRACK_BASE0 + 9 * TRACK_STRIDE
-NOTE_VECTOR = T10_BASE + 0x456F
+
+def _data(filename: str) -> bytes:
+    return (PROBES / filename).read_bytes()
 
 
 def _image(filename: str) -> bytes:
-    return decode_project((PROBES / filename).read_bytes())[1]
+    return decode_project(_data(filename))[1]
+
+
+def _track_base(filename: str, track: int) -> int:
+    return track_base_from_project(_data(filename), track)
+
+
+def _note_vector(filename: str) -> int:
+    return _track_base(filename, 10) + NOTE_VECTOR_OFFSET
 
 
 def _notes(filename: str) -> list[tuple[int, int, int, int, tuple[int, int]]]:
     image = _image(filename)
-    count = image[NOTE_VECTOR]
+    note_vector = _note_vector(filename)
+    count = image[note_vector]
     notes = []
     for index in range(count):
-        offset = NOTE_VECTOR + 1 + index * 12
+        offset = note_vector + 1 + index * 12
         record = image[offset : offset + 12]
         notes.append(
             (
@@ -50,27 +65,30 @@ def test_t10_punch_step9_uses_generic_note_vector() -> None:
 
 
 def test_t10_punch_trigger_captures_only_add_one_note_plus_known_save_noise() -> None:
+    baseline_filename = "t10-punch-in-fx-baseline.xy"
     base = _image("t10-punch-in-fx-baseline.xy")
+    t10_base = _track_base(baseline_filename, 10)
+    note_vector = t10_base + NOTE_VECTOR_OFFSET
     allowed = {
-        T10_BASE + 0x11,
-        T10_BASE + 0x38F2,
-        T10_BASE + 0x38F6,
-        NOTE_VECTOR,
-        *range(NOTE_VECTOR + 1, NOTE_VECTOR + 13),
+        t10_base + EDITED_FLAG_OFFSET,
+        t10_base + SAVE_SIDE_EFFECT_A_OFFSET,
+        t10_base + SAVE_SIDE_EFFECT_B_OFFSET,
+        note_vector,
+        *range(note_vector + 1, note_vector + 13),
     }
     # Opening/saving an aux track may also touch the known T9-T16 project-config
     # save-noise bytes. Vector insertion shifts later data; compare only the
     # prefix up to the inserted note vector.
     for track in range(9, 17):
-        track_base = TRACK_BASE0 + (track - 1) * TRACK_STRIDE
-        allowed.add(track_base + 0x38F2)
-        allowed.add(track_base + 0x38F6)
+        track_base = _track_base(baseline_filename, track)
+        allowed.add(track_base + SAVE_SIDE_EFFECT_A_OFFSET)
+        allowed.add(track_base + SAVE_SIDE_EFFECT_B_OFFSET)
 
     for filename in ("t10-punch-trigger-step1.xy", "t10-punch-trigger-step9.xy"):
         image = _image(filename)
         diffs_before_vector = {
             offset
-            for offset, (a, b) in enumerate(zip(base[: NOTE_VECTOR + 13], image[: NOTE_VECTOR + 13]))
+            for offset, (a, b) in enumerate(zip(base[: note_vector + 13], image[: note_vector + 13]))
             if a != b
         }
         assert diffs_before_vector <= allowed, filename

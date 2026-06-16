@@ -1,6 +1,6 @@
 # 2026-06 Aux Filter Probe Plan (M3, T13–T16)
 
-> **Status:** todo · Firmware **1.1.4**
+> **Status:** captured/analyzed · Firmware **1.1.4**
 > **Baseline source:** `src/bar-menu-probes/2026-06-bar-menu/bar0.xy`
 > **Probe vehicle:** Track **13** (External Audio) — same M3 filter on T14–T16.
 

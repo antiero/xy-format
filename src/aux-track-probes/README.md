@@ -5,6 +5,29 @@ Probe packs for OP-XY auxiliary tracks T9–T16 and **shared** M3/M4 layouts.
 Baseline for all per-track packs: copy
 `src/bar-menu-probes/2026-06-bar-menu/bar0.xy`.
 
+## Shared Track-Struct Layout
+
+Aux probes reuse the same decoded-image track struct as instrument tracks.
+For one logical track, the M1/current engine parameter words are at the common
+track-relative offsets:
+
+| Field | Track-relative offset |
+| --- | ---: |
+| M1 param 1 | `+0x3857` |
+| M1 param 2 | `+0x385B` |
+| M1 param 3 | `+0x385F` |
+| M1 param 4 | `+0x3863` |
+
+The probe findings below usually identify **which aux UI control occupies a
+shared slot**, not a new storage mechanism. Likewise, M3 filter and M4 LFO
+probe packs describe shared aux pages over known track-relative regions.
+
+When writing tests or tools, do not derive track bases with
+`TRACK_BASE0 + n * TRACK_STRIDE` unless the fixture is proven to have no prior
+variable-length vectors. Use the decoded-image track locator
+(`ImageProject.track_start()`) so projects with notes or extra patterns stay
+addressed correctly.
+
 ## Per-track packs
 
 | Track | Directory | Status |

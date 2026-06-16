@@ -1,6 +1,6 @@
 # 2026-06 Aux LFO Probe Plan (M4, T9–T16)
 
-> **Status:** todo · Firmware **1.1.4**
+> **Status:** captured/analyzed · Firmware **1.1.4**
 > **Baseline source:** `src/bar-menu-probes/2026-06-bar-menu/bar0.xy`
 
 ## What this is
