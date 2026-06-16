@@ -970,7 +970,7 @@ class ImageProject:
     DRUM_SLOT = 0x80
     DRUM_TUNE = 0x00       # u8 root note, default 0x3c, ±48 semitones
     DRUM_KEY = 0x02        # u8 MIDI key assignment
-    DRUM_PLAY_MODE = 0x03  # u8: 1=key, 2=oneshot, 3=mute group, 4=loop
+    DRUM_PLAY_MODE = 0x03  # u8; preset corpus confirms patch.json oneshot = 1
     DRUM_DIRECTION = 0x07  # u8: 0=forward, 1=backward
     DRUM_PATH = 0x08       # 72 B latin-1 sample path
     DRUM_START = 0x68      # u32 sample start, default 0

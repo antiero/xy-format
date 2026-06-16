@@ -298,14 +298,13 @@ def _sampler_loop_crossfade(region: dict[str, Any], framecount: int | None) -> i
 def _drum_play_mode(value: Any) -> int | None:
     playmode = _string_value(value).lower()
     if playmode == "oneshot":
-        return 0
-    if playmode == "group":
         return 1
-    if playmode == "loop":
-        return 2
-    if playmode == "gate":
-        return 3
-    return _integer_value(value)
+    numeric = _integer_value(value)
+    if numeric is not None:
+        return numeric
+    if playmode:
+        raise ValueError(f'drum playmode "{playmode}" is not mapped to a project byte yet')
+    return None
 
 
 def _first_region(regions: list[dict[str, Any]]) -> dict[str, Any]:

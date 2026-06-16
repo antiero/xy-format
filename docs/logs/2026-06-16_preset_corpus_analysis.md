@@ -80,6 +80,10 @@ The sampler sample-window finding matters for writer coverage: these must be
 read and written as u32 fields. Many captured `framecount`, `sample.end`,
 `loop.start`, and `loop.end` values exceed 65535.
 
+The analyzer now checks the LFO/FX header bytes directly, not just by prose:
+all 139 paired captures match the `lfo.type`, `lfo.active`, `fx.type`, and
+`fx.active` maps above.
+
 ## Field coverage ledger
 
 | Field | Status | Notes |
@@ -103,7 +107,7 @@ read and written as u32 fields. Many captured `framecount`, `sample.end`,
 | sampler `regions[0].sample`, `hikey`, `pitch.keycenter`, `framecount`, `sample.end`, `loop.start`, `loop.end`, `loop.crossfade` | confirmed | Sample path string, root/keycenter byte, u32 sample-window fields, and normalized crossfade byte. |
 | sampler `regions[0].sample.start`, `reverse`, `gain` | confirmed-for-observed-values | `sample.start` maps to the u32 word when present; `reverse=false` maps to direction byte `0`; observed `gain` values map directly to byte `track+0x395C`. |
 | sampler `regions[0].loop.onrelease`, `tune` | unresolved | `loop.onrelease=true` does not match the previous loop-type assumption in this corpus. `tune` is always zero; slot `+0x00` is keycenter/root instead. |
-| drum `regions[].sample`, `hikey`, `reverse`, `pan`, `transpose`, `tune`, `playmode` | partial | Mostly aligns with drum slot table at `track+0x3957 + voice*0x80`; current captures only show `oneshot`, mostly as byte `1`. |
+| drum `regions[].sample`, `hikey`, `reverse`, `pan`, `transpose`, `tune`, `playmode` | partial | Ten clean 24-region kits align with `track+0x3957 + (hikey - 53) * 0x80`; current paired captures only show `oneshot` as byte `1`. |
 | drum `regions[].sample.end`, `framecount`, `fade.*` | candidate | For most full kits, `sample.end` for voice N is stored at previous slot `+0x70`, similar to fade storage. Voice 0 and suspect kit alignments remain unresolved. |
 | `regions[].lokey`, `regions[].pitch.keycenter` | ignored-or-unresolved | Often redundant with `hikey`/default keycenter, but no independent project field is confirmed. |
 
@@ -136,15 +140,26 @@ nt-fly kites
 This looks like an engine/FX-specific saturation or fixed default lane rather
 than random drift, because all ten project values are exactly `0x7FFFFFFF`.
 
-Drum kit alignment caveats:
+Drum kit alignment:
+
+- Ten clean 24-region kits align path, key assignment, transpose/tune center,
+  pan, reverse/direction, and `patch.json` `oneshot` play mode byte `1` at
+  `track+0x3957 + (hikey - 53) * 0x80`.
+- In those clean kits, `sample.end` / `framecount` for voices 1-23 is found at
+  the previous slot's `+0x70`, matching the earlier fade-style shifted storage
+  pattern. Voice 0 is still unresolved: slot 23's tail does not contain a
+  simple wraparound copy.
+- This means the generic direct drum voice writer is not yet a faithful
+  preset-load serializer for drum `sample.end` / `framecount`. It remains useful
+  for direct edit-field authoring, but patch.json drum preset loading needs a
+  separate shifted-storage path once voice 0 is understood.
+
+Drum kit caveats:
 
 - `nt-hard spunch.xy` appears rotated relative to its `patch.json` region order.
 - `nt-cherry.xy` has a missing/empty voice in the middle of the 24-slot table,
   after which path and end alignment no longer match a simple `hikey - 53`
   mapping.
-- Clean full-kit captures support the candidate rule that drum `sample.end`
-  for voice N is stored at the previous slot's `+0x70`, but voice 0 still
-  needs a targeted fixture.
 
 ## Tooling
 

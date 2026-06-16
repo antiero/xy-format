@@ -32,7 +32,7 @@ def test_maps_drum_regions_to_pad_patches_by_op_xy_key_order() -> None:
                     "sample": "kick-f#2-0.wav",
                     "hikey": 53,
                     "pan": -12,
-                    "playmode": "gate",
+                    "playmode": "oneshot",
                     "reverse": True,
                     "transpose": -3,
                     "gain": 1234,
@@ -51,7 +51,7 @@ def test_maps_drum_regions_to_pad_patches_by_op_xy_key_order() -> None:
     assert patch.pads[0].path == "/fat32/presets/drum/live kit.preset/kick-f#2-0.wav"
     assert patch.pads[0].tune == -3
     assert patch.pads[0].key_assignment == 53
-    assert patch.pads[0].play_mode == 3
+    assert patch.pads[0].play_mode == 1
     assert patch.pads[0].direction == 1
     assert patch.pads[0].pan == -12
     assert patch.pads[0].start == 10
@@ -144,7 +144,7 @@ def test_apply_drum_patch_json_writes_readable_project_fields() -> None:
                 {
                     "sample": "kick.wav",
                     "hikey": 54,
-                    "playmode": "loop",
+                    "playmode": "oneshot",
                     "reverse": True,
                     "transpose": 7,
                     "pan": -25,
@@ -163,7 +163,7 @@ def test_apply_drum_patch_json_writes_readable_project_fields() -> None:
     assert voice.path == "/fat32/presets/drum/live kit.preset/kick.wav"
     assert voice.tune_semitones == 7
     assert voice.key_assignment == 54
-    assert voice.play_mode == 2
+    assert voice.play_mode == 1
     assert voice.direction == 1
     assert voice.pan == -25
     assert voice.start == 100
@@ -238,6 +238,13 @@ def test_apply_patch_json_text_and_file_write_project_fields(tmp_path) -> None:
     text_voice = inspect_drum_samples(text_project).tracks[0].voices[2]
     file_voice = inspect_drum_samples(file_project).tracks[0].voices[2]
     assert text_voice.path == "/fat32/presets/drum/kit.preset/snare.wav"
-    assert text_voice.play_mode == 0
+    assert text_voice.play_mode == 1
     assert text_voice.end == 222
     assert file_voice == text_voice
+
+
+def test_rejects_unmapped_drum_playmode_strings() -> None:
+    with pytest.raises(ValueError, match="not mapped"):
+        drum_kit_patch_from_patch_json(
+            {"type": "drum", "regions": [{"sample": "x.wav", "hikey": 53, "playmode": "loop"}]}
+        )

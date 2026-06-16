@@ -92,6 +92,20 @@ PLAYMODE_WORDS = {
     "mono": 0x3FFFFFFF,
 }
 
+LFO_TYPE_BYTES = {
+    "tremolo": 0x00,
+    "value": 0x01,
+    "random": 0x02,
+    "element": 0x03,
+}
+
+FX_TYPE_BYTES = {
+    "z lowpass": 0x09,
+    "svf": 0x0A,
+    "ladder": 0x10,
+    "z hipass": 0x11,
+}
+
 FIELD_COVERAGE = [
     ("platform", "metadata", "Preset file marker; not expected to be stored as track sound state."),
     ("version", "metadata", "Preset schema version; not expected to be stored as track sound state."),
@@ -115,7 +129,7 @@ FIELD_COVERAGE = [
     ("envelope.filter.*", "confirmed", "q16 words at `track+0x38D7..0x38E3`."),
     ("fx.type", "confirmed", "Byte at `track+0x21`: `z lowpass=9`, `svf=10`, `ladder=16`, `z hipass=17`."),
     ("fx.active", "confirmed", "Boolean byte at `track+0x25`."),
-    ("fx.params[0..7]", "confirmed-with-exception", "q16 words at `track+0x3897..0x38B3`; `params[5]` can serialize as max for some FX/type combinations."),
+    ("fx.params[0..7]", "confirmed-with-exception", "q16 words at `track+0x3897..0x38B3`; `params[5]` serializes as max for ten paired synth-engine captures with JSON `21954`."),
     ("lfo.type", "confirmed", "Byte at `track+0x1C`: `tremolo=0`, `value=1`, `random=2`, `element=3`."),
     ("lfo.active", "confirmed", "Boolean byte at `track+0x20`."),
     ("lfo.params[0..7]", "confirmed", "q16 words at `track+0x38B7..0x38D3`."),
@@ -126,8 +140,8 @@ FIELD_COVERAGE = [
     ("regions[0].loop.crossfade (sampler)", "confirmed", "Byte at `track+0x3956` is `floor(loop.crossfade * 128 / framecount)`."),
     ("regions[0].reverse/gain (sampler)", "confirmed-for-observed-values", "`reverse=false` maps to `track+0x395E == 0`; observed `gain` values map directly to byte `track+0x395C`."),
     ("regions[0].loop.onrelease/tune (sampler)", "unresolved", "`loop.onrelease=true` does not map to the current loop-type byte assumption in this corpus. `tune` is always zero, while slot `+0x00` is keycenter/root."),
-    ("regions[].sample/hikey/reverse/pan/transpose/tune/playmode (drum)", "partial", "Mostly aligns with drum slot table at `track+0x3957 + voice*0x80`; current captures only show `oneshot`, mostly as byte `1`."),
-    ("regions[].sample.end/framecount/fade.* (drum)", "candidate", "For most full kits, `sample.end` for voice N is stored at previous slot `+0x70`, similar to fade storage. Voice 0 and suspect kit alignments remain unresolved."),
+    ("regions[].sample/hikey/reverse/pan/transpose/tune/playmode (drum)", "partial", "Ten clean 24-region kits align with `track+0x3957 + (hikey - 53) * 0x80`; current paired captures only show `oneshot` as byte `1`."),
+    ("regions[].sample.end/framecount/fade.* (drum)", "candidate", "Ten clean 24-region kits store `sample.end`/`framecount` for voices 1-23 at the previous slot's `+0x70`. Voice 0 and suspect kit alignments remain unresolved."),
     ("regions[].lokey/pitch.keycenter", "ignored-or-unresolved", "Often redundant with `hikey`/default keycenter, but no independent project field is confirmed."),
 ]
 
@@ -186,6 +200,7 @@ def analyze(corpus: Path) -> str:
     _check_engine_ids(pairs, mismatches)
     _check_track1_octave(pairs, mismatches)
     _check_playmode(pairs, mismatches)
+    _check_header_bytes(pairs, mismatches)
     _check_preset_labels(pairs, mismatches)
     _check_q16_fields(pairs, mismatches)
     _check_array_q16(pairs, "engine.params", ENGINE_PARAM_OFFSETS, mismatches)
@@ -210,6 +225,7 @@ def analyze(corpus: Path) -> str:
             "- `envelope.amp.*`, `envelope.filter.*`, most `engine.*` lanes, most `fx.params[0..7]`, and `lfo.params[0..7]` map as the high 16 bits of 4-byte words in the known sound-state block.",
             "- Sampler project sample windows store full u32 values at `track+0x393F..0x394F`, not u16 values.",
             "- Sampler `loop.crossfade` stores a normalized byte: `floor(loop.crossfade * 128 / framecount)` at `track+0x3956`.",
+            "- Ten clean drum-kit captures map path/key/tune/pan/reverse/playmode by `hikey - 53`; their voice 1-23 `sample.end` values appear at previous slot `+0x70`.",
             "",
             "## Mismatches / Exceptions",
             "",
@@ -232,7 +248,7 @@ def analyze(corpus: Path) -> str:
             "## Immediate Follow-Ups",
             "",
             "- Treat `nt-dx analog.xy` as suspect: it appears to contain the `nt-dx legend` sample path/window even though the matching `patch.json` is `nt-dx analog.preset`.",
-            "- Sampler sample-window readers/writers must use u32 positions/counts; many preset-loaded values exceed 65535.",
+            "- Drum `sample.end`/`framecount` writing is not preset-load exact yet: clean loaded kits shift voices 1-23 to previous slot `+0x70`, while the generic drum voice writer still writes the direct edit field and voice 0 remains unresolved.",
             "- Use this script after adding more project captures; it is corpus-size independent and should scale to the planned 300+ files.",
         ]
     )
@@ -292,6 +308,45 @@ def _check_playmode(pairs: list[Pair], mismatches: dict[str, list[str]]) -> None
             mismatches["engine.playmode"].append(
                 f"`{pair.name}`: `{playmode}` expected `0x{expected:08X}`, got `0x{got:08X}`"
             )
+
+
+def _check_header_bytes(pairs: list[Pair], mismatches: dict[str, list[str]]) -> None:
+    for pair in pairs:
+        lfo_type = _lookup(pair.patch, "lfo.type")
+        expected_lfo_type = LFO_TYPE_BYTES.get(lfo_type)
+        if expected_lfo_type is not None:
+            got = pair.project.image[pair.track_start + 0x1C]
+            if got != expected_lfo_type:
+                mismatches["lfo.type"].append(
+                    f"`{pair.name}`: `{lfo_type}` expected `0x{expected_lfo_type:02X}`, got `0x{got:02X}`"
+                )
+
+        lfo_active = _lookup(pair.patch, "lfo.active")
+        if isinstance(lfo_active, bool):
+            expected_lfo_active = 1 if lfo_active else 0
+            got = pair.project.image[pair.track_start + 0x20]
+            if got != expected_lfo_active:
+                mismatches["lfo.active"].append(
+                    f"`{pair.name}`: expected `{expected_lfo_active}`, got `{got}`"
+                )
+
+        fx_type = _lookup(pair.patch, "fx.type")
+        expected_fx_type = FX_TYPE_BYTES.get(fx_type)
+        if expected_fx_type is not None:
+            got = pair.project.image[pair.track_start + 0x21]
+            if got != expected_fx_type:
+                mismatches["fx.type"].append(
+                    f"`{pair.name}`: `{fx_type}` expected `0x{expected_fx_type:02X}`, got `0x{got:02X}`"
+                )
+
+        fx_active = _lookup(pair.patch, "fx.active")
+        if isinstance(fx_active, bool):
+            expected_fx_active = 1 if fx_active else 0
+            got = pair.project.image[pair.track_start + 0x25]
+            if got != expected_fx_active:
+                mismatches["fx.active"].append(
+                    f"`{pair.name}`: expected `{expected_fx_active}`, got `{got}`"
+                )
 
 
 def _check_q16_fields(pairs: list[Pair], mismatches: dict[str, list[str]]) -> None:

@@ -229,7 +229,7 @@ are **global `0x09`–`0x54`**, **track middle gaps**, **player engines**,
 | `2026-06-preset-path` | P1-B | track `+0x453F` | **captured** |
 | `2026-06-drum-pan-fade` | M3 | drum slot `+0x06`, `+0x7C` | **captured** |
 | `2026-06-sample-paths` | M1 | drum slot `+0x08` | **captured** |
-| `2026-06-sampler-oneshot` | P2-B | sampler header `+0x3943`, slot `+0x3957` | **captured** |
+| `2026-06-sampler-oneshot` | P2-B | sampler header `+0x393F`, slot `+0x3957` | **captured** |
 | `2026-06-sampler-multi` | P2-C | zone map | **todo** |
 | `2026-06-aux-track-probes` | P3-A | T9–T16 structs plus shared aux filter/LFO | **captured/partial** |
 | `2026-06-players` | P3-B | player state | **todo** |

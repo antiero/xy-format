@@ -54,8 +54,11 @@ together by confirmed sample-based preset behavior.
 
 ## Drum region fields
 
-For `type: "drum"`, each region maps to one pad. The adapter uses
-`voice = hikey - 53`; out-of-range regions are ignored.
+For `type: "drum"`, the adapter authors the clean full-kit mapping validated by
+the preset corpus: `voice = hikey - 53`; out-of-range regions are ignored.
+Sparse or rotated kit ordering is not fully decoded yet (`nt-cherry` and
+`nt-hard spunch` are current caveats), so this adapter does not attempt a more
+general region-placement algorithm.
 
 | Region field | `.xy` write status |
 | --- | --- |
@@ -63,14 +66,14 @@ For `type: "drum"`, each region maps to one pad. The adapter uses
 | `hikey` | Written as drum key assignment and used to select voice index. |
 | `lokey` | Ignored; observed drum presets use `lokey == hikey`. |
 | `pitch.keycenter` | Ignored; observed drum presets use `60`. |
-| `playmode` | Written as drum play mode (`oneshot`, `group`, `loop`, `gate`, or numeric value). |
+| `playmode` | `oneshot` is corpus-confirmed and written as byte `1`; numeric values pass through. Other strings are rejected until mapped from device evidence. |
 | `reverse` | Written as drum direction. |
 | `transpose` | Written as drum tune when present. |
 | `tune` | Written as drum tune only when `transpose` is absent. |
 | `pan` | Written as signed drum pan byte. |
 | `sample.start` | Written as drum sample start. |
-| `sample.end` | Written as drum sample end. |
-| `framecount` | Used as drum sample end only when `sample.end` is absent. |
+| `sample.end` | Written as drum sample end for the selected voice. Corpus analysis shows device-loaded clean kits store voices 1-23 at the previous slot's `+0x70`; writer support still uses the direct voice field. |
+| `framecount` | Used as drum sample end only when `sample.end` is absent; same caveat as `sample.end`. |
 | `gain` | Written as drum gain. |
 | `fade.out` | Written through the confirmed drum fade storage rule. |
 | `fade.in` | Ignored; no confirmed project slot mapping. |
