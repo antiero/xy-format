@@ -1,0 +1,391 @@
+"""Analyze paired `.preset` folders and device-authored project captures.
+
+The corpus under ``src/presets`` pairs ``presets/<name>.preset/patch.json``
+with ``presetprojs/<name>.xy`` where track 1 was assigned that preset on the
+device.  This script checks which ``patch.json`` fields can be found back in
+the decoded project image.
+"""
+
+from __future__ import annotations
+
+import argparse
+import json
+import sys
+from collections import Counter, defaultdict
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Any
+
+
+ROOT = Path(__file__).resolve().parents[2]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+from xy.image_writer import ImageProject
+
+DEFAULT_CORPUS = ROOT / "src" / "presets"
+
+ENGINE_IDS = {
+    "sampler": 0x02,
+    "drum": 0x03,
+    "organ": 0x06,
+    "epiano": 0x07,
+    "prism": 0x12,
+    "hardsync": 0x13,
+    "dissolve": 0x14,
+    "axis": 0x16,
+    "wavetable": 0x1F,
+    "simple": 0x20,
+}
+
+Q16_FIELDS = {
+    "envelope.amp.attack": 0x3877,
+    "envelope.amp.decay": 0x387B,
+    "envelope.amp.sustain": 0x387F,
+    "envelope.amp.release": 0x3883,
+    "engine.portamento.amount": 0x388B,
+    "engine.bendrange": 0x388F,
+    "engine.volume": 0x3893,
+    "envelope.filter.attack": 0x38D7,
+    "envelope.filter.decay": 0x38DB,
+    "envelope.filter.sustain": 0x38DF,
+    "envelope.filter.release": 0x38E3,
+    "engine.modulation.modwheel.target": 0x38FF,
+    "engine.modulation.modwheel.amount": 0x3903,
+    "engine.modulation.aftertouch.target": 0x3907,
+    "engine.modulation.aftertouch.amount": 0x390B,
+    "engine.modulation.pitchbend.target": 0x390F,
+    "engine.modulation.pitchbend.amount": 0x3913,
+    "engine.velocity.sensitivity": 0x3917,
+    "engine.portamento.type": 0x391B,
+    "engine.tuning.scale": 0x391F,
+    "engine.width": 0x3923,
+    "engine.tuning.root": 0x392B,
+    "engine.highpass": 0x392F,
+    "engine.modulation.velocity.target": 0x3933,
+    "engine.modulation.velocity.amount": 0x3937,
+}
+
+ENGINE_PARAM_OFFSETS = [0x3857, 0x385B, 0x385F, 0x3863, 0x3867, 0x386B, 0x386F, 0x3873]
+FX_PARAM_OFFSETS = [0x3897, 0x389B, 0x389F, 0x38A3, 0x38A7, 0x38AB, 0x38AF, 0x38B3]
+LFO_PARAM_OFFSETS = [0x38B7, 0x38BB, 0x38BF, 0x38C3, 0x38C7, 0x38CB, 0x38CF, 0x38D3]
+
+SAMPLER_U32_FIELDS = {
+    "regions.0.framecount": 0x393F,
+    "regions.0.sample.start": 0x3943,
+    "regions.0.sample.end": 0x3947,
+    "regions.0.loop.start": 0x394B,
+    "regions.0.loop.end": 0x394F,
+}
+
+PRESET_LABEL_OFFSET = 0x453F
+PRESET_LABEL_MAX = 0x30
+SAMPLER_SAMPLE_PATH_OFFSET = 0x395F
+SAMPLER_SAMPLE_PATH_MAX = 0x60
+
+PLAYMODE_WORDS = {
+    "poly": 0x15555555,
+    "mono": 0x3FFFFFFF,
+}
+
+FIELD_COVERAGE = [
+    ("platform", "metadata", "Preset file marker; not expected to be stored as track sound state."),
+    ("version", "metadata", "Preset schema version; not expected to be stored as track sound state."),
+    ("type", "confirmed", "Engine byte at `track+0x14`."),
+    ("octave", "unresolved", "No stable byte/u32 location found across current paired captures."),
+    ("engine.params[0..7]", "confirmed", "q16 words at `track+0x3857..0x3873`."),
+    ("engine.playmode", "confirmed", "Raw word at `track+0x3887`: `poly=0x15555555`, `mono=0x3FFFFFFF`."),
+    ("engine.portamento.amount", "confirmed", "q16 word at `track+0x388B`."),
+    ("engine.bendrange", "confirmed", "q16 word at `track+0x388F`."),
+    ("engine.volume", "confirmed", "q16 word at `track+0x3893`."),
+    ("engine.tuning.scale", "confirmed", "q16 word at `track+0x391F`."),
+    ("engine.width", "confirmed", "q16 word at `track+0x3923`."),
+    ("engine.transpose", "candidate", "Raw word at `track+0x3927`; observed `0 -> 0x3FFFFFF8`, `12 -> 0x550A8538`. Encoding not generalized."),
+    ("engine.tuning.root", "confirmed", "q16 word at `track+0x392B`."),
+    ("engine.highpass", "confirmed", "q16 word at `track+0x392F`."),
+    ("engine.velocity.sensitivity", "confirmed", "q16 word at `track+0x3917`."),
+    ("engine.portamento.type", "confirmed", "q16 word at `track+0x391B`."),
+    ("engine.modulation.*.target/amount", "confirmed", "q16 words at `track+0x38FF..0x3937`."),
+    ("engine.tuning[]", "unresolved", "Observed on some organ/epiano/drum/wavetable presets; no project mapping found yet."),
+    ("envelope.amp.*", "confirmed", "q16 words at `track+0x3877..0x3883`."),
+    ("envelope.filter.*", "confirmed", "q16 words at `track+0x38D7..0x38E3`."),
+    ("fx.type", "confirmed", "Byte at `track+0x21`: `z lowpass=9`, `svf=10`, `ladder=16`, `z hipass=17`."),
+    ("fx.active", "confirmed", "Boolean byte at `track+0x25`."),
+    ("fx.params[0..7]", "confirmed-with-exception", "q16 words at `track+0x3897..0x38B3`; `params[5]` can serialize as max for some FX/type combinations."),
+    ("lfo.type", "confirmed", "Byte at `track+0x1C`: `tremolo=0`, `value=1`, `random=2`, `element=3`."),
+    ("lfo.active", "confirmed", "Boolean byte at `track+0x20`."),
+    ("lfo.params[0..7]", "confirmed", "q16 words at `track+0x38B7..0x38D3`."),
+    ("regions[0].sample (sampler)", "confirmed", "C string at `track+0x395F`: `/fat32/presets/1/<preset>.preset/<sample>`."),
+    ("regions[0].framecount/sample.end/loop.start/loop.end (sampler)", "confirmed", "u32 words at `track+0x393F/0x3947/0x394B/0x394F`."),
+    ("regions[0].sample.start (sampler)", "partial", "u32 word at `track+0x3943` when present; absence in JSON means no expectation."),
+    ("regions[0].loop.crossfade (sampler)", "partial", "Low byte at `track+0x3956`; values above 255 need separate encoding work."),
+    ("regions[0].loop.onrelease/reverse/gain/tune (sampler)", "partial", "Known slot fields exist, but this corpus pass does not yet exhaustively validate all encodings."),
+    ("regions[].sample/hikey/reverse/pan/transpose/tune/playmode (drum)", "partial", "Mostly aligns with drum slot table at `track+0x3957 + voice*0x80`; partial kits need stricter alignment checks."),
+    ("regions[].sample.end/framecount/fade.* (drum)", "unresolved", "Current corpus shows shifted/indirect storage for `sample.end`; do not claim direct mapping from this pass."),
+    ("regions[].lokey/pitch.keycenter", "ignored-or-unresolved", "Often redundant with `hikey`/default keycenter, but no independent project field is confirmed."),
+]
+
+
+@dataclass(frozen=True)
+class Pair:
+    name: str
+    preset_dir: Path
+    project_path: Path
+    patch: dict[str, Any]
+    project: ImageProject
+    track_start: int
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--corpus", type=Path, default=DEFAULT_CORPUS)
+    args = parser.parse_args()
+    print(analyze(args.corpus))
+
+
+def analyze(corpus: Path) -> str:
+    preset_dirs = {path.name.removesuffix(".preset"): path for path in (corpus / "presets").glob("*.preset")}
+    project_paths = {path.stem: path for path in (corpus / "presetprojs").glob("*.xy")}
+    pair_names = sorted(set(preset_dirs) & set(project_paths))
+    pairs = [_load_pair(name, preset_dirs[name], project_paths[name]) for name in pair_names]
+
+    type_counts = Counter(pair.patch.get("type", "<missing>") for pair in pairs)
+    all_type_counts = Counter(
+        _read_patch(path / "patch.json").get("type", "<missing>")
+        for path in preset_dirs.values()
+        if (path / "patch.json").exists()
+    )
+
+    sections = [
+        "# Preset Corpus Analysis",
+        "",
+        f"Corpus: `{corpus.as_posix()}`",
+        "",
+        "## Inventory",
+        "",
+        f"- Preset folders: {len(preset_dirs)}",
+        f"- Project captures: {len(project_paths)}",
+        f"- Paired captures: {len(pairs)}",
+        f"- Presets without project capture: {len(set(preset_dirs) - set(project_paths))}",
+        f"- Projects without preset folder: {len(set(project_paths) - set(preset_dirs))}",
+        "",
+        "Paired project types:",
+        _counter_table(type_counts, ("type", "count")),
+        "",
+        "All preset types:",
+        _counter_table(all_type_counts, ("type", "count")),
+    ]
+
+    mismatches: dict[str, list[str]] = defaultdict(list)
+    _check_engine_ids(pairs, mismatches)
+    _check_playmode(pairs, mismatches)
+    _check_preset_labels(pairs, mismatches)
+    _check_q16_fields(pairs, mismatches)
+    _check_array_q16(pairs, "engine.params", ENGINE_PARAM_OFFSETS, mismatches)
+    _check_array_q16(pairs, "fx.params", FX_PARAM_OFFSETS, mismatches)
+    _check_array_q16(pairs, "lfo.params", LFO_PARAM_OFFSETS, mismatches)
+    _check_sampler_fields(pairs, mismatches)
+
+    sections.extend(
+        [
+            "",
+            "## Field Coverage",
+            "",
+            _coverage_table(),
+            "",
+            "## Confirmed Direct Mappings",
+            "",
+            "- `patch.json.type` maps to the track engine byte at `track+0x14` for all paired captures.",
+            "- The short preset label at `track+0x453F` is `1/<preset folder name>` for all paired captures except the duplicate/mismatched sample noted below.",
+            "- `engine.params[0..7]` map directly as q16 values to `track+0x3857..0x3873`.",
+            "- `engine.playmode` maps to the raw word at `track+0x3887` (`poly=0x15555555`, `mono=0x3FFFFFFF`).",
+            "- `envelope.amp.*`, `envelope.filter.*`, most `engine.*` lanes, most `fx.params[0..7]`, and `lfo.params[0..7]` map as the high 16 bits of 4-byte words in the known sound-state block.",
+            "- Sampler project sample windows store full u32 values at `track+0x393F..0x394F`, not u16 values.",
+            "",
+            "## Mismatches / Exceptions",
+            "",
+        ]
+    )
+    if mismatches:
+        for key in sorted(mismatches, key=lambda item: (-len(mismatches[item]), item)):
+            examples = mismatches[key][:8]
+            sections.append(f"### {key} ({len(mismatches[key])})")
+            sections.extend(f"- {example}" for example in examples)
+            if len(mismatches[key]) > len(examples):
+                sections.append(f"- ... {len(mismatches[key]) - len(examples)} more")
+            sections.append("")
+    else:
+        sections.append("No mismatches found.")
+        sections.append("")
+
+    sections.extend(
+        [
+            "## Immediate Follow-Ups",
+            "",
+            "- Treat `nt-dx analog.xy` as suspect: it appears to contain the `nt-dx legend` sample path/window even though the matching `patch.json` is `nt-dx analog.preset`.",
+            "- Update writer assumptions for sampler sample window fields before claiming patch.json write completeness: this corpus shows u32-sized sample positions/counts, and many exceed 65535.",
+            "- Use this script after adding more project captures; it is corpus-size independent and should scale to the planned 300+ files.",
+        ]
+    )
+    return "\n".join(sections)
+
+
+def _load_pair(name: str, preset_dir: Path, project_path: Path) -> Pair:
+    patch = _read_patch(preset_dir / "patch.json")
+    project = ImageProject.from_file(str(project_path))
+    return Pair(name, preset_dir, project_path, patch, project, project.track_start(1))
+
+
+def _read_patch(path: Path) -> dict[str, Any]:
+    data = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(data, dict):
+        raise ValueError(f"{path} root must be an object")
+    return data
+
+
+def _check_engine_ids(pairs: list[Pair], mismatches: dict[str, list[str]]) -> None:
+    for pair in pairs:
+        patch_type = str(pair.patch.get("type", ""))
+        expected = ENGINE_IDS.get(patch_type)
+        got = pair.project.image[pair.track_start + 0x14]
+        if expected is not None and got != expected:
+            mismatches["engine id"].append(
+                f"`{pair.name}`: `{patch_type}` expected `0x{expected:02X}`, got `0x{got:02X}`"
+            )
+
+
+def _check_preset_labels(pairs: list[Pair], mismatches: dict[str, list[str]]) -> None:
+    for pair in pairs:
+        expected = f"1/{pair.name}"
+        got = _cstr(pair.project.image, pair.track_start + PRESET_LABEL_OFFSET, PRESET_LABEL_MAX)
+        if got != expected:
+            mismatches["preset label"].append(f"`{pair.name}`: expected `{expected}`, got `{got}`")
+
+
+def _check_playmode(pairs: list[Pair], mismatches: dict[str, list[str]]) -> None:
+    for pair in pairs:
+        playmode = _lookup(pair.patch, "engine.playmode")
+        expected = PLAYMODE_WORDS.get(playmode)
+        if expected is None:
+            continue
+        got = _u32(pair.project.image, pair.track_start + 0x3887)
+        if got != expected:
+            mismatches["engine.playmode"].append(
+                f"`{pair.name}`: `{playmode}` expected `0x{expected:08X}`, got `0x{got:08X}`"
+            )
+
+
+def _check_q16_fields(pairs: list[Pair], mismatches: dict[str, list[str]]) -> None:
+    for pair in pairs:
+        for path, offset in Q16_FIELDS.items():
+            expected = _lookup(pair.patch, path)
+            if isinstance(expected, int):
+                got = _q16(pair.project.image, pair.track_start + offset)
+                if got != expected:
+                    mismatches[path].append(
+                        f"`{pair.name}`: expected `{expected}`, got `{got}` "
+                        f"(raw `0x{_u32(pair.project.image, pair.track_start + offset):08X}`)"
+                    )
+
+
+def _check_array_q16(
+    pairs: list[Pair],
+    path: str,
+    offsets: list[int],
+    mismatches: dict[str, list[str]],
+) -> None:
+    for pair in pairs:
+        values = _lookup(pair.patch, path)
+        if not isinstance(values, list):
+            continue
+        for index, offset in enumerate(offsets):
+            if index >= len(values) or not isinstance(values[index], int):
+                continue
+            expected = values[index]
+            got = _q16(pair.project.image, pair.track_start + offset)
+            if got != expected:
+                mismatches[f"{path}.{index}"].append(
+                    f"`{pair.name}`: expected `{expected}`, got `{got}` "
+                    f"(raw `0x{_u32(pair.project.image, pair.track_start + offset):08X}`)"
+                )
+
+
+def _check_sampler_fields(pairs: list[Pair], mismatches: dict[str, list[str]]) -> None:
+    for pair in pairs:
+        if pair.patch.get("type") != "sampler":
+            continue
+        regions = pair.patch.get("regions")
+        if not isinstance(regions, list) or not regions or not isinstance(regions[0], dict):
+            continue
+        region = regions[0]
+        sample = region.get("sample")
+        if isinstance(sample, str):
+            expected = f"/fat32/presets/1/{pair.name}.preset/{sample}"
+            got = _cstr(pair.project.image, pair.track_start + SAMPLER_SAMPLE_PATH_OFFSET, SAMPLER_SAMPLE_PATH_MAX)
+            if got != expected:
+                mismatches["sampler sample path"].append(
+                    f"`{pair.name}`: expected `{expected}`, got `{got}`"
+                )
+        for path, offset in SAMPLER_U32_FIELDS.items():
+            expected = _lookup(pair.patch, path)
+            if isinstance(expected, int):
+                got = _u32(pair.project.image, pair.track_start + offset)
+                if got != expected:
+                    mismatches[path].append(f"`{pair.name}`: expected `{expected}`, got `{got}`")
+
+
+def _lookup(data: dict[str, Any], dotted_path: str) -> Any:
+    if dotted_path in data:
+        return data[dotted_path]
+    parts = dotted_path.split(".")
+    return _lookup_parts(data, parts)
+
+
+def _lookup_parts(current: Any, parts: list[str]) -> Any:
+    if not parts:
+        return current
+    remainder = ".".join(parts)
+    if isinstance(current, dict):
+        if remainder in current:
+            return current[remainder]
+        head, *tail = parts
+        if head not in current:
+            return None
+        return _lookup_parts(current[head], tail)
+    if isinstance(current, list):
+        head, *tail = parts
+        if not head.isdigit():
+            return None
+        index = int(head)
+        if index >= len(current):
+            return None
+        return _lookup_parts(current[index], tail)
+    return None
+
+
+def _u32(image: bytearray, offset: int) -> int:
+    return int.from_bytes(image[offset : offset + 4], "little")
+
+
+def _q16(image: bytearray, offset: int) -> int:
+    return _u32(image, offset) >> 16
+
+
+def _cstr(image: bytearray, offset: int, max_len: int) -> str:
+    return bytes(image[offset : offset + max_len]).split(b"\x00", 1)[0].decode("utf-8", "replace")
+
+
+def _counter_table(counter: Counter[str], columns: tuple[str, str]) -> str:
+    lines = [f"| {columns[0]} | {columns[1]} |", "| --- | ---: |"]
+    lines.extend(f"| `{key}` | {value} |" for key, value in counter.most_common())
+    return "\n".join(lines)
+
+
+def _coverage_table() -> str:
+    lines = ["| Field | Status | Notes |", "| --- | --- | --- |"]
+    lines.extend(f"| `{field}` | {status} | {notes} |" for field, status, notes in FIELD_COVERAGE)
+    return "\n".join(lines)
+
+
+if __name__ == "__main__":
+    main()
