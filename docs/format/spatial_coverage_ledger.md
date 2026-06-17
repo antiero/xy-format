@@ -75,7 +75,7 @@ Each baseline track/pattern struct is `0x45D4` bytes before note-vector growth.
 | `+0x38D7..+0x38E6` | 16 | decoded | Filter envelope ADSR. |
 | `+0x38E7..+0x38FF` | 25 | partial | `track.post_filter_env_gap`: last two 4-byte lanes are mixer current values: `+0x38F7` pan and `+0x38FB` volume. Earlier bytes remain opaque. |
 | `+0x38FF..+0x393B` | 61 | partial | Mod routing matrix. Velocity sensitivity and track high-pass are known; exact row/field names and signed amount encoding still need completion. |
-| `+0x393C..+0x3956` | 27 | partial | `track.pre_sample_gap`: tonal sampler project-local sample/window block is pinned at `+0x393F..+0x3953` from the 2026-06-15 sampler captures: framecount, sample/window start, sample/window end, loop start, loop end, plus one unresolved helper at `+0x3953`. |
+| `+0x393C..+0x3956` | 27 | partial | `track.pre_sample_gap`: tonal sampler project-local sample/window block is pinned at `+0x393F..+0x3956` from the 2026-06-15 sampler captures: framecount, sample/window start, sample/window end, loop start, loop end, and loop-crossfade raw u32 at `+0x3953` whose high byte is the coarse UI value at `+0x3956`. |
 | `+0x3957..+0x453E` | 3,048 | partial | Non-overlapping sample/region table bytes before the preset label. Slot paths and several drum sampler params are decoded; tonal sampler and multisampler semantics are still incomplete. |
 | `+0x453F..+0x456E` | 48 | decoded | Preset path string / label. |
 | `+0x456F..+0x456F` | 1 | decoded | Note count byte. |

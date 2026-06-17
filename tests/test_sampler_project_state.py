@@ -7,7 +7,10 @@ import wave
 from pathlib import Path
 
 from xy.image_writer import ImageProject
-from xy.sampler_sample_inspection import read_sampler_sample_edit
+from xy.sampler_sample_inspection import (
+    decode_sampler_loop_crossfade_frames,
+    read_sampler_sample_edit,
+)
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -168,3 +171,10 @@ def test_unique_sampler_preset_alignment_maps_project_sound_state() -> None:
     assert _u32(project, 7, 0x394B) == region["loop.start"]
     assert _u32(project, 7, 0x394F) == region["loop.end"]
     assert _u32(project, 7, 0x3953) == 0x02A73100
+
+    inspected = read_sampler_sample_edit(project, track=7)
+    assert inspected.loop_crossfade_raw == 0x02A73100
+    assert decode_sampler_loop_crossfade_frames(
+        inspected.loop_crossfade_raw,
+        region["framecount"],
+    ) == region["loop.crossfade"]

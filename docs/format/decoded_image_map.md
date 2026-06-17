@@ -264,7 +264,7 @@ string starts at `+0x395F`.
 Tonal sampler project-local window values are stored just before that table,
 inside `track+0x393F..+0x3956`. The 2026-06-15 unique preset capture confirms
 these values are copied from preset `regions[0]` when a sampler preset is
-loaded, except `+0x3953`, which remains derived/unknown:
+loaded:
 
 | track offset | captured meaning |
 |---|---|
@@ -273,12 +273,32 @@ loaded, except `+0x3953`, which remains derived/unknown:
 | +0x3947 | sample/window end |
 | +0x394B | loop start |
 | +0x394F | loop end |
-| +0x3953 | unresolved helper/derived value |
+| +0x3953 | loop crossfade raw u32; preset `loop.crossfade` frames normalized by `framecount` to a q31-like word |
 
 Do not use tonal sampler `patch.json engine.params` as sample-window state:
 the unique capture intentionally set non-default `engine.params`, but
 `track+0x3857..+0x3876` remained centered defaults. Generated projects should
 author the pre-slot window block directly.
+
+Exact `patch.json` preset-load lane map from
+`src/sampler-project-state/2026-06-15/smp07_t7_unique_sampler_preset_loaded.xy`:
+
+| track offsets | patch.json source |
+|---|---|
+| `+0x3877..+0x3883` | `envelope.amp.attack/decay/sustain/release` |
+| `+0x388B` | `engine.portamento.amount` |
+| `+0x388F` | `engine.bendrange` |
+| `+0x3893` | `engine.volume` |
+| `+0x3897..+0x38B3` | `fx.params[0..7]`, except lane 5 (`+0x38AB`) became `0x7FFFFFFF` in the active ladder capture rather than `fx.params[5]` |
+| `+0x38B7..+0x38D3` | `lfo.params[0..7]` |
+| `+0x38D7..+0x38E3` | `envelope.filter.attack/decay/sustain/release` |
+| `+0x38FF..+0x3913` | modwheel, aftertouch, pitchbend target/amount pairs |
+| `+0x3917` | `engine.velocity.sensitivity` |
+| `+0x391B` | `engine.portamento.type` |
+| `+0x3923` | `engine.width` |
+| `+0x392F` | `engine.highpass` |
+| `+0x3933..+0x3937` | velocity modulation target/amount |
+| `+0x393F..+0x3953` | region frame/window/crossfade values |
 
 Preset name field follows the table. (The "amb kit" sampler corpus referenced
 in older notes is not present in the repo; slot internals can be mapped from
@@ -330,7 +350,8 @@ Sampler are **not** at drum `slot+0x68`/`+0x70`; they precede the table:
 | `+0x3947` | sample end u32 LE | `g4`; 2026-06-15 project-state captures exceed 16-bit |
 | `+0x394B` | loop start u32 LE | `g5`; 2026-06-15 project-state captures exceed 16-bit |
 | `+0x394F` | loop end u32 LE | `g6`; 2026-06-15 project-state captures exceed 16-bit |
-| `+0x3956` | loop crossfade u8 | `g11` (`96` ≈ 75% UI) |
+| `+0x3953` | loop crossfade raw u32 | `g11` = `0x60000000` (`96` high byte ≈ 75% UI); `t7-map-unique` preset `loop.crossfade=2048`, `framecount=98807` → `0x02A73100` |
+| `+0x3956` | loop crossfade high byte | legacy/coarse UI view of `+0x3953` |
 | `+0x3957` | tune u8 | `0x3C` + aux=`N×10` (≥0); `0x3D` + aux=`100−N×10` (<0); `g-tune-*` |
 | `+0x395B` | tune aux u8 | paired with `+0x3957`; see tune table in P2-B log |
 | `+0x395A` | loop type u8 | `0x80` infinite · `0x40` off · `0x00` until-release |

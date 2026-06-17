@@ -40,7 +40,7 @@ pre-sample gap immediately before the nominal 24 x 128-byte sample table:
 | `+0x3947` | `98807` (`0x181F7`) | sample/window end |
 | `+0x394B` | `19761` (`0x04D31`) | loop start |
 | `+0x394F` | `79045` (`0x134C5`) | loop end |
-| `+0x3953` | `9880` (`0x2698`) when loaded from `/samples/user`; `0` after preset save/load | unknown, possibly derived preview/crossfade/default window helper |
+| `+0x3953` | `9880` (`0x2698`) when loaded from `/samples/user`; `0` after preset save/load | sampler loop-crossfade raw u32; direct sample-load default still needs a separate explanation |
 
 The 8-byte slot header begins at `+0x3957`, followed by the sample path at
 `+0x395F`.
@@ -88,6 +88,7 @@ loaded:
 | velocity sensitivity, portamento type, width, highpass | `+0x3917..+0x392F` | q16 |
 | velocity target/amount | `+0x3933..+0x3937` | q16 |
 | sampler frame/window values | `+0x393F..+0x394F` | raw frame counts |
+| sampler loop crossfade | `+0x3953` | raw u32 normalized from `loop.crossfade / framecount`; `2048 / 98807` → `0x02A73100` |
 
 The same capture also proves a negative case: `patch.json engine.params`
 does **not** populate the tonal sampler's `+0x3857..+0x3876` M1 block. Those

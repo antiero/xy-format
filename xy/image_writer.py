@@ -984,6 +984,7 @@ class ImageProject:
     SAMPLER_SAMPLE_END = 0x3947
     SAMPLER_LOOP_START = 0x394B
     SAMPLER_LOOP_END = 0x394F
+    SAMPLER_LOOP_CROSSFADE_RAW = 0x3953
     SAMPLER_LOOP_CROSSFADE = 0x3956
     SAMPLER_SLOT_TUNE = 0x00
     SAMPLER_SLOT_LOOP_TYPE = 0x03
@@ -1106,6 +1107,7 @@ class ImageProject:
         loop_start: int | None = None,
         loop_end: int | None = None,
         loop_crossfade: int | None = None,
+        loop_crossfade_raw: int | None = None,
         tune_tenths: int | None = None,
         loop_type: int | None = None,
         gain: int | None = None,
@@ -1141,10 +1143,12 @@ class ImageProject:
             write_u32(self.SAMPLER_LOOP_START, loop_start)
         if loop_end is not None:
             write_u32(self.SAMPLER_LOOP_END, loop_end)
-        if loop_crossfade is not None:
+        if loop_crossfade_raw is not None:
+            write_u32(self.SAMPLER_LOOP_CROSSFADE_RAW, loop_crossfade_raw)
+        elif loop_crossfade is not None:
             if not 0 <= loop_crossfade <= 0xFF:
                 raise ValueError("sampler loop crossfade must be u8")
-            self.image[s + self.SAMPLER_LOOP_CROSSFADE] = loop_crossfade
+            write_u32(self.SAMPLER_LOOP_CROSSFADE_RAW, loop_crossfade << 24)
 
         slot = s + self.DRUM_TABLE
         if path is not None:

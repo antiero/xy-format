@@ -88,7 +88,7 @@ first region. Multi-zone behavior is intentionally not claimed here.
 | `framecount` | Used as sampler sample end u32 only when `sample.end` is absent. |
 | `loop.start` | Written as sampler loop start u32. |
 | `loop.end` | Written as sampler loop end u32. |
-| `loop.crossfade` | Written as sampler loop crossfade byte. |
+| `loop.crossfade` | Written as sampler loop crossfade frames, normalized against `framecount` into the raw u32 at track `+0x3953`; if `framecount` is absent, `sample.end` is used as a fallback denominator. |
 | `loop.enabled` | `false` writes loop type `off`; otherwise loop type defaults to `infinite` unless `loop.onrelease` is true. |
 | `loop.onrelease` | `true` writes loop type `until_release`. |
 | `tune` | Written as sampler tune tenths. |

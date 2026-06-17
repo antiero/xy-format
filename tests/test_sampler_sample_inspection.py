@@ -4,6 +4,8 @@ import pytest
 
 from xy.rle import decode_project
 from xy.sampler_sample_inspection import (
+    decode_sampler_loop_crossfade_frames,
+    encode_sampler_loop_crossfade_frames,
     LOOP_TYPE_INFINITE,
     LOOP_TYPE_OFF,
     LOOP_TYPE_UNTIL_RELEASE,
@@ -45,6 +47,7 @@ def test_baseline_sampler_fields() -> None:
     assert sample.sample_end == 0x17DF4
     assert sample.loop_start == 0x16EC5
     assert sample.loop_end == 0x17DF4
+    assert sample.loop_crossfade_raw == 0
     assert sample.loop_crossfade == 0
     assert sample.tune_byte == 0x3C
     assert sample.tune_aux_byte == 0
@@ -216,8 +219,16 @@ def test_sampler_sample_edit_writer_roundtrips_through_reader() -> None:
     assert sample.sample_end == 0x176B1
     assert sample.loop_start == 0x14D1A
     assert sample.loop_end == 0x178AC
+    assert sample.loop_crossfade_raw == 0x60000000
     assert sample.loop_crossfade == 96
+    assert sample.loop_crossfade_percent == 75
     assert sample.tune_tenths == -5
     assert sample.loop_type_byte == LOOP_TYPE_OFF
     assert sample.gain == 0x7F
     assert sample.direction == 1
+
+
+def test_sampler_loop_crossfade_frame_encoder_matches_unique_preset_capture() -> None:
+    raw = encode_sampler_loop_crossfade_frames(2048, 98807)
+    assert raw == 0x02A73100
+    assert decode_sampler_loop_crossfade_frames(raw, 98807) == 2048

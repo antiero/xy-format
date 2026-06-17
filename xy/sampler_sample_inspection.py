@@ -25,6 +25,7 @@ TRACK_SAMPLE_START_U32 = 0x3943
 TRACK_SAMPLE_END_U32 = 0x3947
 TRACK_LOOP_START_U32 = 0x394B
 TRACK_LOOP_END_U32 = 0x394F
+TRACK_LOOP_CROSSFADE_U32 = 0x3953
 TRACK_LOOP_CROSSFADE_U8 = 0x3956
 
 # Compatibility aliases for older callers/tests.
@@ -69,6 +70,7 @@ class SamplerSampleEdit:
     sample_end: int
     loop_start: int
     loop_end: int
+    loop_crossfade_raw: int
     loop_crossfade: int
     tune_byte: int
     tune_aux_byte: int
@@ -88,8 +90,8 @@ class SamplerSampleEdit:
 
     @property
     def loop_crossfade_percent(self) -> int:
-        """Approximate UI percent; 96 stored ≈ 75% on device (×100/128)."""
-        return round(self.loop_crossfade * 100 / 128)
+        """Approximate UI percent from the normalized raw crossfade word."""
+        return round(self.loop_crossfade_raw * 100 / 0x80000000)
 
     @property
     def direction_label(self) -> str:
@@ -113,6 +115,32 @@ class ProjectSamplerSamples:
 
 def _u32_le(img: bytes, offset: int) -> int:
     return int.from_bytes(img[offset : offset + 4], "little")
+
+
+def encode_sampler_loop_crossfade_frames(crossfade_frames: int, frame_count: int) -> int:
+    """Encode patch.json sampler loop-crossfade frames to the project raw u32.
+
+    Preset-load capture ``t7-map-unique`` stores ``loop.crossfade=2048`` for a
+    98,807-frame sample as ``0x02A73100`` at ``track+0x3953``. That matches a
+    ceiling-normalized fraction of the full sample length.
+    """
+    if crossfade_frames < 0:
+        raise ValueError("sampler loop crossfade frames must be non-negative")
+    if frame_count <= 0:
+        raise ValueError("sampler frame count must be positive")
+    if crossfade_frames == 0:
+        return 0
+    raw = (crossfade_frames * 0x80000000 + frame_count - 1) // frame_count
+    return min(raw, 0x7FFFFFFF)
+
+
+def decode_sampler_loop_crossfade_frames(raw: int, frame_count: int) -> int:
+    """Decode a normalized sampler loop-crossfade raw word to frame count."""
+    if not 0 <= raw <= 0xFFFFFFFF:
+        raise ValueError("sampler loop crossfade raw value must be u32")
+    if frame_count <= 0:
+        raise ValueError("sampler frame count must be positive")
+    return round(raw * frame_count / 0x80000000)
 
 
 def decode_sampler_tune_tenths(tune_byte: int, tune_aux_byte: int) -> int:
@@ -178,6 +206,7 @@ def read_sampler_sample_edit(project: ImageProject, track: int = 1) -> SamplerSa
         sample_end=_u32_le(img, base + TRACK_SAMPLE_END_U32),
         loop_start=_u32_le(img, base + TRACK_LOOP_START_U32),
         loop_end=_u32_le(img, base + TRACK_LOOP_END_U32),
+        loop_crossfade_raw=_u32_le(img, base + TRACK_LOOP_CROSSFADE_U32),
         loop_crossfade=img[base + TRACK_LOOP_CROSSFADE_U8],
         tune_byte=slot[SLOT_TUNE],
         tune_aux_byte=slot[SLOT_TUNE_AUX],
