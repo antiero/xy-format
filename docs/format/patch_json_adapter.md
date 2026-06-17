@@ -72,7 +72,7 @@ general region-placement algorithm.
 | `tune` | Written as drum tune only when `transpose` is absent. |
 | `pan` | Written as signed drum pan byte. |
 | `sample.start` | Written as drum sample start. |
-| `sample.end` | Written as drum sample end for the selected voice. Corpus analysis shows device-loaded clean kits store voices 1-23 at the previous slot's `+0x70`; writer support still uses the direct voice field. |
+| `sample.end` | Written as drum sample end for the selected voice. Corpus analysis shows device-loaded clean kits use the pre-table header for voice 0 and previous slot `+0x68/+0x70` for voices 1-23; writer support still uses the direct voice edit field. |
 | `framecount` | Used as drum sample end only when `sample.end` is absent; same caveat as `sample.end`. |
 | `gain` | Written as drum gain. |
 | `fade.out` | Written through the confirmed drum fade storage rule. |

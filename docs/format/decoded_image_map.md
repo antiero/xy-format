@@ -319,6 +319,12 @@ start/loop_start/end/gain (validated: tune reproduces the capture byte-exact).
 Read API: `xy/drum_sample_inspection.py` (`DrumVoiceSample`,
 `inspect_drum_samples`).
 
+Preset-loaded clean 24-region drum kits use a shifted sample-window layout:
+voice 0 `framecount`/start/end/loop words live in the pre-table header
+`track+0x393F/+0x3943/+0x3947/+0x394B/+0x394F`, while voices 1-23 duplicate
+their `sample.end`/`framecount` values into the previous slot at both `+0x68`
+and `+0x70`. This is distinct from the direct edit-field writer/read API above.
+
 ### One-shot Sampler (`0x02`) — sample-edit header (P2-B)
 
 Voice-0 path still @ `track+0x3957`, slot `+0x08`. **Start/end/loop** for

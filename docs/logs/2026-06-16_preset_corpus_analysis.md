@@ -108,7 +108,8 @@ all 139 paired captures match the `lfo.type`, `lfo.active`, `fx.type`, and
 | sampler `regions[0].sample.start`, `reverse`, `gain` | confirmed-for-observed-values | `sample.start` maps to the u32 word when present; `reverse=false` maps to direction byte `0`; observed `gain` values map directly to byte `track+0x395C`. |
 | sampler `regions[0].loop.onrelease`, `tune` | unresolved | `loop.onrelease=true` does not match the previous loop-type assumption in this corpus. `tune` is always zero; slot `+0x00` is keycenter/root instead. |
 | drum `regions[].sample`, `hikey`, `reverse`, `pan`, `transpose`, `tune`, `playmode` | partial | Ten clean 24-region kits align with `track+0x3957 + (hikey - 53) * 0x80`; current paired captures only show `oneshot` as byte `1`. |
-| drum `regions[].sample.end`, `framecount`, `fade.*` | candidate | For most full kits, `sample.end` for voice N is stored at previous slot `+0x70`, similar to fade storage. Voice 0 and suspect kit alignments remain unresolved. |
+| drum `regions[].sample.end`, `framecount` | confirmed-for-clean-full-kits | Ten clean 24-region kits store voice 0 in the pre-table header (`+0x393F/+0x3947`) and voices 1-23 in the previous slot's `+0x68/+0x70`. Sparse/rotated kits remain unresolved. |
+| drum `regions[].fade.*` | constant-in-corpus | `fade.in` and `fade.out` are zero in every current drum preset, so this corpus cannot independently map them. |
 | `regions[].lokey`, `regions[].pitch.keycenter` | ignored-or-unresolved | Often redundant with `hikey`/default keycenter, but no independent project field is confirmed. |
 
 ## Exceptions
@@ -145,14 +146,16 @@ Drum kit alignment:
 - Ten clean 24-region kits align path, key assignment, transpose/tune center,
   pan, reverse/direction, and `patch.json` `oneshot` play mode byte `1` at
   `track+0x3957 + (hikey - 53) * 0x80`.
-- In those clean kits, `sample.end` / `framecount` for voices 1-23 is found at
-  the previous slot's `+0x70`, matching the earlier fade-style shifted storage
-  pattern. Voice 0 is still unresolved: slot 23's tail does not contain a
-  simple wraparound copy.
+- In those clean kits, voice 0 `framecount`, `sample.start`, `sample.end`,
+  `loop.start`, and `loop.end` use the pre-table header at
+  `track+0x393F/+0x3943/+0x3947/+0x394B/+0x394F` (`loop.end` is
+  `0xFFFFFFFF` in the current full-kit captures).
+- Voices 1-23 store `sample.end` / `framecount` in the previous slot at both
+  `+0x68` and `+0x70`, matching the earlier shifted-storage pattern.
 - This means the generic direct drum voice writer is not yet a faithful
   preset-load serializer for drum `sample.end` / `framecount`. It remains useful
   for direct edit-field authoring, but patch.json drum preset loading needs a
-  separate shifted-storage path once voice 0 is understood.
+  separate shifted-storage path.
 
 Drum kit caveats:
 

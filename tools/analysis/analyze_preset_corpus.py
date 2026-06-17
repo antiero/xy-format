@@ -86,6 +86,10 @@ SAMPLER_SLOT_ROOT_KEY_OFFSET = 0x3957
 SAMPLER_SLOT_GAIN_OFFSET = 0x395C
 SAMPLER_SLOT_DIRECTION_OFFSET = 0x395E
 TRACK1_OCTAVE_OFFSET = 0x003D
+DRUM_TABLE_OFFSET = 0x3957
+DRUM_SLOT_SIZE = 0x80
+DRUM_MIDI_START = 53
+DRUM_SUSPECT_KITS = {"nt-cherry", "nt-hard spunch"}
 
 PLAYMODE_WORDS = {
     "poly": 0x15555555,
@@ -141,7 +145,8 @@ FIELD_COVERAGE = [
     ("regions[0].reverse/gain (sampler)", "confirmed-for-observed-values", "`reverse=false` maps to `track+0x395E == 0`; observed `gain` values map directly to byte `track+0x395C`."),
     ("regions[0].loop.onrelease/tune (sampler)", "unresolved", "`loop.onrelease=true` does not map to the current loop-type byte assumption in this corpus. `tune` is always zero, while slot `+0x00` is keycenter/root."),
     ("regions[].sample/hikey/reverse/pan/transpose/tune/playmode (drum)", "partial", "Ten clean 24-region kits align with `track+0x3957 + (hikey - 53) * 0x80`; current paired captures only show `oneshot` as byte `1`."),
-    ("regions[].sample.end/framecount/fade.* (drum)", "candidate", "Ten clean 24-region kits store `sample.end`/`framecount` for voices 1-23 at the previous slot's `+0x70`. Voice 0 and suspect kit alignments remain unresolved."),
+    ("regions[].sample.end/framecount (drum)", "confirmed-for-clean-full-kits", "Ten clean 24-region kits store voice 0 in the pre-table header (`+0x393F/+0x3947`) and voices 1-23 in the previous slot's `+0x68/+0x70`. Sparse/rotated kits remain unresolved."),
+    ("regions[].fade.* (drum)", "constant-in-corpus", "`fade.in` and `fade.out` are zero in every current drum preset, so this corpus cannot independently map them."),
     ("regions[].lokey/pitch.keycenter", "ignored-or-unresolved", "Often redundant with `hikey`/default keycenter, but no independent project field is confirmed."),
 ]
 
@@ -207,6 +212,7 @@ def analyze(corpus: Path) -> str:
     _check_array_q16(pairs, "fx.params", FX_PARAM_OFFSETS, mismatches)
     _check_array_q16(pairs, "lfo.params", LFO_PARAM_OFFSETS, mismatches)
     _check_sampler_fields(pairs, mismatches)
+    _check_clean_drum_fields(pairs, mismatches)
 
     sections.extend(
         [
@@ -225,7 +231,8 @@ def analyze(corpus: Path) -> str:
             "- `envelope.amp.*`, `envelope.filter.*`, most `engine.*` lanes, most `fx.params[0..7]`, and `lfo.params[0..7]` map as the high 16 bits of 4-byte words in the known sound-state block.",
             "- Sampler project sample windows store full u32 values at `track+0x393F..0x394F`, not u16 values.",
             "- Sampler `loop.crossfade` stores a normalized byte: `floor(loop.crossfade * 128 / framecount)` at `track+0x3956`.",
-            "- Ten clean drum-kit captures map path/key/tune/pan/reverse/playmode by `hikey - 53`; their voice 1-23 `sample.end` values appear at previous slot `+0x70`.",
+            "- Ten clean drum-kit captures map path/key/tune/pan/reverse/playmode by `hikey - 53`.",
+            "- In those clean drum kits, voice 0 sample window values use the pre-table header (`track+0x393F..0x394F`), while voice 1-23 `sample.end`/`framecount` values appear on the previous slot at both `+0x68` and `+0x70`.",
             "",
             "## Mismatches / Exceptions",
             "",
@@ -248,7 +255,7 @@ def analyze(corpus: Path) -> str:
             "## Immediate Follow-Ups",
             "",
             "- Treat `nt-dx analog.xy` as suspect: it appears to contain the `nt-dx legend` sample path/window even though the matching `patch.json` is `nt-dx analog.preset`.",
-            "- Drum `sample.end`/`framecount` writing is not preset-load exact yet: clean loaded kits shift voices 1-23 to previous slot `+0x70`, while the generic drum voice writer still writes the direct edit field and voice 0 remains unresolved.",
+            "- Drum `sample.end`/`framecount` writing is not preset-load exact yet: clean loaded kits use the pre-table header for voice 0 and shift voices 1-23 to previous slot `+0x68/+0x70`, while the generic drum voice writer still writes the direct edit fields.",
             "- Use this script after adding more project captures; it is corpus-size independent and should scale to the planned 300+ files.",
         ]
     )
@@ -437,6 +444,116 @@ def _check_sampler_fields(pairs: list[Pair], mismatches: dict[str, list[str]]) -
             got = _s8(pair.project.image[pair.track_start + SAMPLER_SLOT_GAIN_OFFSET])
             if got != gain:
                 mismatches["regions.0.gain"].append(f"`{pair.name}`: expected `{gain}`, got `{got}`")
+
+
+def _check_clean_drum_fields(pairs: list[Pair], mismatches: dict[str, list[str]]) -> None:
+    for pair in pairs:
+        if pair.patch.get("type") != "drum" or pair.name in DRUM_SUSPECT_KITS:
+            continue
+        regions = pair.patch.get("regions")
+        if not isinstance(regions, list) or len(regions) != 24:
+            continue
+        for region in regions:
+            if not isinstance(region, dict):
+                continue
+            hikey = region.get("hikey")
+            if not isinstance(hikey, int):
+                continue
+            voice = hikey - DRUM_MIDI_START
+            if not 0 <= voice < 24:
+                continue
+            slot = pair.track_start + DRUM_TABLE_OFFSET + voice * DRUM_SLOT_SIZE
+            _check_drum_slot_metadata(pair, region, voice, slot, mismatches)
+            _check_drum_sample_window(pair, region, voice, slot, mismatches)
+
+
+def _check_drum_slot_metadata(
+    pair: Pair,
+    region: dict[str, Any],
+    voice: int,
+    slot: int,
+    mismatches: dict[str, list[str]],
+) -> None:
+    sample = region.get("sample")
+    if isinstance(sample, str):
+        expected_path = f"/fat32/presets/1/{pair.name}.preset/{sample}"
+        got_path = _cstr(pair.project.image, slot + 0x08, 72)
+        if got_path != expected_path:
+            mismatches["drum sample path"].append(
+                f"`{pair.name}` voice {voice}: expected `{expected_path}`, got `{got_path}`"
+            )
+    expected_key = region.get("hikey")
+    if isinstance(expected_key, int):
+        got_key = pair.project.image[slot + 0x02]
+        if got_key != expected_key:
+            mismatches["drum hikey"].append(
+                f"`{pair.name}` voice {voice}: expected `{expected_key}`, got `{got_key}`"
+            )
+    transpose = region.get("transpose")
+    if isinstance(transpose, int):
+        expected_tune = 0x3C + transpose
+        got_tune = pair.project.image[slot + 0x00]
+        if got_tune != expected_tune:
+            mismatches["drum transpose"].append(
+                f"`{pair.name}` voice {voice}: expected tune byte `{expected_tune}`, got `{got_tune}`"
+            )
+    pan = region.get("pan")
+    if isinstance(pan, int):
+        got_pan = _s8(pair.project.image[slot + 0x06])
+        if got_pan != pan:
+            mismatches["drum pan"].append(
+                f"`{pair.name}` voice {voice}: expected `{pan}`, got `{got_pan}`"
+            )
+    reverse = region.get("reverse")
+    if isinstance(reverse, bool):
+        expected_direction = 1 if reverse else 0
+        got_direction = pair.project.image[slot + 0x07]
+        if got_direction != expected_direction:
+            mismatches["drum reverse"].append(
+                f"`{pair.name}` voice {voice}: expected `{expected_direction}`, got `{got_direction}`"
+            )
+    playmode = region.get("playmode")
+    if playmode == "oneshot":
+        got_playmode = pair.project.image[slot + 0x03]
+        if got_playmode != 1:
+            mismatches["drum playmode"].append(
+                f"`{pair.name}` voice {voice}: expected oneshot byte `1`, got `{got_playmode}`"
+            )
+
+
+def _check_drum_sample_window(
+    pair: Pair,
+    region: dict[str, Any],
+    voice: int,
+    slot: int,
+    mismatches: dict[str, list[str]],
+) -> None:
+    sample_end = region.get("sample.end")
+    framecount = region.get("framecount")
+    if not isinstance(sample_end, int) or not isinstance(framecount, int):
+        return
+    if voice == 0:
+        for key, offset, expected in (
+            ("drum voice0 framecount", 0x393F, framecount),
+            ("drum voice0 sample.start", 0x3943, region.get("sample.start", 0)),
+            ("drum voice0 sample.end", 0x3947, sample_end),
+            ("drum voice0 loop.start", 0x394B, 0),
+            ("drum voice0 loop.end", 0x394F, 0xFFFFFFFF),
+        ):
+            got = _u32(pair.project.image, pair.track_start + offset)
+            if got != expected:
+                mismatches[key].append(
+                    f"`{pair.name}` voice 0: expected `{expected}` at `+0x{offset:04X}`, got `{got}`"
+                )
+        return
+
+    prev_slot = pair.track_start + DRUM_TABLE_OFFSET + (voice - 1) * DRUM_SLOT_SIZE
+    for offset in (0x68, 0x70):
+        got = _u32(pair.project.image, prev_slot + offset)
+        if got != sample_end:
+            mismatches[f"drum shifted sample.end +0x{offset:02X}"].append(
+                f"`{pair.name}` voice {voice}: expected `{sample_end}` at previous slot `+0x{offset:02X}`, got `{got}`"
+            )
 
 
 def _lookup(data: dict[str, Any], dotted_path: str) -> Any:
