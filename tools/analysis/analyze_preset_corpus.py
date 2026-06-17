@@ -150,6 +150,67 @@ FIELD_COVERAGE = [
     ("regions[].lokey/pitch.keycenter", "ignored-or-unresolved", "Often redundant with `hikey`/default keycenter, but no independent project field is confirmed."),
 ]
 
+FIELD_INVENTORY_STATUS = {
+    "platform": "metadata",
+    "version": "metadata",
+    "type": "confirmed",
+    "octave": "confirmed-for-track-1",
+    "engine.params[]": "confirmed",
+    "engine.playmode": "confirmed",
+    "engine.portamento.amount": "confirmed",
+    "engine.bendrange": "confirmed",
+    "engine.volume": "confirmed",
+    "engine.tuning.scale": "confirmed",
+    "engine.width": "confirmed",
+    "engine.transpose": "candidate",
+    "engine.tuning.root": "confirmed",
+    "engine.highpass": "confirmed",
+    "engine.velocity.sensitivity": "confirmed",
+    "engine.portamento.type": "confirmed",
+    "engine.modulation.modwheel.target": "confirmed",
+    "engine.modulation.modwheel.amount": "confirmed",
+    "engine.modulation.aftertouch.target": "confirmed",
+    "engine.modulation.aftertouch.amount": "confirmed",
+    "engine.modulation.pitchbend.target": "confirmed",
+    "engine.modulation.pitchbend.amount": "confirmed",
+    "engine.modulation.velocity.target": "confirmed",
+    "engine.modulation.velocity.amount": "confirmed",
+    "engine.tuning[]": "unresolved",
+    "envelope.amp.attack": "confirmed",
+    "envelope.amp.decay": "confirmed",
+    "envelope.amp.sustain": "confirmed",
+    "envelope.amp.release": "confirmed",
+    "envelope.filter.attack": "confirmed",
+    "envelope.filter.decay": "confirmed",
+    "envelope.filter.sustain": "confirmed",
+    "envelope.filter.release": "confirmed",
+    "fx.type": "confirmed",
+    "fx.active": "confirmed",
+    "fx.params[]": "confirmed-with-exception",
+    "lfo.type": "confirmed",
+    "lfo.active": "confirmed",
+    "lfo.params[]": "confirmed",
+    "regions[].sample": "confirmed/partial",
+    "regions[].hikey": "confirmed/partial",
+    "regions[].pitch.keycenter": "confirmed/ignored",
+    "regions[].framecount": "confirmed/partial",
+    "regions[].sample.end": "confirmed/partial",
+    "regions[].sample.start": "partial",
+    "regions[].loop.start": "confirmed",
+    "regions[].loop.end": "confirmed",
+    "regions[].loop.crossfade": "confirmed",
+    "regions[].gain": "confirmed-for-observed-values",
+    "regions[].reverse": "constant-in-corpus",
+    "regions[].lokey": "constant/ignored",
+    "regions[].tune": "constant-in-corpus",
+    "regions[].loop.onrelease": "constant-in-corpus",
+    "regions[].fade.in": "constant-in-corpus",
+    "regions[].fade.out": "constant-in-corpus",
+    "regions[].pan": "constant-in-corpus",
+    "regions[].playmode": "constant-in-corpus",
+    "regions[].transpose": "constant-in-corpus",
+}
+
 
 @dataclass(frozen=True)
 class Pair:
@@ -180,6 +241,7 @@ def analyze(corpus: Path) -> str:
         for path in preset_dirs.values()
         if (path / "patch.json").exists()
     )
+    inventory = _field_inventory(preset_dirs, set(project_paths))
 
     sections = [
         "# Preset Corpus Analysis",
@@ -220,6 +282,10 @@ def analyze(corpus: Path) -> str:
             "## Field Coverage",
             "",
             _coverage_table(),
+            "",
+            "## Patch Field Inventory",
+            "",
+            _field_inventory_table(inventory),
             "",
             "## Confirmed Direct Mappings",
             "",
@@ -280,6 +346,50 @@ def _read_patch(path: Path) -> dict[str, Any]:
     if not isinstance(data, dict):
         raise ValueError(f"{path} root must be an object")
     return data
+
+
+def _field_inventory(
+    preset_dirs: dict[str, Path],
+    project_names: set[str],
+) -> dict[str, dict[str, Any]]:
+    inventory: dict[str, dict[str, Any]] = {}
+    for name, preset_dir in preset_dirs.items():
+        patch_path = preset_dir / "patch.json"
+        if not patch_path.exists():
+            continue
+        patch = _read_patch(patch_path)
+        paired = name in project_names
+        for path, value in _iter_leaf_fields(patch):
+            item = inventory.setdefault(
+                path,
+                {
+                    "all": 0,
+                    "paired": 0,
+                    "values": Counter(),
+                    "paired_values": Counter(),
+                },
+            )
+            item["all"] += 1
+            item["values"][repr(value)] += 1
+            if paired:
+                item["paired"] += 1
+                item["paired_values"][repr(value)] += 1
+    return inventory
+
+
+def _iter_leaf_fields(value: Any, path: str = "") -> list[tuple[str, Any]]:
+    if isinstance(value, dict):
+        fields: list[tuple[str, Any]] = []
+        for key, child in value.items():
+            child_path = f"{path}.{key}" if path else key
+            fields.extend(_iter_leaf_fields(child, child_path))
+        return fields
+    if isinstance(value, list):
+        fields = []
+        for child in value:
+            fields.extend(_iter_leaf_fields(child, f"{path}[]"))
+        return fields
+    return [(path, value)]
 
 
 def _check_engine_ids(pairs: list[Pair], mismatches: dict[str, list[str]]) -> None:
@@ -617,6 +727,31 @@ def _counter_table(counter: Counter[str], columns: tuple[str, str]) -> str:
 def _coverage_table() -> str:
     lines = ["| Field | Status | Notes |", "| --- | --- | --- |"]
     lines.extend(f"| `{field}` | {status} | {notes} |" for field, status, notes in FIELD_COVERAGE)
+    return "\n".join(lines)
+
+
+def _field_inventory_table(inventory: dict[str, dict[str, Any]]) -> str:
+    lines = [
+        "| Field | Status | All Values | Unique | Paired Values | Paired Unique |",
+        "| --- | --- | ---: | ---: | ---: | ---: |",
+    ]
+    for path in sorted(inventory):
+        item = inventory[path]
+        status = FIELD_INVENTORY_STATUS.get(path, "unclassified")
+        lines.append(
+            f"| `{path}` | {status} | {item['all']} | {len(item['values'])} | "
+            f"{item['paired']} | {len(item['paired_values'])} |"
+        )
+    unknown = sorted(path for path in inventory if path not in FIELD_INVENTORY_STATUS)
+    if unknown:
+        lines.extend(
+            [
+                "",
+                "Unclassified field paths:",
+                "",
+                *(f"- `{path}`" for path in unknown),
+            ]
+        )
     return "\n".join(lines)
 
 

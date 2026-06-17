@@ -183,3 +183,9 @@ Drum kit caveats:
 `tools/analysis/analyze_preset_corpus.py` generates a Markdown report from the
 current corpus and should be rerun after adding new project captures. It flags
 missing pairs, mapping mismatches, and likely bad fixture pairings.
+
+The generated report also includes a complete patch-field inventory: every
+leaf `patch.json` path is counted across all presets and paired projects, with
+unique-value counts and a coverage status. This is the guard against new
+fields silently entering the corpus without being mapped, classified as
+metadata, or marked as under-constrained.
