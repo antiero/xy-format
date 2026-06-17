@@ -13,6 +13,7 @@ positions/counts; the original P2-B probes only changed the low two bytes.
 from __future__ import annotations
 
 from dataclasses import dataclass
+import struct
 from typing import Literal
 
 from .image_writer import ImageProject
@@ -124,9 +125,10 @@ def _u32_le(img: bytes, offset: int) -> int:
 def encode_sampler_loop_crossfade_frames(crossfade_frames: int, frame_count: int) -> int:
     """Encode patch.json sampler loop-crossfade frames to the project raw u32.
 
-    Preset-load capture ``t7-map-unique`` stores ``loop.crossfade=2048`` for a
-    98,807-frame sample as ``0x02A73100`` at ``track+0x3953``. That matches a
-    ceiling-normalized fraction of the full sample length.
+    Device preset loads use single-precision float normalization against the
+    full sample length, then truncate to u32 storage. The 2026-06 patch.json
+    field experiment validates this across 0, tiny, quarter-ish, and max
+    values for a 98,807-frame probe sample.
     """
     if crossfade_frames < 0:
         raise ValueError("sampler loop crossfade frames must be non-negative")
@@ -134,7 +136,8 @@ def encode_sampler_loop_crossfade_frames(crossfade_frames: int, frame_count: int
         raise ValueError("sampler frame count must be positive")
     if crossfade_frames == 0:
         return 0
-    raw = (crossfade_frames * 0x80000000 + frame_count - 1) // frame_count
+    normalized = crossfade_frames * 0x80000000 / frame_count
+    raw = int(struct.unpack("f", struct.pack("f", normalized))[0])
     return min(raw, 0x7FFFFFFF)
 
 

@@ -1,6 +1,6 @@
 # 2026-06 patch.json field preset-load experiment
 
-Status: ready for device capture
+Status: captured and analyzed
 Firmware target: OP-XY 1.1.4
 
 ## Goal
@@ -23,7 +23,43 @@ The `.xy` files are baseline project copies. On device, open the matching
 project, load the matching preset onto track 1, save, then copy the saved
 project back over `presetprojs/<case>.xy`.
 
-## Current gaps
+## Analysis summary
+
+Run the analyzer with:
+
+```powershell
+python tools/analysis/analyze_patch_json_field_experiment.py
+```
+
+Captured projects are in `presetprojs/`. Three baseline-identical captures were
+removed because they did not contain useful preset-load evidence:
+
+- `sfld-gain64-revtrue-tune4.xy`
+- `slt-enabled-true-onrelease-false.xy`
+- `slt-enabled-true-onrelease-true.xy`
+
+`dpm-num-0.xy` is also excluded from conclusions because the saved preset label
+inside the project is `presets/dpm-num-2`, not `presets/dpm-num-0`.
+
+Confirmed findings:
+
+- Drum `regions[].playmode` string labels load as `gate=0`, `key=1`,
+  `oneshot=1`, `group=2`, `loop=3`.
+- Drum numeric `playmode` values `1..4` did not pass through as raw slot bytes;
+  they all loaded as byte `1`.
+- Sampler `loop.crossfade` uses single-precision float normalization:
+  `int(float32(loop.crossfade * 0x80000000 / framecount))`, clamped to
+  `0x7FFFFFFF`.
+- Sampler `pitch.keycenter` drives slot `+0x00`; `hikey` and `lokey` did not
+  drive that byte in conflict probes.
+- Sampler patch `tune` is cents and writes slot `+0x04` as a signed byte
+  (`4 -> +0.04`, `-5 -> -0.05`), distinct from the direct sample-edit tune UI
+  encoding.
+- Sampler patch `loop.enabled=false` sets bit `0x40`; `loop.onrelease=true`
+  sets bit `0x80`. These are patch-load bits, not direct sampler-edit labels.
+- Sampler `gain` and `reverse` write slot `+0x05` and `+0x07`.
+
+## Original gaps
 
 ### Drum region `playmode`
 
@@ -50,12 +86,12 @@ Cases:
 - `dpm-str-gate`
 - `dpm-num-0` through `dpm-num-4`
 
-What closes:
+Result:
 
-- The loaded project byte at track 1 drum slot `+0x03` will tell us which string
-  labels the firmware accepts, and which byte each accepted label stores.
-- Numeric cases show whether numeric JSON passes through, is rejected, or is
-  normalized by the device.
+- String labels are confirmed as above.
+- Numeric values are not preserved as raw project bytes by device preset
+  loading, so the patch.json adapter rejects them rather than presenting a
+  misleading raw passthrough.
 
 ### Sampler loop type
 
@@ -78,10 +114,12 @@ Cases:
 - `slt-missing-enabled`
 - `slt-missing-onrelease`
 
-What closes:
+Result:
 
-- The loaded sampler slot `+0x03` byte will confirm whether the patch adapter's
-  loop-type mapping matches device preset loading.
+- Device preset loading composes bits: `0x40` for `loop.enabled=false` and
+  `0x80` for `loop.onrelease=true`. Existing direct edit labels remain useful
+  for the sampler edit screen, but they should not be treated as patch.json
+  field names.
 
 ### Sampler loop crossfade
 
@@ -106,11 +144,11 @@ Cases:
 - `scf-98806`
 - `scf-98807`
 
-What closes:
+Result:
 
-- These cases test whether `loop.crossfade` is ceiling-normalized against
-  `framecount`, and what happens at zero, tiny values, near-end, and full
-  sample length.
+- Ceiling/floor integer math was wrong. The captured raw u32 values match a
+  single-precision float calculation followed by integer truncation and max
+  clamp.
 
 ### Sampler root/key fields
 
@@ -134,10 +172,10 @@ Cases:
 - `skey-conflict-h72-p48`
 - `skey-conflict-h48-p72`
 
-What closes:
+Result:
 
-- These cases tell us whether `hikey`, `pitch.keycenter`, both, or neither
-  drive the loaded sampler root/key byte.
+- `pitch.keycenter` drives the root/key byte. `hikey` and `lokey` did not affect
+  it in conflict probes.
 
 ### Sampler tune/gain/reverse
 
@@ -163,10 +201,11 @@ Cases:
 - `sfld-reverse-true`
 - `sfld-gain64-revtrue-tune4`
 
-What closes:
+Result:
 
-- The loaded sampler slot bytes should confirm whether the patch adapter can
-  safely write these fields through the existing direct-edit writer.
+- `gain` and `reverse` match the direct slot bytes.
+- Patch `tune` does not use the direct sample-edit tune-tenths encoder; it is
+  stored as signed cents at slot `+0x04`.
 
 ## Capture procedure
 

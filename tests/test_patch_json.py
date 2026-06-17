@@ -4,8 +4,6 @@ import pytest
 
 from xy import (
     apply_patch_json_file,
-    LOOP_TYPE_INFINITE,
-    LOOP_TYPE_OFF,
     PatchJsonSoundPatchOptions,
     apply_patch_json_sound,
     apply_patch_json_text,
@@ -97,8 +95,10 @@ def test_maps_sampler_patch_region_to_one_shot_sampler_patch_shape() -> None:
     assert patch.loop_end == 2345
     assert patch.loop_crossfade == 55
     assert patch.loop_crossfade_raw == encode_sampler_loop_crossfade_frames(55, 5000)
-    assert patch.tune_tenths == -5
-    assert patch.loop_type == LOOP_TYPE_INFINITE
+    assert patch.root_key is None
+    assert patch.tune_cents == -5
+    assert patch.tune_tenths is None
+    assert patch.loop_type == 0
     assert patch.gain == 99
     assert patch.direction == 0
 
@@ -108,7 +108,32 @@ def test_maps_disabled_sampler_loops_to_loop_off_storage() -> None:
         {"type": "sampler", "regions": [{"sample": "one.wav", "loop.enabled": False}]}
     )
 
-    assert patch.loop_type == LOOP_TYPE_OFF
+    assert patch.loop_type == 0x40
+
+
+def test_maps_sampler_patch_json_onrelease_to_loop_type_bit() -> None:
+    patch = sampler_patch_from_patch_json(
+        {"type": "sampler", "regions": [{"sample": "one.wav", "loop.onrelease": True}]}
+    )
+
+    assert patch.loop_type == 0x80
+
+
+def test_maps_sampler_patch_json_root_key_from_pitch_keycenter() -> None:
+    patch = sampler_patch_from_patch_json(
+        {
+            "type": "sampler",
+            "regions": [
+                {
+                    "sample": "one.wav",
+                    "hikey": 48,
+                    "pitch.keycenter": 72,
+                }
+            ],
+        }
+    )
+
+    assert patch.root_key == 72
 
 
 def test_sampler_patch_json_requires_frame_count_for_crossfade_frames() -> None:
@@ -198,10 +223,12 @@ def test_apply_sampler_patch_json_writes_readable_project_fields() -> None:
                     "reverse": True,
                     "gain": 88,
                     "tune": 4,
+                    "pitch.keycenter": 64,
                     "sample.start": 12,
                     "loop.start": 123,
                     "loop.end": 2345,
                     "loop.enabled": False,
+                    "loop.onrelease": True,
                     "loop.crossfade": 55,
                 }
             ],
@@ -220,8 +247,9 @@ def test_apply_sampler_patch_json_writes_readable_project_fields() -> None:
     assert sampler.loop_end == 2345
     assert sampler.loop_crossfade_raw == encode_sampler_loop_crossfade_frames(55, 4321)
     assert sampler.loop_crossfade == (sampler.loop_crossfade_raw >> 24)
-    assert sampler.tune_tenths == 4
-    assert sampler.loop_type_byte == LOOP_TYPE_OFF
+    assert sampler.tune_byte == 64
+    assert sampler.tune_aux_byte == 4
+    assert sampler.loop_type_byte == 0xC0
     assert sampler.gain == 88
     assert sampler.direction == 1
 
@@ -326,8 +354,30 @@ def test_apply_patch_json_text_and_file_write_project_fields(tmp_path) -> None:
     assert file_voice == text_voice
 
 
+def test_maps_confirmed_drum_playmode_strings() -> None:
+    expected = {
+        "gate": 0,
+        "key": 1,
+        "oneshot": 1,
+        "group": 2,
+        "loop": 3,
+    }
+    for playmode, byte in expected.items():
+        patch = drum_kit_patch_from_patch_json(
+            {"type": "drum", "regions": [{"sample": "x.wav", "hikey": 53, "playmode": playmode}]}
+        )
+        assert patch.pads[0].play_mode == byte
+
+
 def test_rejects_unmapped_drum_playmode_strings() -> None:
-    with pytest.raises(ValueError, match="not mapped"):
+    with pytest.raises(ValueError, match="unknown drum playmode"):
         drum_kit_patch_from_patch_json(
-            {"type": "drum", "regions": [{"sample": "x.wav", "hikey": 53, "playmode": "loop"}]}
+            {"type": "drum", "regions": [{"sample": "x.wav", "hikey": 53, "playmode": "solo"}]}
+        )
+
+
+def test_rejects_numeric_drum_playmode_values() -> None:
+    with pytest.raises(ValueError, match="not preserved"):
+        drum_kit_patch_from_patch_json(
+            {"type": "drum", "regions": [{"sample": "x.wav", "hikey": 53, "playmode": 3}]}
         )

@@ -12,9 +12,6 @@ from typing import Any
 from .image_writer import ImageProject
 from .sampler_sample_inspection import (
     encode_sampler_loop_crossfade_frames,
-    LOOP_TYPE_INFINITE,
-    LOOP_TYPE_OFF,
-    LOOP_TYPE_UNTIL_RELEASE,
 )
 
 DRUM_MIDI_START = 53
@@ -36,6 +33,17 @@ PLAYMODE_WORDS = {
     "poly": 0x15555555,
     "mono": 0x3FFFFFFF,
 }
+
+DRUM_PLAY_MODE_BYTES = {
+    "gate": 0x00,
+    "key": 0x01,
+    "oneshot": 0x01,
+    "group": 0x02,
+    "loop": 0x03,
+}
+
+SAMPLER_LOOP_DISABLED_BIT = 0x40
+SAMPLER_LOOP_ON_RELEASE_BIT = 0x80
 
 LFO_TYPE_BYTES = {
     "tremolo": 0x00,
@@ -93,6 +101,8 @@ class SamplerPatch:
     loop_end: int | None = None
     loop_crossfade: int | None = None
     loop_crossfade_raw: int | None = None
+    root_key: int | None = None
+    tune_cents: int | None = None
     tune_tenths: int | None = None
     loop_type: int | None = None
     gain: int | None = None
@@ -194,6 +204,8 @@ def apply_sound_patch(
         loop_end=patch.loop_end,
         loop_crossfade=patch.loop_crossfade,
         loop_crossfade_raw=patch.loop_crossfade_raw,
+        root_key=patch.root_key,
+        tune_cents=patch.tune_cents,
         tune_tenths=patch.tune_tenths,
         loop_type=patch.loop_type,
         gain=patch.gain,
@@ -392,7 +404,8 @@ def sampler_patch_from_region(
         loop_end=_integer_value(region.get("loop.end")),
         loop_crossfade=loop_crossfade,
         loop_crossfade_raw=_sampler_loop_crossfade_raw(loop_crossfade, framecount, sample_end),
-        tune_tenths=_integer_value(region.get("tune")),
+        root_key=_integer_value(region.get("pitch.keycenter")),
+        tune_cents=_integer_value(region.get("tune")),
         loop_type=_sampler_loop_type(region),
         gain=_integer_value(region.get("gain")),
         direction=1 if _boolean_value(region.get("reverse")) else 0,
@@ -420,11 +433,12 @@ def _sample_path(region: dict[str, Any], options: PatchJsonSoundPatchOptions) ->
 
 
 def _sampler_loop_type(region: dict[str, Any]) -> int:
+    value = 0
     if _boolean_value(region.get("loop.enabled")) is False:
-        return LOOP_TYPE_OFF
+        value |= SAMPLER_LOOP_DISABLED_BIT
     if _boolean_value(region.get("loop.onrelease")) is True:
-        return LOOP_TYPE_UNTIL_RELEASE
-    return LOOP_TYPE_INFINITE
+        value |= SAMPLER_LOOP_ON_RELEASE_BIT
+    return value
 
 
 def _sampler_loop_crossfade_raw(
@@ -444,13 +458,16 @@ def _sampler_loop_crossfade_raw(
 
 def _drum_play_mode(value: Any) -> int | None:
     playmode = _string_value(value).lower()
-    if playmode == "oneshot":
-        return 1
-    numeric = _integer_value(value)
-    if numeric is not None:
-        return numeric
     if playmode:
-        raise ValueError(f'drum playmode "{playmode}" is not mapped to a project byte yet')
+        try:
+            return DRUM_PLAY_MODE_BYTES[playmode]
+        except KeyError as exc:
+            valid = ", ".join(sorted(DRUM_PLAY_MODE_BYTES))
+            raise ValueError(
+                f'unknown drum playmode "{playmode}"; expected one of {valid}'
+            ) from exc
+    if _integer_value(value) is not None:
+        raise ValueError("numeric drum playmode values are not preserved by device preset loading")
     return None
 
 

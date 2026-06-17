@@ -273,7 +273,7 @@ loaded:
 | +0x3947 | sample/window end |
 | +0x394B | loop start |
 | +0x394F | loop end |
-| +0x3953 | loop crossfade raw u32; preset `loop.crossfade` frames normalized by `framecount` to a q31-like word |
+| +0x3953 | loop crossfade raw u32; preset `loop.crossfade` frames normalized by `framecount` to a q31-like word using single-precision float math |
 
 Do not use tonal sampler `patch.json engine.params` as sample-window state:
 the unique capture intentionally set non-default `engine.params`, but
@@ -299,6 +299,11 @@ Exact `patch.json` preset-load lane map from
 | `+0x392F` | `engine.highpass` |
 | `+0x3933..+0x3937` | velocity modulation target/amount |
 | `+0x393F..+0x3953` | region frame/window/crossfade values |
+| `+0x3957` | sampler `regions[0].pitch.keycenter` root/key byte; conflict probes show this wins over `hikey` |
+| `+0x395A` | sampler patch-load loop bits: `0x40` from `loop.enabled=false`, `0x80` from `loop.onrelease=true` |
+| `+0x395B` | sampler `regions[0].tune` signed cents byte |
+| `+0x395C` | sampler `regions[0].gain` byte |
+| `+0x395E` | sampler `regions[0].reverse` direction byte |
 
 Preset name field follows the table. (The "amb kit" sampler corpus referenced
 in older notes is not present in the repo; slot internals can be mapped from
@@ -317,7 +322,7 @@ order (v0 kick a … v23 chi).
 |---|---|---|
 | +0x00 | **tune** | u8 root note, default 0x3c, **±48 semitones** |
 | +0x02 | key assignment | u8 (MIDI key this voice triggers) |
-| +0x03 | **play mode** | u8; preset corpus confirms `patch.json` `oneshot` stores byte `1`; `cap_drum_params` confirms byte `3` is writable but its UI label is not pinned here |
+| +0x03 | **play mode** | u8; patch.json string labels confirmed by preset-load experiment: `gate=0`, `key=1`, `oneshot=1`, `group=2`, `loop=3`; numeric JSON values are not preserved as raw bytes |
 | +0x05 | *(unused in M3 probes)* | stays 0 when pan/fade edited on v23 |
 | +0x06 | **pan** | signed byte, device ±100 (`d1`/`d2` captures) |
 | +0x7C | **gain / loop-crossfade (fade)** | u32; pad fade UI on v23 → **v22** `+0x7C`; encode `ui×0x0147AF00`, max `0x7FFFFFFF`; decode `(u32>>8)//0x0147AF` — M3 log |
@@ -357,11 +362,11 @@ Sampler are **not** at drum `slot+0x68`/`+0x70`; they precede the table:
 | `+0x3947` | sample end u32 LE | `g4`, preset corpus |
 | `+0x394B` | loop start u32 LE | `g5`, preset corpus |
 | `+0x394F` | loop end u32 LE | `g6`, preset corpus |
-| `+0x3953` | loop crossfade raw u32 | `g11` = `0x60000000` (`96` high byte ≈ 75% UI); `t7-map-unique` preset `loop.crossfade=2048`, `framecount=98807` → `0x02A73100` |
+| `+0x3953` | loop crossfade raw u32 | `g11` = `0x60000000` (`96` high byte ≈ 75% UI); preset-load `loop.crossfade` uses single-precision float normalization by `framecount` |
 | `+0x3956` | loop crossfade high byte | legacy/coarse UI view of `+0x3953` |
-| `+0x3957` | tune u8 | `0x3C` + aux=`N×10` (≥0); `0x3D` + aux=`100−N×10` (<0); `g-tune-*` |
-| `+0x395B` | tune aux u8 | paired with `+0x3957`; see tune table in P2-B log |
-| `+0x395A` | loop type u8 | `0x80` infinite · `0x40` off · `0x00` until-release |
+| `+0x3957` | tune/root u8 | direct sample edit tune byte; patch.json preset loads use `pitch.keycenter` as root/key byte here |
+| `+0x395B` | tune aux u8 | direct sample edit tune aux; patch.json preset loads use signed `regions[0].tune` cents here (`4 -> +0.04`, `-5 -> -0.05` / `0xFB`) |
+| `+0x395A` | loop type u8 | direct sampler edit labels: `0x80` infinite · `0x40` off · `0x00` until-release; patch.json preset loads compose bits `0x40` from `loop.enabled=false` and `0x80` from `loop.onrelease=true` |
 | `+0x395C` | gain u8 | `g8`/`g9` |
 | `+0x395E` | direction u8 | `g7` |
 

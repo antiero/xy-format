@@ -92,7 +92,7 @@ general region-placement algorithm.
 | `hikey` | Written as drum key assignment and used to select voice index. |
 | `lokey` | Ignored; observed drum presets use `lokey == hikey`. |
 | `pitch.keycenter` | Ignored; observed drum presets use `60`. |
-| `playmode` | `oneshot` is corpus-confirmed and written as byte `1`; numeric values pass through. Other strings are rejected until mapped from device evidence. |
+| `playmode` | Preset-load experiment confirmed string labels: `gate=0`, `key=1`, `oneshot=1`, `group=2`, `loop=3`. Numeric JSON values are rejected because device preset loading did not preserve numeric `1..4` as raw bytes. |
 | `reverse` | Written as drum direction. |
 | `transpose` | Written as drum tune when present. |
 | `tune` | Written as drum tune only when `transpose` is absent. |
@@ -117,15 +117,15 @@ first region. Multi-zone behavior is intentionally not claimed here.
 | `framecount` | Written as sampler framecount u32 at `track+0x393F`; also used as sample end when `sample.end` is absent. |
 | `loop.start` | Written as sampler loop start u32. |
 | `loop.end` | Written as sampler loop end u32. |
-| `loop.crossfade` | Written as sampler loop crossfade frames, normalized against `framecount` into the raw u32 at track `+0x3953`; if `framecount` is absent, `sample.end` is used as a fallback denominator. |
-| `loop.enabled` | `false` writes loop type `off`; otherwise loop type defaults to `infinite` unless `loop.onrelease` is true. |
-| `loop.onrelease` | `true` writes loop type `until_release`. |
-| `tune` | Written as sampler tune tenths. |
+| `loop.crossfade` | Written as sampler loop crossfade frames, normalized against `framecount` into the raw u32 at track `+0x3953` using the device's single-precision float calculation; if `framecount` is absent, `sample.end` is used as a fallback denominator. |
+| `loop.enabled` | Patch.json preset loading uses bit `0x40` when `false`; missing/true does not set that bit. This is the patch-load byte, not a direct sampler-edit UI label. |
+| `loop.onrelease` | Patch.json preset loading uses bit `0x80` when `true`; missing/false does not set that bit. This is the patch-load byte, not a direct sampler-edit UI label. |
+| `tune` | Written to sampler slot `+0x04` as signed cents (`4 -> +0.04`, `-5 -> -0.05`, stored as `0xFB`). This is distinct from the direct sample-edit tune encoder. |
 | `gain` | Written as sampler gain byte. |
 | `reverse` | Written as sampler direction. |
-| `hikey` | Corpus-confirmed to match the root/keycenter byte at `track+0x3957` for one-shot sampler presets; ignored for one-shot sampler authoring. |
+| `hikey` | Ignored for one-shot sampler authoring; conflict probes show it does not drive the loaded root/key byte when `pitch.keycenter` differs. |
 | `lokey` | Ignored for one-shot sampler authoring. |
-| `pitch.keycenter` | Corpus-confirmed to match the root/keycenter byte at `track+0x3957` for one-shot sampler presets. |
+| `pitch.keycenter` | Written as the sampler root/key byte at `track+0x3957`. Conflict probes confirm this field wins over `hikey`; `lokey` does not participate. |
 
 ## Unsupported preset types
 

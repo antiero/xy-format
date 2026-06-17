@@ -1246,6 +1246,8 @@ class ImageProject:
         loop_end: int | None = None,
         loop_crossfade: int | None = None,
         loop_crossfade_raw: int | None = None,
+        root_key: int | None = None,
+        tune_cents: int | None = None,
         tune_tenths: int | None = None,
         loop_type: int | None = None,
         gain: int | None = None,
@@ -1254,7 +1256,8 @@ class ImageProject:
         """Set confirmed one-shot Sampler sample-edit fields.
 
         Numeric point fields are raw u32/u8 storage values from the P2-B probes.
-        ``tune_tenths`` uses the probe-backed sampler tune encoder.
+        ``root_key`` and ``tune_cents`` match patch.json preset loading;
+        ``tune_tenths`` uses the direct sample-edit tune encoder.
         """
         from .sampler_sample_inspection import encode_sampler_tune_tenths
 
@@ -1298,6 +1301,14 @@ class ImageProject:
                 72,
                 where=f"track {track} pattern {pattern} sampler path",
             )
+        if root_key is not None:
+            if not 0 <= root_key <= 0xFF:
+                raise ValueError("sampler root key must be u8")
+            self.image[slot + self.SAMPLER_SLOT_TUNE] = root_key
+        if tune_cents is not None:
+            if not -128 <= tune_cents <= 0xFF:
+                raise ValueError("sampler patch tune cents must fit in a signed or unsigned byte")
+            self.image[slot + self.SAMPLER_SLOT_TUNE_AUX] = tune_cents & 0xFF
         if tune_tenths is not None:
             tune_byte, tune_aux = encode_sampler_tune_tenths(tune_tenths)
             self.image[slot + self.SAMPLER_SLOT_TUNE] = tune_byte
