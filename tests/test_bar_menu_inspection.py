@@ -10,8 +10,10 @@ from xy.bar_menu_inspection import (
     TRACK_QUANTIZATION_OFFSET,
     TRACK_GROOVE_UI_SEQUENCE,
     encode_track_groove_ui,
+    encode_track_quantization_ui,
     groove_index_for_ui_value,
     inspect_bar_menu_bytes,
+    quantization_ui_from_raw,
 )
 from xy.image_writer import ImageProject
 from xy.rle import decode_project
@@ -38,7 +40,7 @@ def test_bar_menu_baseline_defaults() -> None:
     assert bar.default_step_length_ticks == 240
     assert bar.default_step_length_ui == 50
     assert bar.quantization_raw == 0xFF
-    assert bar.quantization_ui_approx == 100
+    assert bar.quantization_ui == 100
     assert bar.groove_raw == 0
     assert bar.groove_signed_raw == 0
     assert bar.groove_index == 0
@@ -70,22 +72,62 @@ def test_default_step_length_ticks(filename: str, ticks: int, ui: int) -> None:
 
 
 @pytest.mark.parametrize(
-    "filename,raw,ui_approx",
+    "filename,raw,ui",
     [
         ("bar-q-000.xy", 0x00, 0),
-        ("bar-q-001.xy", 0x04, 2),
-        ("bar-q-002.xy", 0x07, 3),
+        ("bar-q-001.xy", 0x04, 1),
+        ("bar-q-002.xy", 0x07, 2),
         ("bar-q-025-redo.xy", 0x41, 25),
-        ("bar-q-050-redo.xy", 0x81, 51),
+        ("bar-q-050-redo.xy", 0x81, 50),
         ("bar-q-075-redo.xy", 0xC0, 75),
-        ("bar-q-098.xy", 0xFC, 99),
-        ("bar-q-099.xy", 0xFE, 100),
+        ("bar-q-098.xy", 0xFC, 98),
+        ("bar-q-099.xy", 0xFE, 99),
     ],
 )
-def test_quantization_raw_byte(filename: str, raw: int, ui_approx: int) -> None:
+def test_quantization_raw_byte(filename: str, raw: int, ui: int) -> None:
     bar = _bar(filename)
     assert bar.quantization_raw == raw
-    assert bar.quantization_ui_approx == ui_approx
+    assert bar.quantization_ui == ui
+
+
+@pytest.mark.parametrize(
+    "raw,ui",
+    [
+        (0x00, 0),
+        (0x02, 0),
+        (0x03, 1),
+        (0x40, 25),
+        (0x80, 50),
+        (0x81, 50),
+        (0xC0, 75),
+        (0xFC, 98),
+        (0xFD, 99),
+        (0xFE, 99),
+        (0xFF, 100),
+    ],
+)
+def test_quantization_ui_formula(raw: int, ui: int) -> None:
+    assert quantization_ui_from_raw(raw) == ui
+
+
+@pytest.mark.parametrize(
+    "ui,raw",
+    [
+        (0, 0x00),
+        (1, 0x03),
+        (25, 0x40),
+        (50, 0x80),
+        (75, 0xC0),
+        (98, 0xFA),
+        (99, 0xFD),
+        (100, 0xFF),
+    ],
+)
+def test_quantization_ui_encoder_uses_bucket_floor(ui: int, raw: int) -> None:
+    assert encode_track_quantization_ui(ui) == raw
+    assert quantization_ui_from_raw(raw) == ui
+    if raw:
+        assert quantization_ui_from_raw(raw - 1) < ui
 
 
 @pytest.mark.parametrize(
@@ -188,6 +230,9 @@ def test_bar_menu_setters_write_decoded_bytes() -> None:
     assert image[start + TRACK_QUANTIZATION_OFFSET] == 0
     assert image[start + TRACK_GROOVE_OFFSET] == 0x7F
     assert image[start + TRACK_PLOCK_SHAPE_OFFSET] == 0xFB
+
+    project.set_track_quantization_ui(1, 99)
+    assert project.image[start + TRACK_QUANTIZATION_OFFSET] == 0xFD
 
 
 def test_bar_menu_edit_reloads_with_all_decoded_track_starts() -> None:
