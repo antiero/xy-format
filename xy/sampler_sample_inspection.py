@@ -19,12 +19,19 @@ from .rle import decode_project
 SAMPLER_ENGINE_ID = 0x02
 ENGINE_ID_OFFSET = 0x14
 
-# Per-track sample header (before voice table)
-TRACK_SAMPLE_START_U16 = 0x3943
-TRACK_SAMPLE_END_U16 = 0x3947
-TRACK_LOOP_START_U16 = 0x394B
-TRACK_LOOP_END_U16 = 0x394F
+# Per-track sample header (before voice table). These fields are u32 frame
+# positions; the older P2-B one-shot probes only touched the low 16 bits.
+TRACK_SAMPLE_START_U32 = 0x3943
+TRACK_SAMPLE_END_U32 = 0x3947
+TRACK_LOOP_START_U32 = 0x394B
+TRACK_LOOP_END_U32 = 0x394F
 TRACK_LOOP_CROSSFADE_U8 = 0x3956
+
+# Compatibility aliases for older callers/tests.
+TRACK_SAMPLE_START_U16 = TRACK_SAMPLE_START_U32
+TRACK_SAMPLE_END_U16 = TRACK_SAMPLE_END_U32
+TRACK_LOOP_START_U16 = TRACK_LOOP_START_U32
+TRACK_LOOP_END_U16 = TRACK_LOOP_END_U32
 
 VOICE_TABLE_OFFSET = 0x3957
 VOICE_SLOT_SIZE = 0x80
@@ -104,8 +111,8 @@ class ProjectSamplerSamples:
     tracks: tuple[SamplerSampleEdit, ...]
 
 
-def _u16_le(img: bytes, offset: int) -> int:
-    return img[offset] | (img[offset + 1] << 8)
+def _u32_le(img: bytes, offset: int) -> int:
+    return int.from_bytes(img[offset : offset + 4], "little")
 
 
 def decode_sampler_tune_tenths(tune_byte: int, tune_aux_byte: int) -> int:
@@ -167,10 +174,10 @@ def read_sampler_sample_edit(project: ImageProject, track: int = 1) -> SamplerSa
         track=track,
         engine_id=engine_id,
         path=_read_path(slot),
-        sample_start=_u16_le(img, base + TRACK_SAMPLE_START_U16),
-        sample_end=_u16_le(img, base + TRACK_SAMPLE_END_U16),
-        loop_start=_u16_le(img, base + TRACK_LOOP_START_U16),
-        loop_end=_u16_le(img, base + TRACK_LOOP_END_U16),
+        sample_start=_u32_le(img, base + TRACK_SAMPLE_START_U32),
+        sample_end=_u32_le(img, base + TRACK_SAMPLE_END_U32),
+        loop_start=_u32_le(img, base + TRACK_LOOP_START_U32),
+        loop_end=_u32_le(img, base + TRACK_LOOP_END_U32),
         loop_crossfade=img[base + TRACK_LOOP_CROSSFADE_U8],
         tune_byte=slot[SLOT_TUNE],
         tune_aux_byte=slot[SLOT_TUNE_AUX],

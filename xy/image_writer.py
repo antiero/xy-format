@@ -712,6 +712,12 @@ class ImageProject:
             dstarts = [m.start() - 3 for m in SIG_RE.finditer(dimg)]
         ds = dstarts[donor_track - 1]
         donor = dimg[ds : ds + 17876]
+        if donor[0] != 1 or donor[OFF_NOTE_COUNT] != 0:
+            raise ValueError(
+                "set_preset donor track must be pristine: "
+                f"track {donor_track} has pattern_count={donor[0]} "
+                f"note_count={donor[OFF_NOTE_COUNT]}"
+            )
         s = self.track_start(track)
         for a, b in self.PRESET_REGIONS:
             self.image[s + a : s + b] = donor[a:b]

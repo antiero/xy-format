@@ -316,10 +316,10 @@ Sampler are **not** at drum `slot+0x68`/`+0x70`; they precede the table:
 
 | track offset | field | probes |
 |---|---|---|
-| `+0x3943` | sample start u16 LE | `g3` |
-| `+0x3947` | sample end u16 LE | `g4` |
-| `+0x394B` | loop start u16 LE | `g5` |
-| `+0x394F` | loop end u16 LE | `g6` |
+| `+0x3943` | sample start u32 LE | `g3`; 2026-06-15 project-state captures exceed 16-bit |
+| `+0x3947` | sample end u32 LE | `g4`; 2026-06-15 project-state captures exceed 16-bit |
+| `+0x394B` | loop start u32 LE | `g5`; 2026-06-15 project-state captures exceed 16-bit |
+| `+0x394F` | loop end u32 LE | `g6`; 2026-06-15 project-state captures exceed 16-bit |
 | `+0x3956` | loop crossfade u8 | `g11` (`96` ≈ 75% UI) |
 | `+0x3957` | tune u8 | `0x3C` + aux=`N×10` (≥0); `0x3D` + aux=`100−N×10` (<0); `g-tune-*` |
 | `+0x395B` | tune aux u8 | paired with `+0x3957`; see tune table in P2-B log |
@@ -330,7 +330,7 @@ Sampler are **not** at drum `slot+0x68`/`+0x70`; they precede the table:
 API: `xy/sampler_sample_inspection.py`. Log:
 `docs/logs/2026-06-12_sampler_oneshot_inspection.md`.
 
-### Preset assignment (validated)
+### Preset assignment (validated low-level primitive)
 
 Loading a kit/preset = copying the donor's preset-identity regions into
 the target struct at the same offsets:
@@ -339,6 +339,18 @@ except header, pristine flag, p-lock table, step components, and the
 note vector. Validated against u116 (boop kit on T4/T7/T8): donor-copy
 reproduces the device file except UI-session bytes.
 `ImageProject.set_preset()` implements this.
+
+The donor must be a pristine single-pattern, zero-note preset-load track.
+Generated project tracks are not safe preset donors because `+0x4570..end`
+is post-note-count storage; copying it from a track with events creates a
+target whose note count and note-tail bytes disagree. `ImageProject.set_preset()`
+now rejects non-pristine donors instead of producing that impossible state.
+
+This is a fallback for exact device-authored preset-load state, not the
+preferred generated-authoring abstraction. As sampler, drum, pattern, scene,
+and song fields become decoded, JSON/spec authoring should compile those
+semantic fields into image edits directly and reserve donor-copy for fields
+that are still opaque but known to be internally coherent.
 
 ## Open
 
