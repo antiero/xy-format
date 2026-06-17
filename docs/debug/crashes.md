@@ -42,6 +42,10 @@
 - Status: resolved by enforcing `ImageProject.set_preset()`'s pristine-donor
   precondition. Generated project donors must copy sound identity only before
   the note vector, or use an actual pristine preset-load donor.
+- Follow-up direction: generated projects should move toward JSON/spec-level
+  pattern, scene, drum, and sampler construction that writes decoded fields
+  directly. Donor-copy should remain a guarded fallback for opaque
+  device-authored sound state.
 
 ## Notes
 Full historical crash details, callouts, and screenshots references are preserved in `docs/logs/2026-02-13_agents_legacy_snapshot.md`.

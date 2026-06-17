@@ -330,7 +330,7 @@ Sampler are **not** at drum `slot+0x68`/`+0x70`; they precede the table:
 API: `xy/sampler_sample_inspection.py`. Log:
 `docs/logs/2026-06-12_sampler_oneshot_inspection.md`.
 
-### Preset assignment (validated)
+### Preset assignment (validated low-level primitive)
 
 Loading a kit/preset = copying the donor's preset-identity regions into
 the target struct at the same offsets:
@@ -345,6 +345,12 @@ Generated project tracks are not safe preset donors because `+0x4570..end`
 is post-note-count storage; copying it from a track with events creates a
 target whose note count and note-tail bytes disagree. `ImageProject.set_preset()`
 now rejects non-pristine donors instead of producing that impossible state.
+
+This is a fallback for exact device-authored preset-load state, not the
+preferred generated-authoring abstraction. As sampler, drum, pattern, scene,
+and song fields become decoded, JSON/spec authoring should compile those
+semantic fields into image edits directly and reserve donor-copy for fields
+that are still opaque but known to be internally coherent.
 
 ## Open
 

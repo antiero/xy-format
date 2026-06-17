@@ -23,6 +23,12 @@ the RLE layer.
 | spec compiler | `tools/spec_to_xy_image.py` | midi-to-xy spec JSON → image-authored `.xy` |
 | diff workhorse | `tools/analysis/decoded_diff.py` | decoded-space field diffing |
 
+The long-term authoring surface should be structured JSON that compiles into
+decoded-image edits. `ImageProject` is the proven low-level substrate: it keeps
+RLE, vector counts, clones, scenes, and field widths coherent. Higher-level
+JSON adapters should call into those primitives rather than copy raw byte
+ranges or invent a second serializer.
+
 ### `ImageProject` API
 
 ```python
@@ -49,7 +55,7 @@ p.set_filter(track, type=..., enabled=...)
 p.set_sends(track, ext=..., tape=..., fx1=..., fx2=...)
 p.set_lfo_current(track, cc40=..., cc41=...)
 p.set_track_mix(track, pan=..., volume=...)
-p.set_preset(track, donor_path, donor_track)   # whole-instrument copy
+p.set_preset(track, donor_path, donor_track)   # low-level pristine donor copy
 p.set_track_block(track, offset, data)   # envelopes/filter/mod-routing blocks
 
 # per-step modifiers
@@ -124,6 +130,11 @@ preset-load track. Do not pass generated arrangement tracks as preset donors;
 if a workflow needs sound state from a generated project, copy only the known
 sound identity ranges before `track+0x456F` and leave the target note vector
 local.
+
+For generated material, prefer JSON/spec-level construction over donor copying
+wherever the fields are decoded. Preset-copy is a compatibility primitive for
+loading a known-good device-authored sound state, not the organizing model for
+future pattern, scene, drum, or sampler authoring.
 
 ## Removed Legacy Writers
 
