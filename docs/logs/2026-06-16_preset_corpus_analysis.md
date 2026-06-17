@@ -84,6 +84,9 @@ The analyzer now checks the LFO/FX header bytes directly, not just by prose:
 all 139 paired captures match the `lfo.type`, `lfo.active`, `fx.type`, and
 `fx.active` maps above.
 
+It also checks sampler region key consistency: `hikey == pitch.keycenter` and
+`lokey == 0` across the current sampler corpus.
+
 ## Field coverage ledger
 
 | Field | Status | Notes |
@@ -110,7 +113,7 @@ all 139 paired captures match the `lfo.type`, `lfo.active`, `fx.type`, and
 | drum `regions[].sample`, `hikey`, `reverse`, `pan`, `transpose`, `tune`, `playmode` | partial | Ten clean 24-region kits align with `track+0x3957 + (hikey - 53) * 0x80`; current paired captures only show `oneshot` as byte `1`. |
 | drum `regions[].sample.end`, `framecount` | confirmed-for-clean-full-kits | Ten clean 24-region kits store voice 0 in the pre-table header (`+0x393F/+0x3947`) and voices 1-23 in the previous slot's `+0x68/+0x70`. Sparse/rotated kits remain unresolved. |
 | drum `regions[].fade.*` | constant-in-corpus | `fade.in` and `fade.out` are zero in every current drum preset, so this corpus cannot independently map them. |
-| `regions[].lokey`, `regions[].pitch.keycenter` | ignored-or-unresolved | Often redundant with `hikey`/default keycenter, but no independent project field is confirmed. |
+| `regions[].lokey`, `regions[].pitch.keycenter` | redundant-or-ignored | Sampler `hikey` equals `pitch.keycenter` and `lokey` is 0 in the current corpus. Clean drum-kit placement follows `hikey - 53`; drum `lokey`/`pitch.keycenter` do not participate in the confirmed slot mapping. |
 
 ## Exceptions
 

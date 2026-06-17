@@ -147,7 +147,7 @@ FIELD_COVERAGE = [
     ("regions[].sample/hikey/reverse/pan/transpose/tune/playmode (drum)", "partial", "Ten clean 24-region kits align with `track+0x3957 + (hikey - 53) * 0x80`; current paired captures only show `oneshot` as byte `1`."),
     ("regions[].sample.end/framecount (drum)", "confirmed-for-clean-full-kits", "Ten clean 24-region kits store voice 0 in the pre-table header (`+0x393F/+0x3947`) and voices 1-23 in the previous slot's `+0x68/+0x70`. Sparse/rotated kits remain unresolved."),
     ("regions[].fade.* (drum)", "constant-in-corpus", "`fade.in` and `fade.out` are zero in every current drum preset, so this corpus cannot independently map them."),
-    ("regions[].lokey/pitch.keycenter", "ignored-or-unresolved", "Often redundant with `hikey`/default keycenter, but no independent project field is confirmed."),
+    ("regions[].lokey/pitch.keycenter", "redundant-or-ignored", "Sampler `hikey` equals `pitch.keycenter` and `lokey` is 0 in the current corpus. Clean drum-kit placement follows `hikey - 53`; drum `lokey`/`pitch.keycenter` do not participate in the confirmed slot mapping."),
 ]
 
 FIELD_INVENTORY_STATUS = {
@@ -273,6 +273,7 @@ def analyze(corpus: Path) -> str:
     _check_array_q16(pairs, "engine.params", ENGINE_PARAM_OFFSETS, mismatches)
     _check_array_q16(pairs, "fx.params", FX_PARAM_OFFSETS, mismatches)
     _check_array_q16(pairs, "lfo.params", LFO_PARAM_OFFSETS, mismatches)
+    _check_region_key_consistency(pairs, mismatches)
     _check_sampler_fields(pairs, mismatches)
     _check_clean_drum_fields(pairs, mismatches)
 
@@ -297,6 +298,7 @@ def analyze(corpus: Path) -> str:
             "- `envelope.amp.*`, `envelope.filter.*`, most `engine.*` lanes, most `fx.params[0..7]`, and `lfo.params[0..7]` map as the high 16 bits of 4-byte words in the known sound-state block.",
             "- Sampler project sample windows store full u32 values at `track+0x393F..0x394F`, not u16 values.",
             "- Sampler `loop.crossfade` stores a normalized byte: `floor(loop.crossfade * 128 / framecount)` at `track+0x3956`.",
+            "- Sampler region `hikey` equals `pitch.keycenter` across the corpus and maps to the root/keycenter byte at `track+0x3957`; sampler `lokey` is always 0.",
             "- Ten clean drum-kit captures map path/key/tune/pan/reverse/playmode by `hikey - 53`.",
             "- In those clean drum kits, voice 0 sample window values use the pre-table header (`track+0x393F..0x394F`), while voice 1-23 `sample.end`/`framecount` values appear on the previous slot at both `+0x68` and `+0x70`.",
             "",
@@ -506,6 +508,37 @@ def _check_array_q16(
                     f"`{pair.name}`: expected `{expected}`, got `{got}` "
                     f"(raw `0x{_u32(pair.project.image, pair.track_start + offset):08X}`)"
                 )
+
+
+def _check_region_key_consistency(
+    pairs: list[Pair],
+    mismatches: dict[str, list[str]],
+) -> None:
+    for pair in pairs:
+        regions = pair.patch.get("regions")
+        if not isinstance(regions, list):
+            continue
+        for index, region in enumerate(regions):
+            if not isinstance(region, dict):
+                continue
+            patch_type = pair.patch.get("type")
+            hikey = region.get("hikey")
+            lokey = region.get("lokey")
+            keycenter = region.get("pitch.keycenter")
+            if patch_type == "sampler":
+                if isinstance(hikey, int) and isinstance(keycenter, int) and hikey != keycenter:
+                    mismatches["sampler hikey/pitch.keycenter"].append(
+                        f"`{pair.name}` region {index}: hikey `{hikey}` != pitch.keycenter `{keycenter}`"
+                    )
+                if isinstance(lokey, int) and lokey != 0:
+                    mismatches["sampler lokey"].append(
+                        f"`{pair.name}` region {index}: expected lokey `0`, got `{lokey}`"
+                    )
+            elif patch_type == "drum":
+                if isinstance(lokey, int) and isinstance(hikey, int) and lokey not in (0, hikey):
+                    mismatches["drum lokey"].append(
+                        f"`{pair.name}` region {index}: hikey `{hikey}` with lokey `{lokey}`"
+                    )
 
 
 def _check_sampler_fields(pairs: list[Pair], mismatches: dict[str, list[str]]) -> None:
