@@ -9,8 +9,15 @@ These fixtures test fields where direct project editing, device-authored preset
 loads, and current docs do not fully agree yet. Each case has:
 
 - `presets/<case>.preset/patch.json`
-- `presets/<case>.preset/probe.wav`
 - `presetprojs/<case>.xy`
+
+The `.preset` folders are intentionally committed without duplicate WAV files.
+The shared sample asset lives at `src/preset-load-experiments/assets/probe.wav`.
+Before copying this experiment to the OP-XY, populate the preset folders:
+
+```powershell
+python tools/populate_preset_wavs.py src/preset-load-experiments/2026-06-patch-json-fields/presets
+```
 
 The `.xy` files are baseline project copies. On device, open the matching
 project, load the matching preset onto track 1, save, then copy the saved
@@ -165,11 +172,13 @@ What closes:
 
 For each case:
 
-1. Copy or sync this experiment folder to the OP-XY storage.
-2. Open `presetprojs/<case>.xy`.
-3. On track 1, load `presets/<case>.preset`.
-4. Save the project.
-5. Copy the saved project back over `presetprojs/<case>.xy`.
+1. Run `tools/populate_preset_wavs.py` if the preset folders do not contain
+   `probe.wav` yet.
+2. Copy or sync this experiment folder to the OP-XY storage.
+3. Open `presetprojs/<case>.xy`.
+4. On track 1, load `presets/<case>.preset`.
+5. Save the project.
+6. Copy the saved project back over `presetprojs/<case>.xy`.
 
 If a preset fails to load, leave the project unchanged and note the case name.
 That is useful evidence too.
