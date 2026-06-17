@@ -87,6 +87,12 @@ all 139 paired captures match the `lfo.type`, `lfo.active`, `fx.type`, and
 It also checks sampler region key consistency: `hikey == pitch.keycenter` and
 `lokey == 0` across the current sampler corpus.
 
+Follow-up: `docs/logs/2026-06-17_patch_json_field_experiment.md` uses focused
+generated presets to close several fields that were constant or ambiguous in
+this broad corpus: sampler `pitch.keycenter` vs `hikey`, sampler tune cents,
+sampler loop flag bits, drum playmode strings, and byte-exact sampler
+`loop.crossfade` raw encoding.
+
 ## Field coverage ledger
 
 | Field | Status | Notes |
@@ -183,6 +189,10 @@ Drum kit caveats:
 - Drum region fields `fade.in`, `fade.out`, `pan`, `transpose`, `tune`,
   `reverse`, and `playmode` are constant in the paired drum corpus (`playmode`
   is always `oneshot`).
+
+Several of these limitations were intentionally probed next in
+`src/preset-load-experiments/2026-06-patch-json-fields`; see the 2026-06-17 log
+for the narrowed findings.
 
 ## Tooling
 
