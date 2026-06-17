@@ -45,8 +45,16 @@
 
   $: totalNotes = visibleNotes.length;
 
-  const steps = 64;
-  const totalTicks = steps * STEP_TICKS;
+  let steps = 64;
+  $: if ($projectStore && $activeTrackStore !== undefined && $activePatternStore !== undefined) {
+      try {
+          steps = $projectStore.getPatternSteps($activeTrackStore, $activePatternStore) || 16;
+      } catch (e) {
+          steps = 64;
+      }
+  }
+
+  $: totalTicks = steps * STEP_TICKS;
 
   let gridContainer: HTMLDivElement;
 

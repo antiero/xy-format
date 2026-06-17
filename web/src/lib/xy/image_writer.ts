@@ -173,6 +173,11 @@ export class ImageProject {
     view.setUint16(GLOBAL_TEMPO, Math.round(bpm * 10), true);
   }
 
+  public getPatternSteps(track: number, patternIndex: number = 0): number {
+      const s = this.trackPatternStart(track, patternIndex);
+      return this.image[s + OFF_PATTERN_STEPS];
+  }
+
   public setPatternSteps(track: number, steps: number): void {
     if (steps < 1 || steps > 64) {
       throw new Error('pattern length must be 1..64 steps');
