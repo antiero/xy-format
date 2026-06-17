@@ -1121,6 +1121,7 @@ class ImageProject:
     SAMPLER_SAMPLE_END = 0x3947
     SAMPLER_LOOP_START = 0x394B
     SAMPLER_LOOP_END = 0x394F
+    SAMPLER_LOOP_CROSSFADE_RAW = 0x3953
     SAMPLER_LOOP_CROSSFADE = 0x3956
     SAMPLER_SLOT_TUNE = 0x00
     SAMPLER_SLOT_LOOP_TYPE = 0x03
@@ -1148,17 +1149,6 @@ class ImageProject:
             where=f"track {track} pattern {pattern} preset path",
         )
         self.mark_pattern_edited(track, pattern)
-
-    SAMPLER_START = 0x3943
-    SAMPLER_END = 0x3947
-    SAMPLER_LOOP_START = 0x394B
-    SAMPLER_LOOP_END = 0x394F
-    SAMPLER_LOOP_CROSSFADE = 0x3956
-    SAMPLER_SLOT_TUNE = DRUM_TUNE
-    SAMPLER_SLOT_LOOP_TYPE = DRUM_PLAY_MODE
-    SAMPLER_SLOT_TUNE_AUX = 0x04
-    SAMPLER_SLOT_GAIN = 0x05
-    SAMPLER_SLOT_DIRECTION = DRUM_DIRECTION
 
     def set_drum_voice(
         self,
@@ -1255,12 +1245,17 @@ class ImageProject:
         loop_start: int | None = None,
         loop_end: int | None = None,
         loop_crossfade: int | None = None,
+        loop_crossfade_raw: int | None = None,
         tune_tenths: int | None = None,
         loop_type: int | None = None,
         gain: int | None = None,
         direction: int | None = None,
     ) -> None:
-        """Set one-shot Sampler sample-edit fields for a track/pattern slot."""
+        """Set confirmed one-shot Sampler sample-edit fields.
+
+        Numeric point fields are raw u32/u8 storage values from the P2-B probes.
+        ``tune_tenths`` uses the probe-backed sampler tune encoder.
+        """
         from .sampler_sample_inspection import encode_sampler_tune_tenths
 
         s = self.pattern_start(track, pattern)
@@ -1272,22 +1267,28 @@ class ImageProject:
                 self.PRESET_PATH_MAX,
                 where=f"track {track} pattern {pattern} preset path",
             )
-        for offset, value, label in (
-            (self.SAMPLER_FRAMECOUNT, framecount, "framecount"),
-            (self.SAMPLER_SAMPLE_START, sample_start, "sample start"),
-            (self.SAMPLER_SAMPLE_END, sample_end, "sample end"),
-            (self.SAMPLER_LOOP_START, loop_start, "loop start"),
-            (self.SAMPLER_LOOP_END, loop_end, "loop end"),
-        ):
-            if value is not None:
-                self.image[s + offset : s + offset + 4] = self._u32(
-                    value,
-                    where=f"track {track} sampler {label}",
-                )
-        if loop_crossfade is not None:
+
+        def write_u32(rel: int, value: int) -> None:
+            if not 0 <= value <= 0xFFFFFFFF:
+                raise ValueError("sampler point value must be u32")
+            self.image[s + rel : s + rel + 4] = value.to_bytes(4, "little")
+
+        if framecount is not None:
+            write_u32(self.SAMPLER_FRAMECOUNT, framecount)
+        if sample_start is not None:
+            write_u32(self.SAMPLER_SAMPLE_START, sample_start)
+        if sample_end is not None:
+            write_u32(self.SAMPLER_SAMPLE_END, sample_end)
+        if loop_start is not None:
+            write_u32(self.SAMPLER_LOOP_START, loop_start)
+        if loop_end is not None:
+            write_u32(self.SAMPLER_LOOP_END, loop_end)
+        if loop_crossfade_raw is not None:
+            write_u32(self.SAMPLER_LOOP_CROSSFADE_RAW, loop_crossfade_raw)
+        elif loop_crossfade is not None:
             if not 0 <= loop_crossfade <= 0xFF:
                 raise ValueError("sampler loop crossfade must be u8")
-            self.image[s + self.SAMPLER_LOOP_CROSSFADE] = loop_crossfade
+            write_u32(self.SAMPLER_LOOP_CROSSFADE_RAW, loop_crossfade << 24)
 
         slot = s + self.DRUM_TABLE
         if path is not None:
@@ -1295,7 +1296,7 @@ class ImageProject:
                 slot + self.SAMPLER_SLOT_PATH,
                 path,
                 72,
-                where=f"track {track} sampler path",
+                where=f"track {track} pattern {pattern} sampler path",
             )
         if tune_tenths is not None:
             tune_byte, tune_aux = encode_sampler_tune_tenths(tune_tenths)
@@ -1329,6 +1330,12 @@ class ImageProject:
             dstarts = [m.start() - 3 for m in SIG_RE.finditer(dimg)]
         ds = dstarts[donor_track - 1]
         donor = dimg[ds : ds + 17876]
+        if donor[0] != 1 or donor[OFF_NOTE_COUNT] != 0:
+            raise ValueError(
+                "set_preset donor track must be pristine: "
+                f"track {donor_track} has pattern_count={donor[0]} "
+                f"note_count={donor[OFF_NOTE_COUNT]}"
+            )
         s = self.track_start(track)
         for a, b in self.PRESET_REGIONS:
             self.image[s + a : s + b] = donor[a:b]

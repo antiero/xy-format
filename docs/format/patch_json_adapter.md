@@ -112,18 +112,18 @@ first region. Multi-zone behavior is intentionally not claimed here.
 | Region field | `.xy` write status |
 | --- | --- |
 | `sample` | Written to the sampler slot path. If `preset_device_path` is supplied, it is prefixed as `<preset_device_path>/<sample>`. |
-| `sample.start` | Corpus-confirmed as a u32 sampler sample-start word at `track+0x3943` when present. |
-| `sample.end` | Corpus-confirmed as a u32 sampler sample-end word at `track+0x3947`. |
-| `framecount` | Corpus-confirmed as a u32 framecount word at `track+0x393F`; also used as sample end when `sample.end` is absent. |
-| `loop.start` | Corpus-confirmed as a u32 sampler loop-start word at `track+0x394B`. |
-| `loop.end` | Corpus-confirmed as a u32 sampler loop-end word at `track+0x394F`. |
-| `loop.crossfade` | Corpus-confirmed as normalized byte `floor(loop.crossfade * 128 / framecount)` at `track+0x3956`; the adapter writes this normalized storage value when `framecount` is available. |
-| `loop.enabled` | Adapter currently writes loop type from this boolean, but preset-corpus validation is still incomplete. |
-| `loop.onrelease` | Unresolved for preset loads: current corpus has `loop.onrelease=true` while the project slot stores the same loop-type byte as ordinary infinite looping. |
-| `tune` | Unresolved for preset loads: current sampler corpus has only `0`, while slot `+0x00` is confirmed to store keycenter/root instead. |
-| `gain` | Observed nonzero values map directly to byte `track+0x395C`. |
-| `reverse` | `false` maps to direction byte `0` at `track+0x395E`; no `true` sampler preset is in the paired corpus yet. |
-| `hikey` | Corpus-confirmed to match the root/keycenter byte at `track+0x3957` for one-shot sampler presets. |
+| `sample.start` | Written as sampler sample start u32. |
+| `sample.end` | Written as sampler sample end u32. |
+| `framecount` | Written as sampler framecount u32 at `track+0x393F`; also used as sample end when `sample.end` is absent. |
+| `loop.start` | Written as sampler loop start u32. |
+| `loop.end` | Written as sampler loop end u32. |
+| `loop.crossfade` | Written as sampler loop crossfade frames, normalized against `framecount` into the raw u32 at track `+0x3953`; if `framecount` is absent, `sample.end` is used as a fallback denominator. |
+| `loop.enabled` | `false` writes loop type `off`; otherwise loop type defaults to `infinite` unless `loop.onrelease` is true. |
+| `loop.onrelease` | `true` writes loop type `until_release`. |
+| `tune` | Written as sampler tune tenths. |
+| `gain` | Written as sampler gain byte. |
+| `reverse` | Written as sampler direction. |
+| `hikey` | Corpus-confirmed to match the root/keycenter byte at `track+0x3957` for one-shot sampler presets; ignored for one-shot sampler authoring. |
 | `lokey` | Ignored for one-shot sampler authoring. |
 | `pitch.keycenter` | Corpus-confirmed to match the root/keycenter byte at `track+0x3957` for one-shot sampler presets. |
 

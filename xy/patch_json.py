@@ -11,6 +11,7 @@ from typing import Any
 
 from .image_writer import ImageProject
 from .sampler_sample_inspection import (
+    encode_sampler_loop_crossfade_frames,
     LOOP_TYPE_INFINITE,
     LOOP_TYPE_OFF,
     LOOP_TYPE_UNTIL_RELEASE,
@@ -87,9 +88,11 @@ class SamplerPatch:
     framecount: int | None = None
     sample_start: int | None = None
     sample_end: int | None = None
+    frame_count: int | None = None
     loop_start: int | None = None
     loop_end: int | None = None
     loop_crossfade: int | None = None
+    loop_crossfade_raw: int | None = None
     tune_tenths: int | None = None
     loop_type: int | None = None
     gain: int | None = None
@@ -190,6 +193,7 @@ def apply_sound_patch(
         loop_start=patch.loop_start,
         loop_end=patch.loop_end,
         loop_crossfade=patch.loop_crossfade,
+        loop_crossfade_raw=patch.loop_crossfade_raw,
         tune_tenths=patch.tune_tenths,
         loop_type=patch.loop_type,
         gain=patch.gain,
@@ -375,8 +379,9 @@ def sampler_patch_from_region(
     region: dict[str, Any],
     options: PatchJsonSoundPatchOptions,
 ) -> SamplerPatch:
-    sample_end = _integer_value(region.get("sample.end"))
     framecount = _integer_value(region.get("framecount"))
+    sample_end = _integer_value(region.get("sample.end"))
+    loop_crossfade = _integer_value(region.get("loop.crossfade"))
     return SamplerPatch(
         preset_path=_preset_path(options),
         path=_sample_path(region, options),
@@ -385,7 +390,8 @@ def sampler_patch_from_region(
         sample_end=sample_end if sample_end is not None else framecount,
         loop_start=_integer_value(region.get("loop.start")),
         loop_end=_integer_value(region.get("loop.end")),
-        loop_crossfade=_sampler_loop_crossfade(region, framecount),
+        loop_crossfade=loop_crossfade,
+        loop_crossfade_raw=_sampler_loop_crossfade_raw(loop_crossfade, framecount, sample_end),
         tune_tenths=_integer_value(region.get("tune")),
         loop_type=_sampler_loop_type(region),
         gain=_integer_value(region.get("gain")),
@@ -421,13 +427,19 @@ def _sampler_loop_type(region: dict[str, Any]) -> int:
     return LOOP_TYPE_INFINITE
 
 
-def _sampler_loop_crossfade(region: dict[str, Any], framecount: int | None) -> int | None:
-    crossfade = _integer_value(region.get("loop.crossfade"))
-    if crossfade is None:
+def _sampler_loop_crossfade_raw(
+    loop_crossfade: int | None,
+    frame_count: int | None,
+    sample_end: int | None,
+) -> int | None:
+    if loop_crossfade is None:
         return None
-    if not framecount:
-        return crossfade
-    return min(255, (crossfade * 128) // framecount)
+    if loop_crossfade == 0:
+        return 0
+    denominator = frame_count if frame_count is not None else sample_end
+    if denominator is None:
+        raise ValueError("sampler loop.crossfade requires framecount or sample.end")
+    return encode_sampler_loop_crossfade_frames(loop_crossfade, denominator)
 
 
 def _drum_play_mode(value: Any) -> int | None:
