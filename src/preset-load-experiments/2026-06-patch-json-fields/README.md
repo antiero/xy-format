@@ -224,5 +224,6 @@ That is useful evidence too.
 
 ## Generated manifest
 
-`manifest.json` lists every case with its short question. It is intended for
-the follow-up analyzer after device captures are copied back.
+`manifest.json` lists every case with its short question. The committed
+analyzer reads the captured projects directly; the manifest remains as the
+human-readable experiment index.

@@ -1,6 +1,6 @@
 # Patch.json field preset-load experiment
 
-Firmware: OP-XY 1.1.4  
+Firmware: OP-XY 1.1.4
 Fixtures: `src/preset-load-experiments/2026-06-patch-json-fields`
 
 This experiment used generated `.preset/patch.json` folders plus matching
