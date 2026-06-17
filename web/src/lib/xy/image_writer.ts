@@ -15,6 +15,8 @@ export const OFF_NOTE_COUNT = 0x456F;
 export const NOTE_SIZE = 12;
 export const STEP_TICKS = 480;
 
+export const GLOBAL_TEMPO = 0x00;
+
 export const SCENE_SLOT0 = 0x95;
 export const SCENE_SLOT_SIZE = 33;
 
@@ -159,6 +161,16 @@ export class ImageProject {
   public markEdited(track: number): void {
     const s = this.trackStart(track);
     this.image.set([0x00, 0x00], s + OFF_PRISTINE);
+  }
+
+  public getTempo(): number {
+    const view = new DataView(this.image.buffer);
+    return view.getUint16(GLOBAL_TEMPO, true) / 10.0;
+  }
+
+  public setTempo(bpm: number): void {
+    const view = new DataView(this.image.buffer);
+    view.setUint16(GLOBAL_TEMPO, Math.round(bpm * 10), true);
   }
 
   public setPatternSteps(track: number, steps: number): void {

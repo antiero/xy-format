@@ -33,8 +33,18 @@
   const ROW_HEIGHT = 20;
   const BEAT_WIDTH = 120; // 4 steps per beat
   const TICK_WIDTH = BEAT_WIDTH / (STEP_TICKS * 4);
-  const noteRange = [24, 108]; // C1 to C8 roughly
-  const totalNotes = noteRange[1] - noteRange[0] + 1;
+
+  let isCompressedMode = false;
+
+  // Base range: C1 to C8 roughly
+  const BASE_NOTE_RANGE = [24, 108];
+
+  $: visibleNotes = isCompressedMode && notes.length > 0
+      ? Array.from(new Set(notes.map(n => n.note))).sort((a, b) => b - a) // Descending
+      : Array.from({length: BASE_NOTE_RANGE[1] - BASE_NOTE_RANGE[0] + 1}, (_, i) => BASE_NOTE_RANGE[1] - i);
+
+  $: totalNotes = visibleNotes.length;
+
   const steps = 64;
   const totalTicks = steps * STEP_TICKS;
 
@@ -98,7 +108,9 @@
 
     const tick = Math.max(0, Math.round(x / TICK_WIDTH));
     const rowIndex = Math.floor(y / ROW_HEIGHT);
-    const noteValue = noteRange[1] - rowIndex;
+    const noteValue = visibleNotes[rowIndex];
+
+    if (noteValue === undefined) return;
 
     // Snap to 16th note (STEP_TICKS)
     const snappedTick = Math.floor(tick / STEP_TICKS) * STEP_TICKS;
@@ -126,7 +138,7 @@
             // Preview sound
             audioService.ensureReady().then(() => {
                 audioService.noteOn($activeTrackStore - 1, noteValue, 100);
-                setTimeout(() => audioService.noteOff($activeTrackStore - 1, noteValue), 200);
+                audioService.noteOff($activeTrackStore - 1, noteValue, 200);
             });
         } catch (err: any) {
             alert(err.message);
@@ -158,6 +170,27 @@
   // Keep track of notes currently playing
   let playingNotes = new Set<string>();
 
+  let currentTempo = 120;
+  $: if ($projectStore) {
+      currentTempo = $projectStore.getTempo() || 120;
+  }
+
+  function handleTempoChange(e: Event) {
+      const target = e.target as HTMLInputElement;
+      let newBpm = parseFloat(target.value);
+      if (!isNaN(newBpm) && $projectStore) {
+          if (newBpm < 10) newBpm = 10;
+          if (newBpm > 400) newBpm = 400;
+          try {
+              $projectStore.setTempo(newBpm);
+              projectStore.set($projectStore);
+              currentTempo = newBpm;
+          } catch (err: any) {
+              alert(err.message);
+          }
+      }
+  }
+
   function playLoop() {
       if (!$isPlayingStore) return;
 
@@ -165,9 +198,10 @@
       const dtMs = now - lastTime;
       lastTime = now;
 
-      // Calculate ticks based on 120 BPM for now
-      // 120 BPM = 2 beats per second = 2 * (4 * STEP_TICKS) = 8 * STEP_TICKS ticks per second
-      const ticksPerSecond = 8 * STEP_TICKS;
+      // OP-XY sequencer: STEP_TICKS = 480 per 16th note, so 1 beat = 4 * 480 = 1920 ticks
+      // Ticks per minute = BPM * 1920
+      // Ticks per second = (BPM * 1920) / 60 = BPM * 32
+      const ticksPerSecond = currentTempo * (STEP_TICKS * 4) / 60;
       const ticksPerMs = ticksPerSecond / 1000;
 
       const oldTick = $currentTickStore;
@@ -185,24 +219,28 @@
       if ($projectStore) {
         for (let track = 1; track <= 16; track++) {
           try {
+            // For MVP, just playing the active pattern's notes
             const trackNotes = $projectStore.getNotes(track, $activePatternStore);
             for (const note of trackNotes) {
                 const noteId = `${track}-${note.note}-${note.tick}`;
 
                 // If the playhead just crossed the note start
+                // Since this runs in requestAnimationFrame (~16ms), we need to check if the note tick
+                // falls between oldTick and newTick.
                 const isCrossedNormal = !didLoop && note.tick >= oldTick && note.tick < newTick;
                 const isCrossedLoop = didLoop && (note.tick >= oldTick || note.tick < newTick);
 
                 if ((isCrossedNormal || isCrossedLoop) && !playingNotes.has(noteId)) {
-                    // note.velocity might be undefined in old saved files if not set
                     const velocity = note.velocity || 100;
                     audioService.noteOn(track - 1, note.note, velocity);
                     playingNotes.add(noteId);
 
-                    // Schedule note off
+                    // Schedule note off using SpessaSynth precise timing
                     const gateMs = (note.gate / ticksPerMs);
+                    audioService.noteOff(track - 1, note.note, gateMs);
+
+                    // We still need to remove it from playingNotes after it ends
                     setTimeout(() => {
-                        audioService.noteOff(track - 1, note.note);
                         playingNotes.delete(noteId);
                     }, gateMs);
                 }
@@ -222,11 +260,14 @@
       audioService.ensureReady().then(() => {
           isPlayingStore.update(p => !p);
           if ($isPlayingStore) {
+              // Ensure we start from current position cleanly
               lastTime = performance.now();
+              playingNotes.clear();
               playLoop();
           } else {
               cancelAnimationFrame(animationFrame);
               audioService.stopAll();
+              playingNotes.clear();
           }
       });
   }
@@ -250,6 +291,21 @@
         >
             {$isPlayingStore ? 'Stop' : 'Play'}
         </button>
+    </div>
+
+    <!-- Tempo Settings -->
+    <div class="flex items-center gap-2 px-2 bg-neutral-800 rounded p-1">
+        <label for="tempo" class="text-xs text-neutral-400 font-bold uppercase tracking-wider">BPM</label>
+        <input
+            type="number"
+            id="tempo"
+            class="w-16 bg-neutral-900 border border-neutral-700 rounded px-1 text-sm text-center text-white"
+            value={currentTempo}
+            on:change={handleTempoChange}
+            step="0.1"
+            min="10"
+            max="400"
+        />
     </div>
 
     <!-- Track Selector -->
@@ -289,7 +345,13 @@
     </div>
 
     <!-- MIDI Import -->
-    <div class="px-2">
+    <div class="px-2 flex gap-2">
+       <button
+          class="px-3 py-1 rounded text-xs font-bold transition-colors uppercase tracking-wider whitespace-nowrap cursor-pointer { isCompressedMode ? 'bg-emerald-600 text-white hover:bg-emerald-500' : 'bg-neutral-700 text-neutral-300 hover:bg-neutral-600' }"
+          on:click={() => isCompressedMode = !isCompressedMode}
+        >
+          Compressed
+        </button>
        <input
           type="file"
           accept=".mid,.midi"
@@ -323,8 +385,7 @@
 
       <!-- Horizontal row highlights for black keys -->
       <div class="absolute top-0 bottom-0 pointer-events-none z-0" style="left: {KEY_WIDTH}px; right: 0;">
-          {#each Array(totalNotes) as _, r}
-              {@const noteValue = noteRange[1] - r}
+          {#each visibleNotes as noteValue, r}
               {#if isBlackKey(noteValue)}
                   <div class="absolute w-full opacity-5" style="top: {r * ROW_HEIGHT}px; height: {ROW_HEIGHT}px; background-color: #000;"></div>
               {/if}
@@ -341,8 +402,8 @@
           <!-- Render Notes -->
           {#each notes as note}
             {@const tickStart = note.tick}
-            {@const rowIndex = noteRange[1] - note.note}
-            {#if tickStart < totalTicks && rowIndex >= 0 && rowIndex < totalNotes}
+            {@const rowIndex = visibleNotes.indexOf(note.note)}
+            {#if tickStart < totalTicks && rowIndex >= 0}
                 <div
                 class="absolute rounded-sm shadow-[0_0_8px_rgba(0,0,0,0.5)] border border-black/50 hover:brightness-125 transition-all overflow-hidden"
                 style="
@@ -362,8 +423,7 @@
 
       <!-- Keyboard Sidebar (Sticky) -->
       <div class="absolute top-0 bottom-0 left-0 bg-[#1e1e1e] border-r border-neutral-700 z-30" style="width: {KEY_WIDTH}px; transform: translateX({$scrollXStore}px);">
-          {#each Array(totalNotes) as _, r}
-              {@const noteValue = noteRange[1] - r}
+          {#each visibleNotes as noteValue, r}
               {@const isBlack = isBlackKey(noteValue)}
               {@const noteName = getNoteName(noteValue)}
               <!-- svelte-ignore a11y-no-static-element-interactions -->
