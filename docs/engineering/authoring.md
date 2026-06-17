@@ -75,8 +75,23 @@ p.set_step_component(track, step, "pulse", value)   # 14 component names
 p.set_plock(track, step, "cutoff", value)           # ~30 param names
 
 # drum voices (24)
-p.set_drum_voice(track, voice, tune=+7, play_mode=4, start=..., loop_start=..., end=..., gain=...)
+p.set_drum_voice(track, voice, path="/fat32/presets/drum/kit.preset/kick.wav",
+                 tune=+7, key_assignment=53, play_mode=4,
+                 start=..., loop_start=..., end=..., gain=...)
 
+# patch.json adapter for drum/sampler presets
+from xy.patch_json import PatchJsonSoundPatchOptions, apply_patch_json_sound
+apply_patch_json_sound(
+    p, track, patch_json,
+    PatchJsonSoundPatchOptions(preset_device_path="/fat32/presets/drum/kit.preset"),
+)
+```
+
+Use `apply_patch_json_text(...)` or `apply_patch_json_file(...)` when starting
+from serialized JSON instead of an already parsed object. See
+`docs/format/patch_json_adapter.md` for the field-by-field coverage table.
+
+```python
 p.save("out.xy")
 ```
 
