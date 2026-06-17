@@ -59,7 +59,7 @@ Filename = **tenths from +0.00** (`1` → UI `+0.10`, `neg2` → `-0.20`).
 | `g7.xy` | `slot+0x07` | direction `1` |
 | `g8.xy` / `g9.xy` | `slot+0x05` | gain min/max |
 | `g10.xy` | — | byte-identical to g0 |
-| `g11.xy` | `+0x3956` | crossfade `96` (≈75%) |
+| `g11.xy` | `+0x3953` u32 / `+0x3956` high byte | crossfade raw `0x60000000`; high byte `96` (≈75%) |
 | `g12`–`g14.xy` | `slot+0x03` | loop type off / until-release / infinite |
 
 Sampler start/end/loop @ `track+0x3943`…`+0x3956` (not drum `slot+0x68`).
