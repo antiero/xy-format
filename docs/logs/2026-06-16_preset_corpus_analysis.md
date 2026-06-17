@@ -115,18 +115,11 @@ It also checks sampler region key consistency: `hikey == pitch.keycenter` and
 | drum `regions[].fade.*` | constant-in-corpus | `fade.in` and `fade.out` are zero in every current drum preset, so this corpus cannot independently map them. |
 | `regions[].lokey`, `regions[].pitch.keycenter` | redundant-or-ignored | Sampler `hikey` equals `pitch.keycenter` and `lokey` is 0 in the current corpus. Clean drum-kit placement follows `hikey - 53`; drum `lokey`/`pitch.keycenter` do not participate in the confirmed slot mapping. |
 
-## Exceptions
+## Known serialization exceptions
 
-`nt-dx analog.xy` appears to contain the `nt-dx legend` preset load:
-
-| Field | Expected from `nt-dx analog.preset` | Found in project |
-| --- | --- | --- |
-| Preset label | `1/nt-dx analog` | `1/nt-dx legend` |
-| Sample path | `/fat32/presets/1/nt-dx analog.preset/unnamed-c3-61.wav` | `/fat32/presets/1/nt-dx legend.preset/unnamed-c3-60.wav` |
-| `regions[0].framecount` | `423043` | `327223` |
-
-Ten synth-ish presets have `fx.params[5] == 21954` in `patch.json`, while the
-project stores `0x7FFFFFFF` at the corresponding lane:
+`fx.params[5]` serializes as raw `0x7FFFFFFF` in every paired capture. Most
+presets already have `32767` in `patch.json`, so the stored max word matches
+ordinary q16 decoding. The visible exceptions are the non-max JSON cases:
 
 ```text
 nt-bellodic
@@ -137,12 +130,22 @@ nt-circus ring
 nt-cold brew
 nt-digital signals
 nt-equinox
-nt-faded
-nt-fly kites
+nt-faux caring
+nt-funker
 ```
 
-This looks like an engine/FX-specific saturation or fixed default lane rather
-than random drift, because all ten project values are exactly `0x7FFFFFFF`.
+The analyzer treats exactly this lane as an accepted serialization exception;
+other FX-param mismatches still appear in the mismatch section.
+
+## Exceptions
+
+`nt-dx analog.xy` appears to contain the `nt-dx legend` preset load:
+
+| Field | Expected from `nt-dx analog.preset` | Found in project |
+| --- | --- | --- |
+| Preset label | `1/nt-dx analog` | `1/nt-dx legend` |
+| Sample path | `/fat32/presets/1/nt-dx analog.preset/unnamed-c3-61.wav` | `/fat32/presets/1/nt-dx legend.preset/unnamed-c3-60.wav` |
+| `regions[0].framecount` | `423043` | `327223` |
 
 Drum kit alignment:
 

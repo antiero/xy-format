@@ -144,7 +144,7 @@ track unless noted.
 | +Offset | Status | Field | Probe |
 | --- | --- | --- | --- |
 | `+0x3457`–`+0x3856` | **~** | Preset identity region (part 2); abuts stepcomps @ `+0x3457` | `set_preset` |
-| `+0x3857`–`+0x386A` | **x** | Engine params 1–4 (u32 each) | `set_engine_param` |
+| `+0x3857`–`+0x3876` | **x** | Engine params 1–8 (u32 each) | `set_engine_param`, preset corpus |
 | `+0x3877` | **x** | M2 amp ADSR (16 B) | corpus |
 | `+0x3897` | **x** | M3 filter knobs (16 B); aux T13-T16 HPF/LPF pinned, params 2/3 located but semantic effect unknown | corpus, AUX-FILTER |
 | `+0x38AF` | **x** | Send FX I (byte @ `+0x38B2`) | P2-A |

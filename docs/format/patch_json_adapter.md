@@ -14,10 +14,10 @@ them into a decoded `.xy` project image.
 | `name` | Preset display/export name. | Ignored; project stores short preset identity separately. |
 | `type` | Preset engine family such as `drum`, `sampler`, `axis`, etc. | `drum` and `sampler` are writable; other types are rejected. |
 | `octave` | Track keyboard octave. | Confirmed readable for T1 at decoded-image `0x003D` as a signed byte; manual device testing shows this is track-global, not pattern-local. The adapter does not write it yet. |
-| `engine` | Engine-level settings and params. | Not written by this adapter. |
-| `envelope` | Amp/filter envelope blocks. | Not written by this adapter. |
-| `fx` | Preset-local FX state. | Not written by this adapter. |
-| `lfo` | Preset-local LFO state. | Not written by this adapter. |
+| `engine` | Engine-level settings and params. | Confirmed common lanes are written for supported sound patches; see below. |
+| `envelope` | Amp/filter envelope blocks. | Confirmed amp/filter ADSR lanes are written for supported sound patches. |
+| `fx` | Preset-local FX state. | Confirmed type/active/params lanes are written for supported sound patches; `params[5]` serializes as max. |
+| `lfo` | Preset-local LFO state. | Confirmed type/active/params lanes are written for supported sound patches. |
 | `regions` | Sample-region list. | Source for writable drum and one-shot sampler fields. |
 
 ## Common engine fields
@@ -47,10 +47,36 @@ modulation.velocity.amount
 modulation.velocity.target
 ```
 
-The adapter currently does not write these top-level engine fields. Some have
-known project-image locations in other readers/writers, but this adapter only
-promotes fields whose `patch.json` meaning and project slot storage are tied
-together by confirmed sample-based preset behavior.
+The adapter writes the confirmed common project-image lanes when applying a
+supported drum or sampler patch. This does **not** make synth-engine preset
+loading complete: unsupported preset types still need opaque engine tails and
+engine-specific state that are not safely synthesized from `patch.json`.
+
+| Field | `.xy` write status |
+| --- | --- |
+| `type` | Written as the engine byte at `track+0x14` for known engine families. |
+| `engine.params[0..7]` | Written as q16 words at `track+0x3857..0x3873`. |
+| `engine.playmode` | `poly` and `mono` are written as the confirmed raw words at `track+0x3887`. |
+| `engine.portamento.amount` | Written as q16 at `track+0x388B`. |
+| `engine.bendrange` | Written as q16 at `track+0x388F`. |
+| `engine.volume` | Written as q16 at `track+0x3893`. |
+| `engine.modulation.*.target/amount` | Written as q16 words at `track+0x38FF..0x3937`. |
+| `engine.velocity.sensitivity` | Written as q16 at `track+0x3917`. |
+| `engine.portamento.type` | Written as q16 at `track+0x391B`. |
+| `engine.tuning.scale` | Written as q16 at `track+0x391F`. |
+| `engine.width` | Written as q16 at `track+0x3923`. |
+| `engine.transpose` | Not written; current paired corpus only constrains two raw values, not a general encoding. |
+| `engine.tuning.root` | Written as q16 at `track+0x392B`. |
+| `engine.highpass` | Written as q16 at `track+0x392F`. |
+| `engine.tuning[]` | Not written; the current corpus did not find this 12-value table in project bytes. |
+| `envelope.amp.*` | Written as q16 words at `track+0x3877..0x3883`. |
+| `envelope.filter.*` | Written as q16 words at `track+0x38D7..0x38E3`. |
+| `fx.type` | `z lowpass`, `svf`, `ladder`, and `z hipass` are written to `track+0x21`. |
+| `fx.active` | Written as boolean byte at `track+0x25`. |
+| `fx.params[0..7]` | Written as q16 words at `track+0x3897..0x38B3`, except `params[5]`, which serializes as raw `0x7FFFFFFF` in every paired capture. |
+| `lfo.type` | `tremolo`, `value`, `random`, and `element` are written to `track+0x1C`. |
+| `lfo.active` | Written as boolean byte at `track+0x20`. |
+| `lfo.params[0..7]` | Written as q16 words at `track+0x38B7..0x38D3`. |
 
 ## Drum region fields
 

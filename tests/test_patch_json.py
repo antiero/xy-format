@@ -9,6 +9,7 @@ from xy import (
     PatchJsonSoundPatchOptions,
     apply_patch_json_sound,
     apply_patch_json_text,
+    read_patch_sound_state,
     drum_kit_patch_from_patch_json,
     inspect_drum_samples,
     inspect_preset_paths,
@@ -21,6 +22,9 @@ from xy import (
 from xy.image_writer import ImageProject
 
 BASE = "src/one-off-changes-from-default/unnamed 1.xy"
+UNIQUE_SAMPLER_PATCH = (
+    "src/sampler-project-state/2026-06-15/presets/t7-map-unique.preset/patch.json"
+)
 
 
 def test_maps_drum_regions_to_pad_patches_by_op_xy_key_order() -> None:
@@ -210,6 +214,49 @@ def test_apply_sampler_patch_json_writes_readable_project_fields() -> None:
     assert sampler.loop_type_byte == LOOP_TYPE_OFF
     assert sampler.gain == 88
     assert sampler.direction == 1
+
+
+def test_apply_sampler_patch_json_writes_confirmed_common_sound_state() -> None:
+    patch = json.loads(open(UNIQUE_SAMPLER_PATCH, encoding="utf-8").read())
+    project = ImageProject.from_file(BASE)
+
+    apply_patch_json_file(
+        project,
+        7,
+        UNIQUE_SAMPLER_PATCH,
+        PatchJsonSoundPatchOptions(preset_device_path="/fat32/presets/snapshot/t7-map-unique.preset"),
+    )
+
+    state = read_patch_sound_state(project, 7)
+    assert state.engine_id == 0x02
+    assert state.engine_params == tuple(patch["engine"]["params"])
+    assert state.playmode_raw == 0x15555555
+    assert state.amp_envelope == (
+        patch["envelope"]["amp"]["attack"],
+        patch["envelope"]["amp"]["decay"],
+        patch["envelope"]["amp"]["sustain"],
+        patch["envelope"]["amp"]["release"],
+    )
+    assert state.fx_type == 0x10
+    assert state.fx_active is True
+    assert state.fx_params[:5] == tuple(patch["fx"]["params"][:5])
+    assert state.fx_params[5] == 0x7FFF
+    assert state.fx_params[6:] == tuple(patch["fx"]["params"][6:])
+    assert state.lfo_type == 0x03
+    assert state.lfo_active is True
+    assert state.lfo_params == tuple(patch["lfo"]["params"])
+    assert state.filter_envelope == (
+        patch["envelope"]["filter"]["attack"],
+        patch["envelope"]["filter"]["decay"],
+        patch["envelope"]["filter"]["sustain"],
+        patch["envelope"]["filter"]["release"],
+    )
+    assert state.portamento_amount == patch["engine"]["portamento.amount"]
+    assert state.bendrange == patch["engine"]["bendrange"]
+    assert state.volume == patch["engine"]["volume"]
+    assert state.modwheel_amount == patch["engine"]["modulation"]["modwheel"]["amount"]
+    assert state.velocity_target == patch["engine"]["modulation"]["velocity"]["target"]
+    assert state.highpass == patch["engine"]["highpass"]
 
 
 def test_apply_patch_json_text_and_file_write_project_fields(tmp_path) -> None:

@@ -69,6 +69,7 @@ Q16_FIELDS = {
 ENGINE_PARAM_OFFSETS = [0x3857, 0x385B, 0x385F, 0x3863, 0x3867, 0x386B, 0x386F, 0x3873]
 FX_PARAM_OFFSETS = [0x3897, 0x389B, 0x389F, 0x38A3, 0x38A7, 0x38AB, 0x38AF, 0x38B3]
 LFO_PARAM_OFFSETS = [0x38B7, 0x38BB, 0x38BF, 0x38C3, 0x38C7, 0x38CB, 0x38CF, 0x38D3]
+FX_PARAM5_SATURATED_RAW = 0x7FFFFFFF
 
 SAMPLER_U32_FIELDS = {
     "regions.0.framecount": 0x393F,
@@ -309,6 +310,10 @@ def analyze(corpus: Path) -> str:
             "- Sampler region fields `loop.onrelease`, `tune`, `lokey`, and `reverse` are constant across all current sampler presets; only their observed/default behavior is constrained.",
             "- Drum region fields `fade.in`, `fade.out`, `pan`, `transpose`, `tune`, `reverse`, and `playmode` are constant in the paired drum corpus (`playmode` is always `oneshot`).",
             "",
+            "## Known Serialization Exceptions",
+            "",
+            "- `fx.params[5]` serializes as raw `0x7FFFFFFF` in every paired capture. This usually matches `patch.json` because most presets already store `32767`; the non-max JSON cases are checked as accepted serialization exceptions.",
+            "",
             "## Mismatches / Exceptions",
             "",
         ]
@@ -502,12 +507,29 @@ def _check_array_q16(
             if index >= len(values) or not isinstance(values[index], int):
                 continue
             expected = values[index]
-            got = _q16(pair.project.image, pair.track_start + offset)
+            raw = _u32(pair.project.image, pair.track_start + offset)
+            if _is_known_array_q16_exception(pair, path, index, expected, raw):
+                continue
+            got = raw >> 16
             if got != expected:
                 mismatches[f"{path}.{index}"].append(
                     f"`{pair.name}`: expected `{expected}`, got `{got}` "
-                    f"(raw `0x{_u32(pair.project.image, pair.track_start + offset):08X}`)"
+                    f"(raw `0x{raw:08X}`)"
                 )
+
+
+def _is_known_array_q16_exception(
+    pair: Pair,
+    path: str,
+    index: int,
+    expected: int,
+    raw: int,
+) -> bool:
+    return (
+        path == "fx.params"
+        and index == 5
+        and raw == FX_PARAM5_SATURATED_RAW
+    )
 
 
 def _check_region_key_consistency(

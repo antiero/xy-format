@@ -54,7 +54,7 @@ p.set_plock_shape_raw(track, 0)
 
 # instrument / sound
 p.set_engine(track, engine_id)
-p.set_engine_param(track, index, value)  # index 1..4, internal u32
+p.set_engine_param(track, index, value)  # index 1..8, internal u32
 p.set_m2_shift(track, play_mode=..., portamento=..., pitch_bend_range=...,
                engine_volume=...)       # raw current-value u32 lanes
 p.set_filter(track, type=..., enabled=...)

@@ -455,10 +455,12 @@ class ImageProject:
     # --- per-track sound / engine (track-relative offsets) ----------------
     TRK_SCALE = 0x06
     TRK_ENGINE = 0x14
+    TRK_LFO_TYPE = 0x1C
     TRK_M4_PAGE = 0x20
+    TRK_LFO_ON = TRK_M4_PAGE
     TRK_FILTER_TYPE = 0x21
     TRK_FILTER_ON = 0x25
-    TRK_PARAMS = 0x3857     # 4 engine params, u32 each
+    TRK_PARAMS = 0x3857     # 8 engine params, u32 each
     TRK_AMP_ENV = {
         "attack": 0x3877,
         "decay": 0x387B,
@@ -471,6 +473,8 @@ class ImageProject:
         "pitch_bend_range": 0x388F,   # CC30 current lane
         "engine_volume": 0x3893,      # CC31 current lane
     }
+    TRK_FX_PARAMS = (0x3897, 0x389B, 0x389F, 0x38A3, 0x38A7, 0x38AB, 0x38AF, 0x38B3)
+    TRK_LFO_PARAMS = (0x38B7, 0x38BB, 0x38BF, 0x38C3, 0x38C7, 0x38CB, 0x38CF, 0x38D3)
     TRK_SENDS = {
         "ext": 0x38A7,    # CC36 current lane
         "tape": 0x38AB,   # CC37 current lane; inferred by lane order
@@ -492,6 +496,22 @@ class ImageProject:
         "decay": 0x38DB,
         "sustain": 0x38DF,
         "release": 0x38E3,
+    }
+    TRK_MODULATION = {
+        "modwheel_target": 0x38FF,
+        "modwheel_amount": 0x3903,
+        "aftertouch_target": 0x3907,
+        "aftertouch_amount": 0x390B,
+        "pitchbend_target": 0x390F,
+        "pitchbend_amount": 0x3913,
+        "velocity_sensitivity": 0x3917,
+        "portamento_type": 0x391B,
+        "tuning_scale": 0x391F,
+        "width": 0x3923,
+        "tuning_root": 0x392B,
+        "highpass": 0x392F,
+        "velocity_target": 0x3933,
+        "velocity_amount": 0x3937,
     }
     TRK_MIX = {
         "pan": 0x38F7,     # CC10 current lane
@@ -565,11 +585,25 @@ class ImageProject:
         self.image[self.track_start(track) + self.TRK_ENGINE] = engine_id & 0xFF
         self.mark_edited(track)
 
+    @staticmethod
+    def _q16(value: int) -> int:
+        if not isinstance(value, int) or isinstance(value, bool):
+            raise TypeError("q16 value must be an integer")
+        if not 0 <= value <= 0x7FFF:
+            raise ValueError("q16 value must be in 0..0x7FFF")
+        return value << 16
+
     def set_engine_param(self, track: int, index: int, value: int) -> None:
-        """index 1..4; value is the device's internal (fixed-point) u32."""
+        """index 1..8; value is the device's internal (fixed-point) u32."""
+        if not 1 <= index <= 8:
+            raise ValueError("engine param index must be 1..8")
         o = self.track_start(track) + self.TRK_PARAMS + (index - 1) * 4
         self.image[o : o + 4] = self._u32(value, where=f"track {track} engine param {index}")
         self.mark_edited(track)
+
+    def set_engine_param_q16(self, track: int, index: int, value: int) -> None:
+        """Set a patch.json-style q16 engine param value (0..0x7FFF)."""
+        self.set_engine_param(track, index, self._q16(value))
 
     def set_engine_params(
         self,
@@ -579,8 +613,15 @@ class ImageProject:
         param2: int | None = None,
         param3: int | None = None,
         param4: int | None = None,
+        param5: int | None = None,
+        param6: int | None = None,
+        param7: int | None = None,
+        param8: int | None = None,
     ) -> None:
-        for index, value in enumerate((param1, param2, param3, param4), start=1):
+        for index, value in enumerate(
+            (param1, param2, param3, param4, param5, param6, param7, param8),
+            start=1,
+        ):
             if value is not None:
                 self.set_engine_param(track, index, value)
 
@@ -729,6 +770,101 @@ class ImageProject:
                     self.TRK_FILTER_ENV[name],
                     value,
                     where=f"track {track} filter envelope {name}",
+                )
+
+    def set_fx_state(
+        self,
+        track: int,
+        *,
+        type: int | None = None,
+        active: bool | None = None,
+        params: list[int] | tuple[int, ...] | None = None,
+    ) -> None:
+        """Set preset-local FX header and q16 params confirmed by the corpus."""
+        if type is not None or active is not None:
+            self.set_filter(track, type=type, enabled=active)
+        if params is not None:
+            if len(params) > len(self.TRK_FX_PARAMS):
+                raise ValueError("FX params must contain at most 8 values")
+            for index, value in enumerate(params):
+                raw = 0x7FFFFFFF if index == 5 else self._q16(value)
+                self._write_track_u32(
+                    track,
+                    self.TRK_FX_PARAMS[index],
+                    raw,
+                    where=f"track {track} FX param {index + 1}",
+                )
+
+    def set_lfo_state(
+        self,
+        track: int,
+        *,
+        type: int | None = None,
+        active: bool | None = None,
+        params: list[int] | tuple[int, ...] | None = None,
+    ) -> None:
+        """Set preset-local LFO header and q16 params confirmed by the corpus."""
+        s = self.track_start(track)
+        if type is not None:
+            self.image[s + self.TRK_LFO_TYPE] = type & 0xFF
+        if active is not None:
+            self.image[s + self.TRK_LFO_ON] = 1 if active else 0
+        if type is not None or active is not None:
+            self.mark_edited(track)
+        if params is not None:
+            if len(params) > len(self.TRK_LFO_PARAMS):
+                raise ValueError("LFO params must contain at most 8 values")
+            for index, value in enumerate(params):
+                self._write_track_u32(
+                    track,
+                    self.TRK_LFO_PARAMS[index],
+                    self._q16(value),
+                    where=f"track {track} LFO param {index + 1}",
+                )
+
+    def set_patch_modulation_state(
+        self,
+        track: int,
+        *,
+        modwheel_target: int | None = None,
+        modwheel_amount: int | None = None,
+        aftertouch_target: int | None = None,
+        aftertouch_amount: int | None = None,
+        pitchbend_target: int | None = None,
+        pitchbend_amount: int | None = None,
+        velocity_sensitivity: int | None = None,
+        portamento_type: int | None = None,
+        tuning_scale: int | None = None,
+        width: int | None = None,
+        tuning_root: int | None = None,
+        highpass: int | None = None,
+        velocity_target: int | None = None,
+        velocity_amount: int | None = None,
+    ) -> None:
+        """Set confirmed patch.json q16 modulation/settings lanes."""
+        values = {
+            "modwheel_target": modwheel_target,
+            "modwheel_amount": modwheel_amount,
+            "aftertouch_target": aftertouch_target,
+            "aftertouch_amount": aftertouch_amount,
+            "pitchbend_target": pitchbend_target,
+            "pitchbend_amount": pitchbend_amount,
+            "velocity_sensitivity": velocity_sensitivity,
+            "portamento_type": portamento_type,
+            "tuning_scale": tuning_scale,
+            "width": width,
+            "tuning_root": tuning_root,
+            "highpass": highpass,
+            "velocity_target": velocity_target,
+            "velocity_amount": velocity_amount,
+        }
+        for name, value in values.items():
+            if value is not None:
+                self._write_track_u32(
+                    track,
+                    self.TRK_MODULATION[name],
+                    self._q16(value),
+                    where=f"track {track} patch {name}",
                 )
 
     def set_track_mix(
