@@ -96,9 +96,9 @@ all 139 paired captures match the `lfo.type`, `lfo.active`, `fx.type`, and
 | `engine.playmode` | confirmed | Raw word at `track+0x3887`. |
 | `engine.portamento.amount`, `engine.bendrange`, `engine.volume` | confirmed | q16 words at `track+0x388B/0x388F/0x3893`. |
 | `engine.velocity.sensitivity`, `engine.portamento.type`, `engine.tuning.scale`, `engine.width`, `engine.tuning.root`, `engine.highpass` | confirmed | q16 words in the `track+0x3917..0x392F` block. |
-| `engine.transpose` | candidate | Raw word at `track+0x3927`; observed `0 -> 0x3FFFFFF8`, `12 -> 0x550A8538`. Encoding not generalized. |
+| `engine.transpose` | candidate | Raw word at `track+0x3927`; current paired corpus only has `0 -> 0x3FFFFFF8` and `12 -> 0x550A8538`, so encoding is not generalized. |
 | `engine.modulation.*.target/amount` | confirmed | q16 words at `track+0x38FF..0x3937`. |
-| `engine.tuning[]` | unresolved | Observed on some organ/epiano/drum/wavetable presets. The paired captures all use the same 12-value table, and no direct float/int/q16 byte table has been found yet. |
+| `engine.tuning[]` | unresolved | Observed on 25 presets, 8 paired captures. All use the same 12-value table; direct float/int/q16 byte-table searches did not find it. |
 | `envelope.amp.*`, `envelope.filter.*` | confirmed | q16 ADSR words in the known envelope blocks. |
 | `fx.type`, `fx.active` | confirmed | Header bytes at `track+0x21` and `track+0x25`. |
 | `fx.params[0..7]` | confirmed-with-exception | q16 words at `track+0x3897..0x38B3`; `params[5]` can serialize as max for some FX/type combinations. |
@@ -106,7 +106,7 @@ all 139 paired captures match the `lfo.type`, `lfo.active`, `fx.type`, and
 | `lfo.params[0..7]` | confirmed | q16 words at `track+0x38B7..0x38D3`. |
 | sampler `regions[0].sample`, `hikey`, `pitch.keycenter`, `framecount`, `sample.end`, `loop.start`, `loop.end`, `loop.crossfade` | confirmed | Sample path string, root/keycenter byte, u32 sample-window fields, and normalized crossfade byte. |
 | sampler `regions[0].sample.start`, `reverse`, `gain` | confirmed-for-observed-values | `sample.start` maps to the u32 word when present; `reverse=false` maps to direction byte `0`; observed `gain` values map directly to byte `track+0x395C`. |
-| sampler `regions[0].loop.onrelease`, `tune` | unresolved | `loop.onrelease=true` does not match the previous loop-type assumption in this corpus. `tune` is always zero; slot `+0x00` is keycenter/root instead. |
+| sampler `regions[0].loop.enabled`, `loop.onrelease`, `tune`, `lokey`, `reverse` | constant-in-corpus | `loop.enabled` is absent, `loop.onrelease` is always true, `tune` and `lokey` are always 0, and `reverse` is always false in current sampler presets. |
 | drum `regions[].sample`, `hikey`, `reverse`, `pan`, `transpose`, `tune`, `playmode` | partial | Ten clean 24-region kits align with `track+0x3957 + (hikey - 53) * 0x80`; current paired captures only show `oneshot` as byte `1`. |
 | drum `regions[].sample.end`, `framecount` | confirmed-for-clean-full-kits | Ten clean 24-region kits store voice 0 in the pre-table header (`+0x393F/+0x3947`) and voices 1-23 in the previous slot's `+0x68/+0x70`. Sparse/rotated kits remain unresolved. |
 | drum `regions[].fade.*` | constant-in-corpus | `fade.in` and `fade.out` are zero in every current drum preset, so this corpus cannot independently map them. |
@@ -163,6 +163,20 @@ Drum kit caveats:
 - `nt-cherry.xy` has a missing/empty voice in the middle of the 24-slot table,
   after which path and end alignment no longer match a simple `hikey - 53`
   mapping.
+
+## Corpus limits / still under-constrained
+
+- `engine.transpose` has only two paired values (`0` and `12`), so the raw
+  words are known but the general encoding is not.
+- `engine.tuning[]` appears in 25 presets but always with the same 12-value
+  table; no direct float32/float64/int-cent/q16 table was found in the paired
+  track images.
+- Sampler region fields `loop.onrelease`, `tune`, `lokey`, and `reverse` are
+  constant across all current sampler presets; only their observed/default
+  behavior is constrained.
+- Drum region fields `fade.in`, `fade.out`, `pan`, `transpose`, `tune`,
+  `reverse`, and `playmode` are constant in the paired drum corpus (`playmode`
+  is always `oneshot`).
 
 ## Tooling
 
