@@ -7,6 +7,10 @@ import wave
 from pathlib import Path
 
 from xy.image_writer import ImageProject
+from xy.sampler_sample_inspection import (
+    decode_sampler_loop_crossfade_frames,
+    read_sampler_sample_edit,
+)
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -103,6 +107,12 @@ def test_loop_edit_moves_only_preslot_window_values() -> None:
     assert _u32(changed, 7, 0x394B) == 0x7F4A
     assert _u32(changed, 7, 0x394F) == 0x128BF
 
+    inspected = read_sampler_sample_edit(changed, track=7)
+    assert inspected.sample_start == 0x1F65
+    assert inspected.sample_end == 0x175F1
+    assert inspected.loop_start == 0x7F4A
+    assert inspected.loop_end == 0x128BF
+
 
 def test_unique_sampler_preset_alignment_maps_project_sound_state() -> None:
     project = _project("smp07_t7_unique_sampler_preset_loaded.xy")
@@ -161,3 +171,10 @@ def test_unique_sampler_preset_alignment_maps_project_sound_state() -> None:
     assert _u32(project, 7, 0x394B) == region["loop.start"]
     assert _u32(project, 7, 0x394F) == region["loop.end"]
     assert _u32(project, 7, 0x3953) == 0x02A73100
+
+    inspected = read_sampler_sample_edit(project, track=7)
+    assert inspected.loop_crossfade_raw == 0x02A73100
+    assert decode_sampler_loop_crossfade_frames(
+        inspected.loop_crossfade_raw,
+        region["framecount"],
+    ) == region["loop.crossfade"]

@@ -19,6 +19,7 @@ from xy import (
     sound_patch_from_patch_json,
 )
 from xy.image_writer import ImageProject
+from xy.sampler_sample_inspection import encode_sampler_loop_crossfade_frames
 
 BASE = "src/one-off-changes-from-default/unnamed 1.xy"
 
@@ -90,6 +91,7 @@ def test_maps_sampler_patch_region_to_one_shot_sampler_patch_shape() -> None:
     assert patch.loop_start == 123
     assert patch.loop_end == 2345
     assert patch.loop_crossfade == 55
+    assert patch.loop_crossfade_raw == encode_sampler_loop_crossfade_frames(55, 5000)
     assert patch.tune_tenths == -5
     assert patch.loop_type == LOOP_TYPE_INFINITE
     assert patch.gain == 99
@@ -102,6 +104,13 @@ def test_maps_disabled_sampler_loops_to_loop_off_storage() -> None:
     )
 
     assert patch.loop_type == LOOP_TYPE_OFF
+
+
+def test_sampler_patch_json_requires_frame_count_for_crossfade_frames() -> None:
+    with pytest.raises(ValueError, match="requires framecount"):
+        sampler_patch_from_patch_json(
+            {"type": "sampler", "regions": [{"sample": "one.wav", "loop.crossfade": 12}]}
+        )
 
 
 def test_reads_patch_json_text_and_file(tmp_path) -> None:
@@ -202,11 +211,38 @@ def test_apply_sampler_patch_json_writes_readable_project_fields() -> None:
     assert sampler.sample_end == 4321
     assert sampler.loop_start == 123
     assert sampler.loop_end == 2345
-    assert sampler.loop_crossfade == 55
+    assert sampler.loop_crossfade_raw == encode_sampler_loop_crossfade_frames(55, 4321)
+    assert sampler.loop_crossfade == (sampler.loop_crossfade_raw >> 24)
     assert sampler.tune_tenths == 4
     assert sampler.loop_type_byte == LOOP_TYPE_OFF
     assert sampler.gain == 88
     assert sampler.direction == 1
+
+
+def test_apply_sampler_patch_json_writes_u32_sample_points() -> None:
+    project = ImageProject.from_file(BASE)
+    apply_patch_json_sound(
+        project,
+        3,
+        {
+            "type": "sampler",
+            "regions": [
+                {
+                    "sample": "long.wav",
+                    "framecount": 0x176B1,
+                    "sample.start": 0x1F65,
+                    "loop.start": 0x14D1A,
+                    "loop.end": 0x178AC,
+                }
+            ],
+        },
+    )
+
+    sampler = read_sampler_sample_edit(project, 3)
+    assert sampler.sample_start == 0x1F65
+    assert sampler.sample_end == 0x176B1
+    assert sampler.loop_start == 0x14D1A
+    assert sampler.loop_end == 0x178AC
 
 
 def test_apply_patch_json_text_and_file_write_project_fields(tmp_path) -> None:

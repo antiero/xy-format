@@ -63,7 +63,7 @@ For `type: "drum"`, each region maps to one pad. The adapter uses
 | `hikey` | Written as drum key assignment and used to select voice index. |
 | `lokey` | Ignored; observed drum presets use `lokey == hikey`. |
 | `pitch.keycenter` | Ignored; observed drum presets use `60`. |
-| `playmode` | Written as drum play mode (`oneshot`, `group`, `loop`, `gate`, or numeric value). |
+| `playmode` | Written as drum play mode using the patch.json adapter mapping `oneshot=0`, `group=1`, `loop=2`, `gate=3`; numeric values are passed through. |
 | `reverse` | Written as drum direction. |
 | `transpose` | Written as drum tune when present. |
 | `tune` | Written as drum tune only when `transpose` is absent. |
@@ -83,12 +83,12 @@ first region. Multi-zone behavior is intentionally not claimed here.
 | Region field | `.xy` write status |
 | --- | --- |
 | `sample` | Written to the sampler slot path. If `preset_device_path` is supplied, it is prefixed as `<preset_device_path>/<sample>`. |
-| `sample.start` | Written as sampler sample start. |
-| `sample.end` | Written as sampler sample end. |
-| `framecount` | Used as sampler sample end only when `sample.end` is absent. |
-| `loop.start` | Written as sampler loop start. |
-| `loop.end` | Written as sampler loop end. |
-| `loop.crossfade` | Written as sampler loop crossfade byte. |
+| `sample.start` | Written as sampler sample start u32. |
+| `sample.end` | Written as sampler sample end u32. |
+| `framecount` | Used as sampler sample end u32 only when `sample.end` is absent. |
+| `loop.start` | Written as sampler loop start u32. |
+| `loop.end` | Written as sampler loop end u32. |
+| `loop.crossfade` | Written as sampler loop crossfade frames, normalized against `framecount` into the raw u32 at track `+0x3953`; if `framecount` is absent, `sample.end` is used as a fallback denominator. |
 | `loop.enabled` | `false` writes loop type `off`; otherwise loop type defaults to `infinite` unless `loop.onrelease` is true. |
 | `loop.onrelease` | `true` writes loop type `until_release`. |
 | `tune` | Written as sampler tune tenths. |

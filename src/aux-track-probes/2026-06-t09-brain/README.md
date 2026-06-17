@@ -13,7 +13,7 @@ recorded Brain sequence storage.
 | --- | --- |
 | `t09-brain-mode-manual.xy` | Set Brain mode to manual. | Manual - c major |
 | `t09-brain-mode-auto.xy` | Set Brain mode to auto. | Auto - same as default. also detects as c major. |
-| `t09-brain-key-d.xy` | Set key/root to D | manual - key d major. expect increment of 2 semitones from c major.| 
+| `t09-brain-key-d.xy` | Set key/root to D | manual - key d major. expect increment of 2 semitones from c major.|
 | `t09-brain-scale-minor.xy` | Set scale to minor. | manual - scale C minor (index 6). |
 | `t09-brain-link-t1.xy` | Link T1. | default is not linked |
 | `t09-brain-link-t2.xy` | Link T2. | default is not linked |

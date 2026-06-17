@@ -7,8 +7,6 @@ from dataclasses import dataclass
 from .image_writer import ImageProject
 from .rle import decode_project
 
-TRACK_BASE0 = 0x0D79
-TRACK_STRIDE = 0x45D4
 BRAIN_TRACK = 9
 
 BRAIN_ROUTE_MASK_OFFSET = 0x09
@@ -112,15 +110,9 @@ class BrainInspection:
         return BRAIN_SCALE_NAMES[self.candidate_scale_index]
 
 
-def _track_base(track: int) -> int:
-    if not 1 <= track <= 16:
-        raise ValueError("track must be 1..16")
-    return TRACK_BASE0 + (track - 1) * TRACK_STRIDE
-
-
 def read_brain(project: ImageProject) -> BrainInspection:
     image = project.image
-    base = _track_base(BRAIN_TRACK)
+    base = project.track_start(BRAIN_TRACK)
     param_words = tuple(
         int.from_bytes(
             image[

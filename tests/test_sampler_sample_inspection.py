@@ -4,6 +4,8 @@ import pytest
 
 from xy.rle import decode_project
 from xy.sampler_sample_inspection import (
+    decode_sampler_loop_crossfade_frames,
+    encode_sampler_loop_crossfade_frames,
     LOOP_TYPE_INFINITE,
     LOOP_TYPE_OFF,
     LOOP_TYPE_UNTIL_RELEASE,
@@ -42,9 +44,10 @@ def test_baseline_sampler_fields() -> None:
     assert sample.engine_id == 0x02
     assert "nt-acidic" in sample.path
     assert sample.sample_start == 0
-    assert sample.sample_end == 0x7DF4
-    assert sample.loop_start == 0x6EC5
-    assert sample.loop_end == 0x7DF4
+    assert sample.sample_end == 0x17DF4
+    assert sample.loop_start == 0x16EC5
+    assert sample.loop_end == 0x17DF4
+    assert sample.loop_crossfade_raw == 0
     assert sample.loop_crossfade == 0
     assert sample.tune_byte == 0x3C
     assert sample.tune_aux_byte == 0
@@ -59,9 +62,9 @@ def test_baseline_sampler_fields() -> None:
         ("g1.xy", {"tune_byte": 0xFF}),
         ("g2.xy", {"tune_byte": 0x00, "tune_aux_byte": 0x5A}),
         ("g3.xy", {"sample_start": 0x17C4}),
-        ("g4.xy", {"sample_end": 0x76B1, "loop_end": 0x76B1}),
-        ("g5.xy", {"loop_start": 0x4D1A}),
-        ("g6.xy", {"loop_end": 0x78AC, "sample_end": 0x7DF4}),
+        ("g4.xy", {"sample_end": 0x176B1, "loop_end": 0x176B1}),
+        ("g5.xy", {"loop_start": 0x14D1A}),
+        ("g6.xy", {"loop_end": 0x178AC, "sample_end": 0x17DF4}),
         ("g7.xy", {"direction": 1}),
         ("g8.xy", {"gain": 0xE2}),
         ("g9.xy", {"gain": 0x14}),
@@ -198,10 +201,10 @@ def test_sampler_sample_edit_writer_roundtrips_through_reader() -> None:
     project = ImageProject.from_file(str(BASELINE))
     project.set_sampler_sample_edit(
         1,
-        sample_start=100,
-        sample_end=200,
-        loop_start=120,
-        loop_end=180,
+        sample_start=0x1F65,
+        sample_end=0x176B1,
+        loop_start=0x14D1A,
+        loop_end=0x178AC,
         loop_crossfade=96,
         tune_tenths=-5,
         loop_type=LOOP_TYPE_OFF,
@@ -212,12 +215,20 @@ def test_sampler_sample_edit_writer_roundtrips_through_reader() -> None:
     reread = ImageProject(project.header, bytearray(decode_project(project.to_bytes())[1]))
     reread._rescan()
     sample = read_sampler_sample_edit(reread)
-    assert sample.sample_start == 100
-    assert sample.sample_end == 200
-    assert sample.loop_start == 120
-    assert sample.loop_end == 180
+    assert sample.sample_start == 0x1F65
+    assert sample.sample_end == 0x176B1
+    assert sample.loop_start == 0x14D1A
+    assert sample.loop_end == 0x178AC
+    assert sample.loop_crossfade_raw == 0x60000000
     assert sample.loop_crossfade == 96
+    assert sample.loop_crossfade_percent == 75
     assert sample.tune_tenths == -5
     assert sample.loop_type_byte == LOOP_TYPE_OFF
     assert sample.gain == 0x7F
     assert sample.direction == 1
+
+
+def test_sampler_loop_crossfade_frame_encoder_matches_unique_preset_capture() -> None:
+    raw = encode_sampler_loop_crossfade_frames(2048, 98807)
+    assert raw == 0x02A73100
+    assert decode_sampler_loop_crossfade_frames(raw, 98807) == 2048
