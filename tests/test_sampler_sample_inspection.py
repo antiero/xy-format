@@ -42,9 +42,9 @@ def test_baseline_sampler_fields() -> None:
     assert sample.engine_id == 0x02
     assert "nt-acidic" in sample.path
     assert sample.sample_start == 0
-    assert sample.sample_end == 0x7DF4
-    assert sample.loop_start == 0x6EC5
-    assert sample.loop_end == 0x7DF4
+    assert sample.sample_end == 0x17DF4
+    assert sample.loop_start == 0x16EC5
+    assert sample.loop_end == 0x17DF4
     assert sample.loop_crossfade == 0
     assert sample.tune_byte == 0x3C
     assert sample.tune_aux_byte == 0
@@ -59,9 +59,9 @@ def test_baseline_sampler_fields() -> None:
         ("g1.xy", {"tune_byte": 0xFF}),
         ("g2.xy", {"tune_byte": 0x00, "tune_aux_byte": 0x5A}),
         ("g3.xy", {"sample_start": 0x17C4}),
-        ("g4.xy", {"sample_end": 0x76B1, "loop_end": 0x76B1}),
-        ("g5.xy", {"loop_start": 0x4D1A}),
-        ("g6.xy", {"loop_end": 0x78AC, "sample_end": 0x7DF4}),
+        ("g4.xy", {"sample_end": 0x176B1, "loop_end": 0x176B1}),
+        ("g5.xy", {"loop_start": 0x14D1A}),
+        ("g6.xy", {"loop_end": 0x178AC, "sample_end": 0x17DF4}),
         ("g7.xy", {"direction": 1}),
         ("g8.xy", {"gain": 0xE2}),
         ("g9.xy", {"gain": 0x14}),

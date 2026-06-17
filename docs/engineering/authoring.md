@@ -117,6 +117,14 @@ The only authoring rule that matters: **build a coherent machine state**
 *impossible* state, not bad syntax). Start from a real baseline, apply
 edits, keep counts/selections/scene state consistent.
 
+Preset-copy donors are part of that coherence rule. `ImageProject.set_preset()`
+copies post-note-count storage as part of the device-validated preset identity
+transfer, so its donor track must be a pristine single-pattern, zero-note
+preset-load track. Do not pass generated arrangement tracks as preset donors;
+if a workflow needs sound state from a generated project, copy only the known
+sound identity ranges before `track+0x456F` and leave the target note vector
+local.
+
 ## Removed Legacy Writers
 
 The old scaffold, descriptor, preamble, event-type, profile, and velocity-nudge
