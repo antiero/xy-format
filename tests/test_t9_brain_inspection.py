@@ -3,6 +3,7 @@ from pathlib import Path
 import pytest
 
 from xy.brain_inspection import inspect_brain_bytes
+from xy.image_writer import ImageProject
 
 PROBES = Path("src/aux-track-probes/2026-06-t09-brain")
 
@@ -56,6 +57,16 @@ def test_brain_recorded_notes_use_generic_note_vector() -> None:
     assert brain.notes[1].note == 67
     assert brain.notes[1].velocity == 100
     assert brain.notes[1].flags == (0, 0)
+
+
+def test_brain_inspection_uses_decoded_track_locator_after_earlier_track_growth() -> None:
+    project = ImageProject.from_file(str(PROBES / "t09-brain-route-t1-only.xy"))
+    project.add_note(1, step=1, note=60)
+
+    brain = inspect_brain_bytes(project.to_bytes())
+
+    assert brain.route_mask == 0x01
+    assert brain.routed_tracks == (1,)
 
 
 def test_brain_known_raw_parameter_words() -> None:
@@ -125,5 +136,3 @@ def test_brain_scale_candidate_uses_seven_encoder_buckets(
     assert brain.scale_raw == raw
     assert brain.candidate_scale_index == index
     assert brain.candidate_scale_name == name
-
-

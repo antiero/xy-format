@@ -198,10 +198,10 @@ def test_sampler_sample_edit_writer_roundtrips_through_reader() -> None:
     project = ImageProject.from_file(str(BASELINE))
     project.set_sampler_sample_edit(
         1,
-        sample_start=100,
-        sample_end=200,
-        loop_start=120,
-        loop_end=180,
+        sample_start=0x1F65,
+        sample_end=0x176B1,
+        loop_start=0x14D1A,
+        loop_end=0x178AC,
         loop_crossfade=96,
         tune_tenths=-5,
         loop_type=LOOP_TYPE_OFF,
@@ -212,10 +212,10 @@ def test_sampler_sample_edit_writer_roundtrips_through_reader() -> None:
     reread = ImageProject(project.header, bytearray(decode_project(project.to_bytes())[1]))
     reread._rescan()
     sample = read_sampler_sample_edit(reread)
-    assert sample.sample_start == 100
-    assert sample.sample_end == 200
-    assert sample.loop_start == 120
-    assert sample.loop_end == 180
+    assert sample.sample_start == 0x1F65
+    assert sample.sample_end == 0x176B1
+    assert sample.loop_start == 0x14D1A
+    assert sample.loop_end == 0x178AC
     assert sample.loop_crossfade == 96
     assert sample.tune_tenths == -5
     assert sample.loop_type_byte == LOOP_TYPE_OFF

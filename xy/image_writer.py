@@ -1038,26 +1038,26 @@ class ImageProject:
     ) -> None:
         """Set confirmed one-shot Sampler sample-edit fields.
 
-        Numeric point fields are raw u16/u8 storage values from the P2-B probes.
+        Numeric point fields are raw u32/u8 storage values from the P2-B probes.
         ``tune_tenths`` uses the probe-backed sampler tune encoder.
         """
         from .sampler_sample_inspection import encode_sampler_tune_tenths
 
         s = self.track_start(track)
 
-        def write_u16(rel: int, value: int) -> None:
-            if not 0 <= value <= 0xFFFF:
-                raise ValueError("sampler point value must be u16")
-            self.image[s + rel : s + rel + 2] = value.to_bytes(2, "little")
+        def write_u32(rel: int, value: int) -> None:
+            if not 0 <= value <= 0xFFFFFFFF:
+                raise ValueError("sampler point value must be u32")
+            self.image[s + rel : s + rel + 4] = value.to_bytes(4, "little")
 
         if sample_start is not None:
-            write_u16(self.SAMPLER_START, sample_start)
+            write_u32(self.SAMPLER_START, sample_start)
         if sample_end is not None:
-            write_u16(self.SAMPLER_END, sample_end)
+            write_u32(self.SAMPLER_END, sample_end)
         if loop_start is not None:
-            write_u16(self.SAMPLER_LOOP_START, loop_start)
+            write_u32(self.SAMPLER_LOOP_START, loop_start)
         if loop_end is not None:
-            write_u16(self.SAMPLER_LOOP_END, loop_end)
+            write_u32(self.SAMPLER_LOOP_END, loop_end)
         if loop_crossfade is not None:
             if not 0 <= loop_crossfade <= 0xFF:
                 raise ValueError("sampler loop crossfade must be u8")
