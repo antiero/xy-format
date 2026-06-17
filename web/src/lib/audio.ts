@@ -20,13 +20,14 @@ class AudioService {
             }
 
             // Load worklet processor
-            await this.context.audioWorklet.addModule('/spessasynth_processor.min.js');
+            const basePath = import.meta.env.BASE_URL;
+            await this.context.audioWorklet.addModule(`${basePath}spessasynth_processor.min.js`);
 
             this.synth = new WorkletSynthesizer(this.context);
             this.synth.connect(this.context.destination);
 
             // Fetch default soundfont
-            const response = await fetch('/soundfont/A320U.sf2');
+            const response = await fetch(`${basePath}soundfont/A320U.sf2`);
             const arrayBuffer = await response.arrayBuffer();
 
             await this.synth.soundBankManager.addSoundBank(arrayBuffer, 'main');
