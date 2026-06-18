@@ -7,6 +7,7 @@ import wave
 from pathlib import Path
 
 from xy.image_writer import ImageProject
+from xy.patch_sound_state import read_patch_sound_state
 from xy.sampler_sample_inspection import (
     decode_sampler_loop_crossfade_frames,
     read_sampler_sample_edit,
@@ -171,6 +172,44 @@ def test_unique_sampler_preset_alignment_maps_project_sound_state() -> None:
     assert _u32(project, 7, 0x394B) == region["loop.start"]
     assert _u32(project, 7, 0x394F) == region["loop.end"]
     assert _u32(project, 7, 0x3953) == 0x02A73100
+
+def test_patch_sound_state_reader_maps_unique_sampler_preset() -> None:
+    project = _project("smp07_t7_unique_sampler_preset_loaded.xy")
+    patch = _unique_preset()
+    state = read_patch_sound_state(project, 7)
+
+    assert state.engine_id == 0x02
+    assert state.engine_params == (0x4000,) * 8
+    assert state.playmode_raw == 0x15555555
+    assert state.amp_envelope == (
+        patch["envelope"]["amp"]["attack"],
+        patch["envelope"]["amp"]["decay"],
+        patch["envelope"]["amp"]["sustain"],
+        patch["envelope"]["amp"]["release"],
+    )
+    assert state.fx_params[:5] == tuple(patch["fx"]["params"][:5])
+    assert state.fx_params[5] == 0x7FFF
+    assert state.fx_params[6:] == tuple(patch["fx"]["params"][6:])
+    assert state.lfo_params == tuple(patch["lfo"]["params"])
+    assert state.filter_envelope == (
+        patch["envelope"]["filter"]["attack"],
+        patch["envelope"]["filter"]["decay"],
+        patch["envelope"]["filter"]["sustain"],
+        patch["envelope"]["filter"]["release"],
+    )
+    assert state.modwheel_target == patch["engine"]["modulation"]["modwheel"]["target"]
+    assert state.aftertouch_amount == patch["engine"]["modulation"]["aftertouch"]["amount"]
+    assert state.pitchbend_target == patch["engine"]["modulation"]["pitchbend"]["target"]
+    assert state.velocity_sensitivity == patch["engine"]["velocity.sensitivity"]
+    assert state.portamento_type == patch["engine"]["portamento.type"]
+    assert state.width == patch["engine"]["width"]
+    assert state.highpass == patch["engine"]["highpass"]
+
+
+def test_unique_sampler_preset_raw_crossfade_maps_to_patch_json_frames() -> None:
+    project = _project("smp07_t7_unique_sampler_preset_loaded.xy")
+    patch = _unique_preset()
+    region = patch["regions"][0]
 
     inspected = read_sampler_sample_edit(project, track=7)
     assert inspected.loop_crossfade_raw == 0x02A73100

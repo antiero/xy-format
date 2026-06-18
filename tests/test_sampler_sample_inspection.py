@@ -13,10 +13,10 @@ from xy.sampler_sample_inspection import (
     SAMPLER_TUNE_NEGATIVE_BYTE,
     SamplerSampleEdit,
     TRACK_LOOP_CROSSFADE_U8,
-    TRACK_LOOP_END_U16,
-    TRACK_LOOP_START_U16,
-    TRACK_SAMPLE_END_U16,
-    TRACK_SAMPLE_START_U16,
+    TRACK_LOOP_END_U32,
+    TRACK_LOOP_START_U32,
+    TRACK_SAMPLE_END_U32,
+    TRACK_SAMPLE_START_U32,
     VOICE_TABLE_OFFSET,
     SLOT_DIRECTION,
     SLOT_GAIN,
@@ -43,6 +43,7 @@ def test_baseline_sampler_fields() -> None:
     sample = _baseline()
     assert sample.engine_id == 0x02
     assert "nt-acidic" in sample.path
+    assert sample.framecount == 0x17DF4
     assert sample.sample_start == 0
     assert sample.sample_end == 0x17DF4
     assert sample.loop_start == 0x16EC5
@@ -109,18 +110,18 @@ def _track_region_diffs(base: bytes, var: bytes, track_base: int) -> list[int]:
     [
         ("g1.xy", {VOICE_TABLE_OFFSET + SLOT_TUNE}),
         ("g2.xy", {VOICE_TABLE_OFFSET + SLOT_TUNE, VOICE_TABLE_OFFSET + SLOT_TUNE_AUX}),
-        ("g3.xy", {TRACK_SAMPLE_START_U16, TRACK_SAMPLE_START_U16 + 1}),
+        ("g3.xy", {TRACK_SAMPLE_START_U32, TRACK_SAMPLE_START_U32 + 1}),
         (
             "g4.xy",
             {
-                TRACK_SAMPLE_END_U16,
-                TRACK_SAMPLE_END_U16 + 1,
-                TRACK_LOOP_END_U16,
-                TRACK_LOOP_END_U16 + 1,
+                TRACK_SAMPLE_END_U32,
+                TRACK_SAMPLE_END_U32 + 1,
+                TRACK_LOOP_END_U32,
+                TRACK_LOOP_END_U32 + 1,
             },
         ),
-        ("g5.xy", {TRACK_LOOP_START_U16, TRACK_LOOP_START_U16 + 1}),
-        ("g6.xy", {TRACK_LOOP_END_U16, TRACK_LOOP_END_U16 + 1}),
+        ("g5.xy", {TRACK_LOOP_START_U32, TRACK_LOOP_START_U32 + 1}),
+        ("g6.xy", {TRACK_LOOP_END_U32, TRACK_LOOP_END_U32 + 1}),
         ("g7.xy", {VOICE_TABLE_OFFSET + SLOT_DIRECTION}),
         ("g8.xy", {VOICE_TABLE_OFFSET + SLOT_GAIN}),
         ("g9.xy", {VOICE_TABLE_OFFSET + SLOT_GAIN}),
@@ -201,10 +202,11 @@ def test_sampler_sample_edit_writer_roundtrips_through_reader() -> None:
     project = ImageProject.from_file(str(BASELINE))
     project.set_sampler_sample_edit(
         1,
-        sample_start=0x1F65,
-        sample_end=0x176B1,
-        loop_start=0x14D1A,
-        loop_end=0x178AC,
+        framecount=0x20000,
+        sample_start=100,
+        sample_end=0x12345,
+        loop_start=0x10020,
+        loop_end=0x12300,
         loop_crossfade=96,
         tune_tenths=-5,
         loop_type=LOOP_TYPE_OFF,
@@ -215,10 +217,11 @@ def test_sampler_sample_edit_writer_roundtrips_through_reader() -> None:
     reread = ImageProject(project.header, bytearray(decode_project(project.to_bytes())[1]))
     reread._rescan()
     sample = read_sampler_sample_edit(reread)
-    assert sample.sample_start == 0x1F65
-    assert sample.sample_end == 0x176B1
-    assert sample.loop_start == 0x14D1A
-    assert sample.loop_end == 0x178AC
+    assert sample.framecount == 0x20000
+    assert sample.sample_start == 100
+    assert sample.sample_end == 0x12345
+    assert sample.loop_start == 0x10020
+    assert sample.loop_end == 0x12300
     assert sample.loop_crossfade_raw == 0x60000000
     assert sample.loop_crossfade == 96
     assert sample.loop_crossfade_percent == 75

@@ -1,0 +1,187 @@
+[
+  {
+    "name": "dpm-str-oneshot",
+    "type": "drum",
+    "question": "Drum playmode string oneshot"
+  },
+  {
+    "name": "dpm-str-key",
+    "type": "drum",
+    "question": "Drum playmode string key"
+  },
+  {
+    "name": "dpm-str-group",
+    "type": "drum",
+    "question": "Drum playmode string group"
+  },
+  {
+    "name": "dpm-str-loop",
+    "type": "drum",
+    "question": "Drum playmode string loop"
+  },
+  {
+    "name": "dpm-str-gate",
+    "type": "drum",
+    "question": "Drum playmode string gate"
+  },
+  {
+    "name": "dpm-num-0",
+    "type": "drum",
+    "question": "Drum playmode numeric 0"
+  },
+  {
+    "name": "dpm-num-1",
+    "type": "drum",
+    "question": "Drum playmode numeric 1"
+  },
+  {
+    "name": "dpm-num-2",
+    "type": "drum",
+    "question": "Drum playmode numeric 2"
+  },
+  {
+    "name": "dpm-num-3",
+    "type": "drum",
+    "question": "Drum playmode numeric 3"
+  },
+  {
+    "name": "dpm-num-4",
+    "type": "drum",
+    "question": "Drum playmode numeric 4"
+  },
+  {
+    "name": "slt-enabled-false",
+    "type": "sampler",
+    "question": "Sampler loop.enabled=false"
+  },
+  {
+    "name": "slt-enabled-true-onrelease-true",
+    "type": "sampler",
+    "question": "Sampler enabled true, onrelease true"
+  },
+  {
+    "name": "slt-enabled-true-onrelease-false",
+    "type": "sampler",
+    "question": "Sampler enabled true, onrelease false"
+  },
+  {
+    "name": "slt-missing-enabled",
+    "type": "sampler",
+    "question": "Sampler missing loop.enabled"
+  },
+  {
+    "name": "slt-missing-onrelease",
+    "type": "sampler",
+    "question": "Sampler missing loop.onrelease"
+  },
+  {
+    "name": "scf-00000",
+    "type": "sampler",
+    "question": "Sampler loop.crossfade 0"
+  },
+  {
+    "name": "scf-00001",
+    "type": "sampler",
+    "question": "Sampler loop.crossfade 1"
+  },
+  {
+    "name": "scf-02048",
+    "type": "sampler",
+    "question": "Sampler loop.crossfade 2048"
+  },
+  {
+    "name": "scf-24702",
+    "type": "sampler",
+    "question": "Sampler loop.crossfade 24702"
+  },
+  {
+    "name": "scf-49404",
+    "type": "sampler",
+    "question": "Sampler loop.crossfade 49404"
+  },
+  {
+    "name": "scf-74105",
+    "type": "sampler",
+    "question": "Sampler loop.crossfade 74105"
+  },
+  {
+    "name": "scf-98806",
+    "type": "sampler",
+    "question": "Sampler loop.crossfade 98806"
+  },
+  {
+    "name": "scf-98807",
+    "type": "sampler",
+    "question": "Sampler loop.crossfade 98807"
+  },
+  {
+    "name": "skey-hikey-64",
+    "type": "sampler",
+    "question": "Sampler hikey only 64"
+  },
+  {
+    "name": "skey-pitch-64",
+    "type": "sampler",
+    "question": "Sampler pitch.keycenter only 64"
+  },
+  {
+    "name": "skey-both-64",
+    "type": "sampler",
+    "question": "Sampler hikey and pitch.keycenter 64"
+  },
+  {
+    "name": "skey-lokey-12",
+    "type": "sampler",
+    "question": "Sampler lokey only 12"
+  },
+  {
+    "name": "skey-conflict-h72-p48",
+    "type": "sampler",
+    "question": "Sampler conflict hikey 72 vs pitch.keycenter 48"
+  },
+  {
+    "name": "skey-conflict-h48-p72",
+    "type": "sampler",
+    "question": "Sampler conflict hikey 48 vs pitch.keycenter 72"
+  },
+  {
+    "name": "sfld-tune-neg5",
+    "type": "sampler",
+    "question": "Sampler tune -5"
+  },
+  {
+    "name": "sfld-tune-pos4",
+    "type": "sampler",
+    "question": "Sampler tune +4"
+  },
+  {
+    "name": "sfld-gain-001",
+    "type": "sampler",
+    "question": "Sampler gain 1"
+  },
+  {
+    "name": "sfld-gain-064",
+    "type": "sampler",
+    "question": "Sampler gain 64"
+  },
+  {
+    "name": "sfld-gain-127",
+    "type": "sampler",
+    "question": "Sampler gain 127"
+  },
+  {
+    "name": "sfld-reverse-false",
+    "type": "sampler",
+    "question": "Sampler reverse false"
+  },
+  {
+    "name": "sfld-reverse-true",
+    "type": "sampler",
+    "question": "Sampler reverse true"
+  },
+  {
+    "name": "sfld-gain64-revtrue-tune4",
+    "type": "sampler",
+    "question": "Sampler combined gain/reverse/tune"
+  }
+]

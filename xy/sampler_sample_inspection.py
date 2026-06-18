@@ -2,15 +2,18 @@
 
 Sampler (engine ``0x02``) stores sample path in voice-0 of the shared
 24×128 B table @ ``track+0x3957``. Start/end/loop points live in a
-**per-track** header immediately before that table (``0x3943``–``0x3956``),
+**per-track** header immediately before that table (``0x393F``–``0x3956``),
 not at drum offsets ``+0x68`` / ``+0x70`` inside the slot.
 
 Firmware 1.1.4; validated on ``nt-acidic`` one-shot captures ``g0``–``g14``.
+Preset-corpus captures confirm these sample-window fields are full u32 frame
+positions/counts; the original P2-B probes only changed the low two bytes.
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass
+import struct
 from typing import Literal
 
 from .image_writer import ImageProject
@@ -21,6 +24,7 @@ ENGINE_ID_OFFSET = 0x14
 
 # Per-track sample header (before voice table). These fields are u32 frame
 # positions; the older P2-B one-shot probes only touched the low 16 bits.
+TRACK_FRAMECOUNT_U32 = 0x393F
 TRACK_SAMPLE_START_U32 = 0x3943
 TRACK_SAMPLE_END_U32 = 0x3947
 TRACK_LOOP_START_U32 = 0x394B
@@ -66,6 +70,7 @@ class SamplerSampleEdit:
     track: int
     engine_id: int
     path: str
+    framecount: int
     sample_start: int
     sample_end: int
     loop_start: int
@@ -120,9 +125,10 @@ def _u32_le(img: bytes, offset: int) -> int:
 def encode_sampler_loop_crossfade_frames(crossfade_frames: int, frame_count: int) -> int:
     """Encode patch.json sampler loop-crossfade frames to the project raw u32.
 
-    Preset-load capture ``t7-map-unique`` stores ``loop.crossfade=2048`` for a
-    98,807-frame sample as ``0x02A73100`` at ``track+0x3953``. That matches a
-    ceiling-normalized fraction of the full sample length.
+    Device preset loads use single-precision float normalization against the
+    full sample length, then truncate to u32 storage. The 2026-06 patch.json
+    field experiment validates this across 0, tiny, quarter-ish, and max
+    values for a 98,807-frame probe sample.
     """
     if crossfade_frames < 0:
         raise ValueError("sampler loop crossfade frames must be non-negative")
@@ -130,7 +136,8 @@ def encode_sampler_loop_crossfade_frames(crossfade_frames: int, frame_count: int
         raise ValueError("sampler frame count must be positive")
     if crossfade_frames == 0:
         return 0
-    raw = (crossfade_frames * 0x80000000 + frame_count - 1) // frame_count
+    normalized = crossfade_frames * 0x80000000 / frame_count
+    raw = int(struct.unpack("f", struct.pack("f", normalized))[0])
     return min(raw, 0x7FFFFFFF)
 
 
@@ -202,6 +209,7 @@ def read_sampler_sample_edit(project: ImageProject, track: int = 1) -> SamplerSa
         track=track,
         engine_id=engine_id,
         path=_read_path(slot),
+        framecount=_u32_le(img, base + TRACK_FRAMECOUNT_U32),
         sample_start=_u32_le(img, base + TRACK_SAMPLE_START_U32),
         sample_end=_u32_le(img, base + TRACK_SAMPLE_END_U32),
         loop_start=_u32_le(img, base + TRACK_LOOP_START_U32),

@@ -62,7 +62,9 @@ Filename = **tenths from +0.00** (`1` → UI `+0.10`, `neg2` → `-0.20`).
 | `g11.xy` | `+0x3953` u32 / `+0x3956` high byte | crossfade raw `0x60000000`; high byte `96` (≈75%) |
 | `g12`–`g14.xy` | `slot+0x03` | loop type off / until-release / infinite |
 
-Sampler start/end/loop @ `track+0x3943`…`+0x3956` (not drum `slot+0x68`).
+Sampler framecount/start/end/loop @ `track+0x393F`…`+0x3956` (not drum
+`slot+0x68`). The original one-shot probes only changed low bytes; the preset
+corpus later confirmed these window fields are full u32 values.
 
 **Tune encoding:** positive tenths → aux `N×10`; negative → `0x3D` + `100−N×10`.
 

@@ -455,10 +455,12 @@ class ImageProject:
     # --- per-track sound / engine (track-relative offsets) ----------------
     TRK_SCALE = 0x06
     TRK_ENGINE = 0x14
+    TRK_LFO_TYPE = 0x1C
     TRK_M4_PAGE = 0x20
+    TRK_LFO_ON = TRK_M4_PAGE
     TRK_FILTER_TYPE = 0x21
     TRK_FILTER_ON = 0x25
-    TRK_PARAMS = 0x3857     # 4 engine params, u32 each
+    TRK_PARAMS = 0x3857     # 8 engine params, u32 each
     TRK_AMP_ENV = {
         "attack": 0x3877,
         "decay": 0x387B,
@@ -471,6 +473,8 @@ class ImageProject:
         "pitch_bend_range": 0x388F,   # CC30 current lane
         "engine_volume": 0x3893,      # CC31 current lane
     }
+    TRK_FX_PARAMS = (0x3897, 0x389B, 0x389F, 0x38A3, 0x38A7, 0x38AB, 0x38AF, 0x38B3)
+    TRK_LFO_PARAMS = (0x38B7, 0x38BB, 0x38BF, 0x38C3, 0x38C7, 0x38CB, 0x38CF, 0x38D3)
     TRK_SENDS = {
         "ext": 0x38A7,    # CC36 current lane
         "tape": 0x38AB,   # CC37 current lane; inferred by lane order
@@ -492,6 +496,22 @@ class ImageProject:
         "decay": 0x38DB,
         "sustain": 0x38DF,
         "release": 0x38E3,
+    }
+    TRK_MODULATION = {
+        "modwheel_target": 0x38FF,
+        "modwheel_amount": 0x3903,
+        "aftertouch_target": 0x3907,
+        "aftertouch_amount": 0x390B,
+        "pitchbend_target": 0x390F,
+        "pitchbend_amount": 0x3913,
+        "velocity_sensitivity": 0x3917,
+        "portamento_type": 0x391B,
+        "tuning_scale": 0x391F,
+        "width": 0x3923,
+        "tuning_root": 0x392B,
+        "highpass": 0x392F,
+        "velocity_target": 0x3933,
+        "velocity_amount": 0x3937,
     }
     TRK_MIX = {
         "pan": 0x38F7,     # CC10 current lane
@@ -561,15 +581,37 @@ class ImageProject:
         self.image[self.track_start(track) + self.TRK_SCALE] = b & 0xFF
         self.mark_edited(track)
 
-    def set_engine(self, track: int, engine_id: int) -> None:
-        self.image[self.track_start(track) + self.TRK_ENGINE] = engine_id & 0xFF
-        self.mark_edited(track)
+    def set_engine(self, track: int, engine_id: int, *, pattern: int = 1) -> None:
+        s = self.pattern_start(track, pattern)
+        self.image[s + self.TRK_ENGINE] = engine_id & 0xFF
+        self.mark_pattern_edited(track, pattern)
 
-    def set_engine_param(self, track: int, index: int, value: int) -> None:
-        """index 1..4; value is the device's internal (fixed-point) u32."""
-        o = self.track_start(track) + self.TRK_PARAMS + (index - 1) * 4
+    @staticmethod
+    def _q16(value: int) -> int:
+        if not isinstance(value, int) or isinstance(value, bool):
+            raise TypeError("q16 value must be an integer")
+        if not 0 <= value <= 0x7FFF:
+            raise ValueError("q16 value must be in 0..0x7FFF")
+        return value << 16
+
+    def set_engine_param(self, track: int, index: int, value: int, *, pattern: int = 1) -> None:
+        """index 1..8; value is the device's internal (fixed-point) u32."""
+        if not 1 <= index <= 8:
+            raise ValueError("engine param index must be 1..8")
+        o = self.pattern_start(track, pattern) + self.TRK_PARAMS + (index - 1) * 4
         self.image[o : o + 4] = self._u32(value, where=f"track {track} engine param {index}")
-        self.mark_edited(track)
+        self.mark_pattern_edited(track, pattern)
+
+    def set_engine_param_q16(
+        self,
+        track: int,
+        index: int,
+        value: int,
+        *,
+        pattern: int = 1,
+    ) -> None:
+        """Set a patch.json-style q16 engine param value (0..0x7FFF)."""
+        self.set_engine_param(track, index, self._q16(value), pattern=pattern)
 
     def set_engine_params(
         self,
@@ -579,15 +621,31 @@ class ImageProject:
         param2: int | None = None,
         param3: int | None = None,
         param4: int | None = None,
+        param5: int | None = None,
+        param6: int | None = None,
+        param7: int | None = None,
+        param8: int | None = None,
+        pattern: int = 1,
     ) -> None:
-        for index, value in enumerate((param1, param2, param3, param4), start=1):
+        for index, value in enumerate(
+            (param1, param2, param3, param4, param5, param6, param7, param8),
+            start=1,
+        ):
             if value is not None:
-                self.set_engine_param(track, index, value)
+                self.set_engine_param(track, index, value, pattern=pattern)
 
-    def _write_track_u32(self, track: int, offset: int, value: int, *, where: str) -> None:
-        o = self.track_start(track) + offset
+    def _write_track_u32(
+        self,
+        track: int,
+        offset: int,
+        value: int,
+        *,
+        where: str,
+        pattern: int = 1,
+    ) -> None:
+        o = self.pattern_start(track, pattern) + offset
         self.image[o : o + 4] = self._u32(value, where=where)
-        self.mark_edited(track)
+        self.mark_pattern_edited(track, pattern)
 
     def set_m2_shift(
         self,
@@ -597,6 +655,7 @@ class ImageProject:
         portamento: int | None = None,
         pitch_bend_range: int | None = None,
         engine_volume: int | None = None,
+        pattern: int = 1,
     ) -> None:
         """Set M2 shift/current lanes.
 
@@ -617,6 +676,7 @@ class ImageProject:
                     self.TRK_M2_SHIFT[name],
                     value,
                     where=f"track {track} M2 {name}",
+                    pattern=pattern,
                 )
 
     def set_amp_envelope(
@@ -627,6 +687,7 @@ class ImageProject:
         decay: int | None = None,
         sustain: int | None = None,
         release: int | None = None,
+        pattern: int = 1,
     ) -> None:
         """Set M2 amp envelope ADSR current lanes."""
         for name, value in {
@@ -641,6 +702,7 @@ class ImageProject:
                     self.TRK_AMP_ENV[name],
                     value,
                     where=f"track {track} amp envelope {name}",
+                    pattern=pattern,
                 )
 
     def set_filter_knobs(
@@ -715,6 +777,7 @@ class ImageProject:
         decay: int | None = None,
         sustain: int | None = None,
         release: int | None = None,
+        pattern: int = 1,
     ) -> None:
         """Set filter envelope ADSR current lanes."""
         for name, value in {
@@ -729,6 +792,108 @@ class ImageProject:
                     self.TRK_FILTER_ENV[name],
                     value,
                     where=f"track {track} filter envelope {name}",
+                    pattern=pattern,
+                )
+
+    def set_fx_state(
+        self,
+        track: int,
+        *,
+        type: int | None = None,
+        active: bool | None = None,
+        params: list[int] | tuple[int, ...] | None = None,
+        pattern: int = 1,
+    ) -> None:
+        """Set preset-local FX header and q16 params confirmed by the corpus."""
+        if type is not None or active is not None:
+            self.set_filter(track, type=type, enabled=active, pattern=pattern)
+        if params is not None:
+            if len(params) > len(self.TRK_FX_PARAMS):
+                raise ValueError("FX params must contain at most 8 values")
+            for index, value in enumerate(params):
+                raw = 0x7FFFFFFF if index == 5 else self._q16(value)
+                self._write_track_u32(
+                    track,
+                    self.TRK_FX_PARAMS[index],
+                    raw,
+                    where=f"track {track} FX param {index + 1}",
+                    pattern=pattern,
+                )
+
+    def set_lfo_state(
+        self,
+        track: int,
+        *,
+        type: int | None = None,
+        active: bool | None = None,
+        params: list[int] | tuple[int, ...] | None = None,
+        pattern: int = 1,
+    ) -> None:
+        """Set preset-local LFO header and q16 params confirmed by the corpus."""
+        s = self.pattern_start(track, pattern)
+        if type is not None:
+            self.image[s + self.TRK_LFO_TYPE] = type & 0xFF
+        if active is not None:
+            self.image[s + self.TRK_LFO_ON] = 1 if active else 0
+        if type is not None or active is not None:
+            self.mark_pattern_edited(track, pattern)
+        if params is not None:
+            if len(params) > len(self.TRK_LFO_PARAMS):
+                raise ValueError("LFO params must contain at most 8 values")
+            for index, value in enumerate(params):
+                self._write_track_u32(
+                    track,
+                    self.TRK_LFO_PARAMS[index],
+                    self._q16(value),
+                    where=f"track {track} LFO param {index + 1}",
+                    pattern=pattern,
+                )
+
+    def set_patch_modulation_state(
+        self,
+        track: int,
+        *,
+        modwheel_target: int | None = None,
+        modwheel_amount: int | None = None,
+        aftertouch_target: int | None = None,
+        aftertouch_amount: int | None = None,
+        pitchbend_target: int | None = None,
+        pitchbend_amount: int | None = None,
+        velocity_sensitivity: int | None = None,
+        portamento_type: int | None = None,
+        tuning_scale: int | None = None,
+        width: int | None = None,
+        tuning_root: int | None = None,
+        highpass: int | None = None,
+        velocity_target: int | None = None,
+        velocity_amount: int | None = None,
+        pattern: int = 1,
+    ) -> None:
+        """Set confirmed patch.json q16 modulation/settings lanes."""
+        values = {
+            "modwheel_target": modwheel_target,
+            "modwheel_amount": modwheel_amount,
+            "aftertouch_target": aftertouch_target,
+            "aftertouch_amount": aftertouch_amount,
+            "pitchbend_target": pitchbend_target,
+            "pitchbend_amount": pitchbend_amount,
+            "velocity_sensitivity": velocity_sensitivity,
+            "portamento_type": portamento_type,
+            "tuning_scale": tuning_scale,
+            "width": width,
+            "tuning_root": tuning_root,
+            "highpass": highpass,
+            "velocity_target": velocity_target,
+            "velocity_amount": velocity_amount,
+        }
+        for name, value in values.items():
+            if value is not None:
+                self._write_track_u32(
+                    track,
+                    self.TRK_MODULATION[name],
+                    self._q16(value),
+                    where=f"track {track} patch {name}",
+                    pattern=pattern,
                 )
 
     def set_track_mix(
@@ -907,13 +1072,20 @@ class ImageProject:
             raise ValueError(f"unknown FX type {name!r}; expected one of {valid}") from exc
         self.set_fx_type(track, type_byte)
 
-    def set_filter(self, track: int, *, type: int | None = None, enabled: bool | None = None) -> None:
-        s = self.track_start(track)
+    def set_filter(
+        self,
+        track: int,
+        *,
+        type: int | None = None,
+        enabled: bool | None = None,
+        pattern: int = 1,
+    ) -> None:
+        s = self.pattern_start(track, pattern)
         if type is not None:
             self.image[s + self.TRK_FILTER_TYPE] = type & 0xFF
         if enabled is not None:
             self.image[s + self.TRK_FILTER_ON] = 1 if enabled else 0
-        self.mark_edited(track)
+        self.mark_pattern_edited(track, pattern)
 
     def set_track_block(self, track: int, offset: int, data: bytes) -> None:
         """Generic in-place block write (envelopes/filter/mod-routing blocks
@@ -970,7 +1142,7 @@ class ImageProject:
     DRUM_SLOT = 0x80
     DRUM_TUNE = 0x00       # u8 root note, default 0x3c, ±48 semitones
     DRUM_KEY = 0x02        # u8 MIDI key assignment
-    DRUM_PLAY_MODE = 0x03  # u8: 1=key, 2=oneshot, 3=mute group, 4=loop
+    DRUM_PLAY_MODE = 0x03  # u8; preset corpus confirms patch.json oneshot = 1
     DRUM_DIRECTION = 0x07  # u8: 0=forward, 1=backward
     DRUM_PATH = 0x08       # 72 B latin-1 sample path
     DRUM_START = 0x68      # u32 sample start, default 0
@@ -980,6 +1152,7 @@ class ImageProject:
     DRUM_GAIN = 0x7C       # u32 sample gain / loop-crossfade, default 0 (max 0x7FFFFFFF)
     SAMPLER_ENGINE = 0x02
     DRUM_ENGINE = 0x03
+    SAMPLER_FRAMECOUNT = 0x393F
     SAMPLER_SAMPLE_START = 0x3943
     SAMPLER_SAMPLE_END = 0x3947
     SAMPLER_LOOP_START = 0x394B
@@ -1102,12 +1275,15 @@ class ImageProject:
         pattern: int = 1,
         preset_path: str | None = None,
         path: str | None = None,
+        framecount: int | None = None,
         sample_start: int | None = None,
         sample_end: int | None = None,
         loop_start: int | None = None,
         loop_end: int | None = None,
         loop_crossfade: int | None = None,
         loop_crossfade_raw: int | None = None,
+        root_key: int | None = None,
+        tune_cents: int | None = None,
         tune_tenths: int | None = None,
         loop_type: int | None = None,
         gain: int | None = None,
@@ -1116,7 +1292,8 @@ class ImageProject:
         """Set confirmed one-shot Sampler sample-edit fields.
 
         Numeric point fields are raw u32/u8 storage values from the P2-B probes.
-        ``tune_tenths`` uses the probe-backed sampler tune encoder.
+        ``root_key`` and ``tune_cents`` match patch.json preset loading;
+        ``tune_tenths`` uses the direct sample-edit tune encoder.
         """
         from .sampler_sample_inspection import encode_sampler_tune_tenths
 
@@ -1135,6 +1312,8 @@ class ImageProject:
                 raise ValueError("sampler point value must be u32")
             self.image[s + rel : s + rel + 4] = value.to_bytes(4, "little")
 
+        if framecount is not None:
+            write_u32(self.SAMPLER_FRAMECOUNT, framecount)
         if sample_start is not None:
             write_u32(self.SAMPLER_SAMPLE_START, sample_start)
         if sample_end is not None:
@@ -1158,22 +1337,27 @@ class ImageProject:
                 72,
                 where=f"track {track} pattern {pattern} sampler path",
             )
+        if root_key is not None:
+            if not 0 <= root_key <= 0xFF:
+                raise ValueError("sampler root key must be u8")
+            self.image[slot + self.SAMPLER_SLOT_TUNE] = root_key
+        if tune_cents is not None:
+            if not -128 <= tune_cents <= 0xFF:
+                raise ValueError("sampler patch tune cents must fit in a signed or unsigned byte")
+            self.image[slot + self.SAMPLER_SLOT_TUNE_AUX] = tune_cents & 0xFF
         if tune_tenths is not None:
             tune_byte, tune_aux = encode_sampler_tune_tenths(tune_tenths)
             self.image[slot + self.SAMPLER_SLOT_TUNE] = tune_byte
             self.image[slot + self.SAMPLER_SLOT_TUNE_AUX] = tune_aux
-        if loop_type is not None:
-            if not 0 <= loop_type <= 0xFF:
-                raise ValueError("sampler loop type must be u8")
-            self.image[slot + self.SAMPLER_SLOT_LOOP_TYPE] = loop_type
-        if gain is not None:
-            if not 0 <= gain <= 0xFF:
-                raise ValueError("sampler gain must be u8")
-            self.image[slot + self.SAMPLER_SLOT_GAIN] = gain
-        if direction is not None:
-            if not 0 <= direction <= 0xFF:
-                raise ValueError("sampler direction must be u8")
-            self.image[slot + self.SAMPLER_SLOT_DIRECTION] = direction
+        for offset, value, label in (
+            (self.SAMPLER_SLOT_LOOP_TYPE, loop_type, "loop type"),
+            (self.SAMPLER_SLOT_GAIN, gain, "gain"),
+            (self.SAMPLER_SLOT_DIRECTION, direction, "direction"),
+        ):
+            if value is not None:
+                if not 0 <= value <= 0xFF:
+                    raise ValueError(f"sampler {label} must be u8")
+                self.image[slot + offset] = value
         self.mark_pattern_edited(track, pattern)
 
     # --- preset / instrument assignment -----------------------------------
