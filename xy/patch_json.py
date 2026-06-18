@@ -223,7 +223,7 @@ def apply_patch_json_sound(
 ) -> SoundPatch:
     """Convert and apply a patch.json object, returning the intermediate patch."""
     patch = sound_patch_from_patch_json(patch_json, options)
-    apply_patch_json_confirmed_sound_state(project, track, patch_json)
+    apply_patch_json_confirmed_sound_state(project, track, patch_json, pattern=pattern)
     apply_sound_patch(project, track, patch, pattern=pattern)
     return patch
 
@@ -239,7 +239,7 @@ def apply_patch_json_text(
     """Parse patch.json text and apply it to a track/pattern sound slot."""
     patch_json = _parse_patch_json_text(text)
     patch = sound_patch_from_patch_json(patch_json, options)
-    apply_patch_json_confirmed_sound_state(project, track, patch_json)
+    apply_patch_json_confirmed_sound_state(project, track, patch_json, pattern=pattern)
     apply_sound_patch(project, track, patch, pattern=pattern)
     return patch
 
@@ -255,7 +255,7 @@ def apply_patch_json_file(
     """Read a patch.json file and apply it to a track/pattern sound slot."""
     patch_json = _parse_patch_json_text(Path(path).read_text(encoding="utf-8"))
     patch = sound_patch_from_patch_json(patch_json, options)
-    apply_patch_json_confirmed_sound_state(project, track, patch_json)
+    apply_patch_json_confirmed_sound_state(project, track, patch_json, pattern=pattern)
     apply_sound_patch(project, track, patch, pattern=pattern)
     return patch
 
@@ -264,6 +264,8 @@ def apply_patch_json_confirmed_sound_state(
     project: ImageProject,
     track: int,
     patch_json: dict[str, Any],
+    *,
+    pattern: int = 1,
 ) -> None:
     """Write confirmed non-region patch.json sound-state fields.
 
@@ -275,17 +277,17 @@ def apply_patch_json_confirmed_sound_state(
 
     patch_type = _string_value(patch_json.get("type")).lower()
     if patch_type in ENGINE_IDS:
-        project.set_engine(track, ENGINE_IDS[patch_type])
+        project.set_engine(track, ENGINE_IDS[patch_type], pattern=pattern)
 
     engine = _dict_value(patch_json.get("engine"))
     params = _integer_array(engine.get("params"), limit=8)
     for index, value in enumerate(params, start=1):
-        project.set_engine_param_q16(track, index, value)
+        project.set_engine_param_q16(track, index, value, pattern=pattern)
 
     playmode = _string_value(engine.get("playmode")).lower()
     if playmode:
         try:
-            project.set_m2_shift(track, play_mode=PLAYMODE_WORDS[playmode])
+            project.set_m2_shift(track, play_mode=PLAYMODE_WORDS[playmode], pattern=pattern)
         except KeyError as exc:
             raise ValueError(f'engine playmode "{playmode}" is not mapped to a project word yet') from exc
 
@@ -294,6 +296,7 @@ def apply_patch_json_confirmed_sound_state(
         portamento=_optional_q16(engine.get("portamento.amount")),
         pitch_bend_range=_optional_q16(engine.get("bendrange")),
         engine_volume=_optional_q16(engine.get("volume")),
+        pattern=pattern,
     )
 
     modulation = _dict_value(engine.get("modulation"))
@@ -317,6 +320,7 @@ def apply_patch_json_confirmed_sound_state(
         highpass=_integer_value(engine.get("highpass")),
         velocity_target=_integer_value(velocity.get("target")),
         velocity_amount=_integer_value(velocity.get("amount")),
+        pattern=pattern,
     )
 
     envelope = _dict_value(patch_json.get("envelope"))
@@ -327,6 +331,7 @@ def apply_patch_json_confirmed_sound_state(
         decay=_optional_q16(amp.get("decay")),
         sustain=_optional_q16(amp.get("sustain")),
         release=_optional_q16(amp.get("release")),
+        pattern=pattern,
     )
     filt = _dict_value(envelope.get("filter"))
     project.set_filter_envelope(
@@ -335,6 +340,7 @@ def apply_patch_json_confirmed_sound_state(
         decay=_optional_q16(filt.get("decay")),
         sustain=_optional_q16(filt.get("sustain")),
         release=_optional_q16(filt.get("release")),
+        pattern=pattern,
     )
 
     fx = _dict_value(patch_json.get("fx"))
@@ -345,6 +351,7 @@ def apply_patch_json_confirmed_sound_state(
         type=fx_type,
         active=_boolean_value(fx.get("active")),
         params=fx_params or None,
+        pattern=pattern,
     )
 
     lfo = _dict_value(patch_json.get("lfo"))
@@ -355,6 +362,7 @@ def apply_patch_json_confirmed_sound_state(
         type=lfo_type,
         active=_boolean_value(lfo.get("active")),
         params=lfo_params or None,
+        pattern=pattern,
     )
 
 

@@ -581,9 +581,10 @@ class ImageProject:
         self.image[self.track_start(track) + self.TRK_SCALE] = b & 0xFF
         self.mark_edited(track)
 
-    def set_engine(self, track: int, engine_id: int) -> None:
-        self.image[self.track_start(track) + self.TRK_ENGINE] = engine_id & 0xFF
-        self.mark_edited(track)
+    def set_engine(self, track: int, engine_id: int, *, pattern: int = 1) -> None:
+        s = self.pattern_start(track, pattern)
+        self.image[s + self.TRK_ENGINE] = engine_id & 0xFF
+        self.mark_pattern_edited(track, pattern)
 
     @staticmethod
     def _q16(value: int) -> int:
@@ -593,17 +594,24 @@ class ImageProject:
             raise ValueError("q16 value must be in 0..0x7FFF")
         return value << 16
 
-    def set_engine_param(self, track: int, index: int, value: int) -> None:
+    def set_engine_param(self, track: int, index: int, value: int, *, pattern: int = 1) -> None:
         """index 1..8; value is the device's internal (fixed-point) u32."""
         if not 1 <= index <= 8:
             raise ValueError("engine param index must be 1..8")
-        o = self.track_start(track) + self.TRK_PARAMS + (index - 1) * 4
+        o = self.pattern_start(track, pattern) + self.TRK_PARAMS + (index - 1) * 4
         self.image[o : o + 4] = self._u32(value, where=f"track {track} engine param {index}")
-        self.mark_edited(track)
+        self.mark_pattern_edited(track, pattern)
 
-    def set_engine_param_q16(self, track: int, index: int, value: int) -> None:
+    def set_engine_param_q16(
+        self,
+        track: int,
+        index: int,
+        value: int,
+        *,
+        pattern: int = 1,
+    ) -> None:
         """Set a patch.json-style q16 engine param value (0..0x7FFF)."""
-        self.set_engine_param(track, index, self._q16(value))
+        self.set_engine_param(track, index, self._q16(value), pattern=pattern)
 
     def set_engine_params(
         self,
@@ -617,18 +625,27 @@ class ImageProject:
         param6: int | None = None,
         param7: int | None = None,
         param8: int | None = None,
+        pattern: int = 1,
     ) -> None:
         for index, value in enumerate(
             (param1, param2, param3, param4, param5, param6, param7, param8),
             start=1,
         ):
             if value is not None:
-                self.set_engine_param(track, index, value)
+                self.set_engine_param(track, index, value, pattern=pattern)
 
-    def _write_track_u32(self, track: int, offset: int, value: int, *, where: str) -> None:
-        o = self.track_start(track) + offset
+    def _write_track_u32(
+        self,
+        track: int,
+        offset: int,
+        value: int,
+        *,
+        where: str,
+        pattern: int = 1,
+    ) -> None:
+        o = self.pattern_start(track, pattern) + offset
         self.image[o : o + 4] = self._u32(value, where=where)
-        self.mark_edited(track)
+        self.mark_pattern_edited(track, pattern)
 
     def set_m2_shift(
         self,
@@ -638,6 +655,7 @@ class ImageProject:
         portamento: int | None = None,
         pitch_bend_range: int | None = None,
         engine_volume: int | None = None,
+        pattern: int = 1,
     ) -> None:
         """Set M2 shift/current lanes.
 
@@ -658,6 +676,7 @@ class ImageProject:
                     self.TRK_M2_SHIFT[name],
                     value,
                     where=f"track {track} M2 {name}",
+                    pattern=pattern,
                 )
 
     def set_amp_envelope(
@@ -668,6 +687,7 @@ class ImageProject:
         decay: int | None = None,
         sustain: int | None = None,
         release: int | None = None,
+        pattern: int = 1,
     ) -> None:
         """Set M2 amp envelope ADSR current lanes."""
         for name, value in {
@@ -682,6 +702,7 @@ class ImageProject:
                     self.TRK_AMP_ENV[name],
                     value,
                     where=f"track {track} amp envelope {name}",
+                    pattern=pattern,
                 )
 
     def set_filter_knobs(
@@ -756,6 +777,7 @@ class ImageProject:
         decay: int | None = None,
         sustain: int | None = None,
         release: int | None = None,
+        pattern: int = 1,
     ) -> None:
         """Set filter envelope ADSR current lanes."""
         for name, value in {
@@ -770,6 +792,7 @@ class ImageProject:
                     self.TRK_FILTER_ENV[name],
                     value,
                     where=f"track {track} filter envelope {name}",
+                    pattern=pattern,
                 )
 
     def set_fx_state(
@@ -779,10 +802,11 @@ class ImageProject:
         type: int | None = None,
         active: bool | None = None,
         params: list[int] | tuple[int, ...] | None = None,
+        pattern: int = 1,
     ) -> None:
         """Set preset-local FX header and q16 params confirmed by the corpus."""
         if type is not None or active is not None:
-            self.set_filter(track, type=type, enabled=active)
+            self.set_filter(track, type=type, enabled=active, pattern=pattern)
         if params is not None:
             if len(params) > len(self.TRK_FX_PARAMS):
                 raise ValueError("FX params must contain at most 8 values")
@@ -793,6 +817,7 @@ class ImageProject:
                     self.TRK_FX_PARAMS[index],
                     raw,
                     where=f"track {track} FX param {index + 1}",
+                    pattern=pattern,
                 )
 
     def set_lfo_state(
@@ -802,15 +827,16 @@ class ImageProject:
         type: int | None = None,
         active: bool | None = None,
         params: list[int] | tuple[int, ...] | None = None,
+        pattern: int = 1,
     ) -> None:
         """Set preset-local LFO header and q16 params confirmed by the corpus."""
-        s = self.track_start(track)
+        s = self.pattern_start(track, pattern)
         if type is not None:
             self.image[s + self.TRK_LFO_TYPE] = type & 0xFF
         if active is not None:
             self.image[s + self.TRK_LFO_ON] = 1 if active else 0
         if type is not None or active is not None:
-            self.mark_edited(track)
+            self.mark_pattern_edited(track, pattern)
         if params is not None:
             if len(params) > len(self.TRK_LFO_PARAMS):
                 raise ValueError("LFO params must contain at most 8 values")
@@ -820,6 +846,7 @@ class ImageProject:
                     self.TRK_LFO_PARAMS[index],
                     self._q16(value),
                     where=f"track {track} LFO param {index + 1}",
+                    pattern=pattern,
                 )
 
     def set_patch_modulation_state(
@@ -840,6 +867,7 @@ class ImageProject:
         highpass: int | None = None,
         velocity_target: int | None = None,
         velocity_amount: int | None = None,
+        pattern: int = 1,
     ) -> None:
         """Set confirmed patch.json q16 modulation/settings lanes."""
         values = {
@@ -865,6 +893,7 @@ class ImageProject:
                     self.TRK_MODULATION[name],
                     self._q16(value),
                     where=f"track {track} patch {name}",
+                    pattern=pattern,
                 )
 
     def set_track_mix(
@@ -1043,13 +1072,20 @@ class ImageProject:
             raise ValueError(f"unknown FX type {name!r}; expected one of {valid}") from exc
         self.set_fx_type(track, type_byte)
 
-    def set_filter(self, track: int, *, type: int | None = None, enabled: bool | None = None) -> None:
-        s = self.track_start(track)
+    def set_filter(
+        self,
+        track: int,
+        *,
+        type: int | None = None,
+        enabled: bool | None = None,
+        pattern: int = 1,
+    ) -> None:
+        s = self.pattern_start(track, pattern)
         if type is not None:
             self.image[s + self.TRK_FILTER_TYPE] = type & 0xFF
         if enabled is not None:
             self.image[s + self.TRK_FILTER_ON] = 1 if enabled else 0
-        self.mark_edited(track)
+        self.mark_pattern_edited(track, pattern)
 
     def set_track_block(self, track: int, offset: int, data: bytes) -> None:
         """Generic in-place block write (envelopes/filter/mod-routing blocks

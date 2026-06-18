@@ -21,9 +21,14 @@ from xy.image_writer import ImageProject
 from xy.sampler_sample_inspection import encode_sampler_loop_crossfade_frames
 
 BASE = "src/one-off-changes-from-default/unnamed 1.xy"
+MULTI_PATTERN_BASE = "src/one-off-changes-from-default/j01_5trk_p9_blank.xy"
 UNIQUE_SAMPLER_PATCH = (
     "src/sampler-project-state/2026-06-15/presets/t7-map-unique.preset/patch.json"
 )
+
+
+def _u32(project: ImageProject, base: int, rel: int) -> int:
+    return int.from_bytes(project.image[base + rel : base + rel + 4], "little")
 
 
 def test_maps_drum_regions_to_pad_patches_by_op_xy_key_order() -> None:
@@ -295,6 +300,48 @@ def test_apply_sampler_patch_json_writes_confirmed_common_sound_state() -> None:
     assert state.modwheel_amount == patch["engine"]["modulation"]["modwheel"]["amount"]
     assert state.velocity_target == patch["engine"]["modulation"]["velocity"]["target"]
     assert state.highpass == patch["engine"]["highpass"]
+
+
+def test_apply_patch_json_pattern_writes_common_state_to_requested_pattern() -> None:
+    project = ImageProject.from_file(MULTI_PATTERN_BASE)
+    pattern1 = project.pattern_start(1, 1)
+    before_pattern1_param1 = _u32(project, pattern1, 0x3857)
+    before_pattern1_attack = _u32(project, pattern1, 0x3877)
+
+    apply_patch_json_sound(
+        project,
+        1,
+        {
+            "type": "sampler",
+            "engine": {
+                "params": [1, 2, 3, 4, 5, 6, 7, 8],
+                "playmode": "poly",
+                "portamento.amount": 9,
+                "bendrange": 10,
+                "volume": 11,
+                "modulation": {"velocity": {"target": 12, "amount": 13}},
+            },
+            "envelope": {"amp": {"attack": 14}, "filter": {"release": 15}},
+            "fx": {"type": "ladder", "active": True, "params": [1, 2, 3, 4, 5, 6, 7, 8]},
+            "lfo": {"type": "element", "active": True, "params": [8, 7, 6, 5, 4, 3, 2, 1]},
+            "regions": [{"sample": "x.wav", "framecount": 100, "pitch.keycenter": 64}],
+        },
+        PatchJsonSoundPatchOptions(preset_device_path="/fat32/presets/snapshot/test.preset"),
+        pattern=2,
+    )
+
+    pattern1 = project.pattern_start(1, 1)
+    pattern2 = project.pattern_start(1, 2)
+    pattern2_path = bytes(project.image[pattern2 + 0x395F : pattern2 + 0x39A7]).split(b"\0", 1)[0]
+
+    assert _u32(project, pattern1, 0x3857) == before_pattern1_param1
+    assert _u32(project, pattern1, 0x3877) == before_pattern1_attack
+    assert project.image[pattern2 + 0x14] == 0x02
+    assert _u32(project, pattern2, 0x3857) == 1 << 16
+    assert _u32(project, pattern2, 0x3877) == 14 << 16
+    assert project.image[pattern2 + 0x21] == 0x10
+    assert project.image[pattern2 + 0x20] == 1
+    assert pattern2_path == b"/fat32/presets/snapshot/test.preset/x.wav"
 
 
 def test_apply_sampler_patch_json_writes_u32_sample_points() -> None:

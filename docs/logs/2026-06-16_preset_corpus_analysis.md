@@ -74,7 +74,7 @@ All preset types:
 | sampler sample path | C string at `track+0x395F`, usually `/fat32/presets/1/<preset>.preset/<sample>`. |
 | sampler `hikey` / `pitch.keycenter` | Root/keycenter byte at `track+0x3957`. These two JSON fields match each other in the current sampler corpus. |
 | sampler sample windows | Full u32 values at `track+0x393F/0x3943/0x3947/0x394B/0x394F`. |
-| sampler `loop.crossfade` | Normalized byte at `track+0x3956`: `floor(loop.crossfade * 128 / framecount)`. |
+| sampler `loop.crossfade` | Raw u32 at `track+0x3953`: single-precision float normalization of frame count by `framecount`, clamped to `0x7FFFFFFF`. |
 
 The sampler sample-window finding matters for writer coverage: these must be
 read and written as u32 fields. Many captured `framecount`, `sample.end`,
@@ -113,7 +113,7 @@ sampler loop flag bits, drum playmode strings, and byte-exact sampler
 | `fx.params[0..7]` | confirmed-with-exception | q16 words at `track+0x3897..0x38B3`; `params[5]` can serialize as max for some FX/type combinations. |
 | `lfo.type`, `lfo.active` | confirmed | Header bytes at `track+0x1C` and `track+0x20`. |
 | `lfo.params[0..7]` | confirmed | q16 words at `track+0x38B7..0x38D3`. |
-| sampler `regions[0].sample`, `hikey`, `pitch.keycenter`, `framecount`, `sample.end`, `loop.start`, `loop.end`, `loop.crossfade` | confirmed | Sample path string, root/keycenter byte, u32 sample-window fields, and normalized crossfade byte. |
+| sampler `regions[0].sample`, `hikey`, `pitch.keycenter`, `framecount`, `sample.end`, `loop.start`, `loop.end`, `loop.crossfade` | confirmed | Sample path string, root/keycenter byte, u32 sample-window fields, and raw u32 crossfade normalization. |
 | sampler `regions[0].sample.start`, `reverse`, `gain` | confirmed-for-observed-values | `sample.start` maps to the u32 word when present; `reverse=false` maps to direction byte `0`; observed `gain` values map directly to byte `track+0x395C`. |
 | sampler `regions[0].loop.enabled`, `loop.onrelease`, `tune`, `lokey`, `reverse` | constant-in-corpus | `loop.enabled` is absent, `loop.onrelease` is always true, `tune` and `lokey` are always 0, and `reverse` is always false in current sampler presets. |
 | drum `regions[].sample`, `hikey`, `reverse`, `pan`, `transpose`, `tune`, `playmode` | partial | Ten clean 24-region kits align with `track+0x3957 + (hikey - 53) * 0x80`; current paired captures only show `oneshot` as byte `1`. |
@@ -152,6 +152,7 @@ other FX-param mismatches still appear in the mismatch section.
 | Preset label | `1/nt-dx analog` | `1/nt-dx legend` |
 | Sample path | `/fat32/presets/1/nt-dx analog.preset/unnamed-c3-61.wav` | `/fat32/presets/1/nt-dx legend.preset/unnamed-c3-60.wav` |
 | `regions[0].framecount` | `423043` | `327223` |
+| `regions[0].loop.crossfade` raw u32 | `0x11EB84C0` | `0x0000668B` |
 
 Drum kit alignment:
 

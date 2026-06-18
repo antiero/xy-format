@@ -22,6 +22,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from xy.image_writer import ImageProject
+from xy.sampler_sample_inspection import encode_sampler_loop_crossfade_frames
 
 DEFAULT_CORPUS = ROOT / "src" / "presets"
 
@@ -142,7 +143,7 @@ FIELD_COVERAGE = [
     ("regions[0].hikey/pitch.keycenter (sampler)", "confirmed", "Root/keycenter byte at `track+0x3957`; these match each other in the current corpus."),
     ("regions[0].framecount/sample.end/loop.start/loop.end (sampler)", "confirmed", "u32 words at `track+0x393F/0x3947/0x394B/0x394F`."),
     ("regions[0].sample.start (sampler)", "partial", "u32 word at `track+0x3943` when present; absence in JSON means no expectation."),
-    ("regions[0].loop.crossfade (sampler)", "confirmed", "Byte at `track+0x3956` is `floor(loop.crossfade * 128 / framecount)`."),
+    ("regions[0].loop.crossfade (sampler)", "confirmed", "Raw u32 at `track+0x3953` is single-precision float normalization of `loop.crossfade` frames by `framecount`."),
     ("regions[0].reverse/gain (sampler)", "confirmed-for-observed-values", "`reverse=false` maps to `track+0x395E == 0`; observed `gain` values map directly to byte `track+0x395C`."),
     ("regions[0].loop.enabled/loop.onrelease/tune/lokey/reverse (sampler)", "constant-in-corpus", "`loop.enabled` is absent, `loop.onrelease` is always true, `tune` and `lokey` are always 0, and `reverse` is always false in current sampler presets."),
     ("regions[].sample/hikey/reverse/pan/transpose/tune/playmode (drum)", "partial", "Ten clean 24-region kits align with `track+0x3957 + (hikey - 53) * 0x80`; current paired captures only show `oneshot` as byte `1`."),
@@ -298,7 +299,7 @@ def analyze(corpus: Path) -> str:
             "- `engine.playmode` maps to the raw word at `track+0x3887` (`poly=0x15555555`, `mono=0x3FFFFFFF`).",
             "- `envelope.amp.*`, `envelope.filter.*`, most `engine.*` lanes, most `fx.params[0..7]`, and `lfo.params[0..7]` map as the high 16 bits of 4-byte words in the known sound-state block.",
             "- Sampler project sample windows store full u32 values at `track+0x393F..0x394F`, not u16 values.",
-            "- Sampler `loop.crossfade` stores a normalized byte: `floor(loop.crossfade * 128 / framecount)` at `track+0x3956`.",
+            "- Sampler `loop.crossfade` stores a raw u32 at `track+0x3953`: single-precision float normalization of frame count by `framecount`, clamped to `0x7FFFFFFF`.",
             "- Sampler region `hikey` equals `pitch.keycenter` across the corpus and maps to the root/keycenter byte at `track+0x3957`; sampler `lokey` is always 0.",
             "- Ten clean drum-kit captures map path/key/tune/pan/reverse/playmode by `hikey - 53`.",
             "- In those clean drum kits, voice 0 sample window values use the pre-table header (`track+0x393F..0x394F`), while voice 1-23 `sample.end`/`framecount` values appear on the previous slot at both `+0x68` and `+0x70`.",
@@ -597,11 +598,11 @@ def _check_sampler_fields(pairs: list[Pair], mismatches: dict[str, list[str]]) -
         framecount = region.get("framecount")
         crossfade = region.get("loop.crossfade")
         if isinstance(framecount, int) and framecount > 0 and isinstance(crossfade, int):
-            expected_crossfade = min(255, (crossfade * 128) // framecount)
-            got = pair.project.image[pair.track_start + 0x3956]
+            expected_crossfade = encode_sampler_loop_crossfade_frames(crossfade, framecount)
+            got = _u32(pair.project.image, pair.track_start + 0x3953)
             if got != expected_crossfade:
                 mismatches["regions.0.loop.crossfade"].append(
-                    f"`{pair.name}`: expected `{expected_crossfade}` from `{crossfade}`/`{framecount}`, got `{got}`"
+                    f"`{pair.name}`: expected `0x{expected_crossfade:08X}` from `{crossfade}`/`{framecount}`, got `0x{got:08X}`"
                 )
         reverse = region.get("reverse")
         if isinstance(reverse, bool):
