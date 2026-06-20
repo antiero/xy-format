@@ -1,118 +1,181 @@
 <script lang="ts">
-  import { projectStore } from './stores/project';
-  import { ImageProject } from './lib/xy/image_writer';
-  import Sequencer from './components/Sequencer.svelte';
-  import Arranger from './components/Arranger.svelte';
+  import { onDestroy, onMount } from 'svelte';
+  import ProjectWorkspace from './components/ProjectWorkspace.svelte';
+  import PatternWorkspace from './components/PatternWorkspace.svelte';
+  import ArrangeWorkspace from './components/ArrangeWorkspace.svelte';
+  import InspectWorkspace from './components/InspectWorkspace.svelte';
+  import { activeModeStore, projectStore, type WorkspaceMode } from './stores/project';
+  import { editedFileName, exportXYProject } from './lib/xy/projectExporter';
+  import { loadXYFile } from './lib/xy/projectLoader';
+  import { projectSummary } from './lib/xy/projectViewModel';
+  import { validationCounts } from './lib/xy/validation';
 
   let fileInput: HTMLInputElement;
-  let activeTab: 'sequencer' | 'arranger' = 'sequencer';
+  let loadError = '';
+  let dragging = false;
+
+  const modes: { id: WorkspaceMode; label: string }[] = [
+    { id: 'project', label: 'Project' },
+    { id: 'pattern', label: 'Pattern' },
+    { id: 'arrange', label: 'Arrange' },
+    { id: 'inspect', label: 'Inspect' },
+  ];
+
+  $: counts = $projectStore ? validationCounts($projectStore.validation) : { errors: 0, warnings: 0, info: 0 };
+
+  async function openFile(file: File) {
+    loadError = '';
+    try {
+      const project = await loadXYFile(file);
+      projectStore.set(project);
+      activeModeStore.set('project');
+    } catch (error) {
+      console.error(error);
+      loadError = error instanceof Error ? error.message : 'Could not parse this .xy file.';
+    }
+  }
 
   async function handleFileUpload(event: Event) {
     const target = event.target as HTMLInputElement;
     const file = target.files?.[0];
-    if (file) {
-      const buffer = await file.arrayBuffer();
-      const uint8Array = new Uint8Array(buffer);
-      try {
-        const proj = ImageProject.fromBytes(uint8Array);
-        projectStore.set(proj);
-      } catch (err) {
-        console.error("Failed to parse project file:", err);
-        alert("Failed to parse project file. Is it a valid .xy file?");
-      }
+    if (file) await openFile(file);
+    target.value = '';
+  }
+
+  async function handleDrop(event: DragEvent) {
+    event.preventDefault();
+    dragging = false;
+    const file = event.dataTransfer?.files?.[0];
+    if (file) await openFile(file);
+  }
+
+  async function handleDownload() {
+    const project = $projectStore;
+    if (!project) return;
+    if (counts.errors > 0 && !window.confirm(`Export with ${counts.errors} validation error(s)?`)) {
+      return;
+    }
+    const blob = await exportXYProject(project);
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = editedFileName(project.fileName);
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+
+  function handleKeydown(event: KeyboardEvent) {
+    const project = $projectStore;
+    if (!project) return;
+    const key = event.key.toLowerCase();
+    if ((event.metaKey || event.ctrlKey) && key === 's') {
+      event.preventDefault();
+      void handleDownload();
+    } else if (key === 'p' && !event.metaKey && !event.ctrlKey) {
+      activeModeStore.set('pattern');
+    } else if (key === 'a' && !event.metaKey && !event.ctrlKey) {
+      activeModeStore.set('arrange');
     }
   }
 
-  function handleDownload() {
-    if (!$projectStore) return;
+  onMount(() => {
+    window.addEventListener('keydown', handleKeydown);
+  });
 
-    try {
-      const bytes = $projectStore.toBytes();
-      const blob = new Blob([bytes as BlobPart], { type: 'application/octet-stream' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = 'edited_project.xy';
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-    } catch (err) {
-      console.error("Failed to generate project file:", err);
-      alert("Failed to generate project file.");
-    }
-  }
+  onDestroy(() => {
+    window.removeEventListener('keydown', handleKeydown);
+  });
 </script>
 
-<main class="min-h-screen bg-neutral-900 text-neutral-200 flex flex-col font-mono">
-  <header class="bg-neutral-800 p-4 flex justify-between items-center border-b border-neutral-700">
-    <div class="flex items-center gap-4">
-      <h1 class="text-xl font-bold tracking-widest uppercase text-white">OP-XY Editor</h1>
-      <span class="text-xs px-2 py-1 bg-yellow-500/20 text-yellow-400 rounded-full border border-yellow-500/30">MVP</span>
+<main
+  class="app-shell"
+  class:dragging
+  on:dragover|preventDefault={() => dragging = true}
+  on:dragleave={() => dragging = false}
+  on:drop={handleDrop}
+>
+  <input
+    type="file"
+    accept=".xy"
+    bind:this={fileInput}
+    on:change={handleFileUpload}
+    class="visually-hidden"
+  />
+
+  <header class="topbar">
+    <div class="brand-lockup">
+      <span class="brand-led"></span>
+      <div>
+        <h1>XY Project Lab</h1>
+        <p>unofficial OP-XY project-file utility</p>
+      </div>
     </div>
 
-    <div class="flex items-center gap-4">
-      <input
-        type="file"
-        accept=".xy"
-        bind:this={fileInput}
-        on:change={handleFileUpload}
-        class="hidden"
-      />
-      <button
-        class="px-4 py-2 bg-neutral-700 hover:bg-neutral-600 rounded text-sm transition-colors uppercase tracking-wider cursor-pointer"
-        on:click={() => fileInput.click()}
-      >
-        Load .xy
-      </button>
+    {#if $projectStore}
+      <div class="project-status">
+        <span>{$projectStore.fileName}</span>
+        <span>{$projectStore.modified ? 'modified' : 'clean'}</span>
+        <span class:error={counts.errors > 0} class:warn={counts.errors === 0 && counts.warnings > 0}>
+          {counts.errors}e · {counts.warnings}w
+        </span>
+      </div>
+    {/if}
 
-      {#if $projectStore}
-        <button
-          class="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 rounded text-sm text-white font-bold transition-colors uppercase tracking-wider shadow-lg shadow-emerald-900/50 cursor-pointer"
-          on:click={handleDownload}
-        >
-          Save .xy
-        </button>
-      {/if}
+    <div class="toolbar-actions">
+      <button type="button" on:click={() => fileInput.click()}>open .xy</button>
+      <button type="button" disabled={!$projectStore} class="primary" on:click={handleDownload}>export</button>
     </div>
   </header>
 
-  <div class="flex-1 p-6 flex flex-col">
-    {#if !$projectStore}
-      <div class="h-full flex-1 flex flex-col items-center justify-center text-neutral-500 border-2 border-dashed border-neutral-700 rounded-xl p-12 bg-neutral-800/50">
-        <svg class="w-16 h-16 mb-4 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 13h6m-3-3v6m5 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
-        <p class="text-lg">Please load an OP-XY project file to begin.</p>
-        <p class="text-sm mt-2 opacity-75">You can find .xy files on your device's disk.</p>
+  {#if $projectStore}
+    <nav class="modebar" aria-label="Workspace mode">
+      {#each modes as mode}
+        <button
+          type="button"
+          class:active={$activeModeStore === mode.id}
+          on:click={() => activeModeStore.set(mode.id)}
+        >
+          {mode.label}
+        </button>
+      {/each}
+      <span>{projectSummary($projectStore)}</span>
+    </nav>
 
-        <button
-          class="mt-6 px-6 py-3 bg-neutral-700 hover:bg-neutral-600 rounded-lg text-sm transition-colors uppercase tracking-wider border border-neutral-600 hover:border-neutral-500 cursor-pointer"
-          on:click={() => fileInput.click()}
-        >
-          Browse Files
-        </button>
-      </div>
-    {:else}
-      <div class="flex gap-2 mb-4">
-        <button
-          class="px-6 py-2 rounded-t-lg font-bold text-sm tracking-widest uppercase transition-colors cursor-pointer {activeTab === 'sequencer' ? 'bg-neutral-800 text-white border-t border-l border-r border-neutral-700' : 'bg-neutral-900 text-neutral-500 hover:text-neutral-300'}"
-          on:click={() => activeTab = 'sequencer'}
-        >
-          Sequencer
-        </button>
-        <button
-          class="px-6 py-2 rounded-t-lg font-bold text-sm tracking-widest uppercase transition-colors cursor-pointer {activeTab === 'arranger' ? 'bg-neutral-800 text-white border-t border-l border-r border-neutral-700' : 'bg-neutral-900 text-neutral-500 hover:text-neutral-300'}"
-          on:click={() => activeTab = 'arranger'}
-        >
-          Arranger
-        </button>
-      </div>
-      <div class="bg-neutral-800 rounded-b-xl rounded-tr-xl border border-neutral-700 p-4 shadow-xl flex-1 flex flex-col min-h-0 -mt-4 z-10 relative">
-        {#if activeTab === 'sequencer'}
-          <Sequencer />
-        {:else}
-          <Arranger />
+    <div class="workspace-frame">
+      {#if $activeModeStore === 'project'}
+        <ProjectWorkspace project={$projectStore} />
+      {:else if $activeModeStore === 'pattern'}
+        <PatternWorkspace project={$projectStore} />
+      {:else if $activeModeStore === 'arrange'}
+        <ArrangeWorkspace project={$projectStore} />
+      {:else}
+        <InspectWorkspace project={$projectStore} />
+      {/if}
+    </div>
+  {:else}
+    <section class="launch-surface">
+      <div class="launch-copy">
+        <p class="eyebrow">Local project editor</p>
+        <h2>XY Project Lab</h2>
+        <p>inspect, arrange and export OP-XY project files</p>
+        <div class="launch-actions">
+          <button type="button" class="primary" on:click={() => fileInput.click()}>open .xy project</button>
+        </div>
+        {#if loadError}
+          <p class="load-error">{loadError}</p>
         {/if}
       </div>
-    {/if}
-  </div>
+      <div class="device-plane" aria-hidden="true">
+        <div class="screen-line"></div>
+        <div class="device-grid">
+          {#each Array(64) as _, i}
+            <span class:red={i % 17 === 0}></span>
+          {/each}
+        </div>
+      </div>
+      <p class="disclaimer">Unofficial project-file utility for OP-XY. Teenage Engineering and OP-XY are trademarks of their respective owners.</p>
+    </section>
+  {/if}
 </main>
