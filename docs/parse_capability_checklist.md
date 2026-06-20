@@ -40,6 +40,7 @@ fields. Heuristic reads must say so and stay `[~]` until structural decode exist
 | `xy/master_saturator_inspection.py` | `test_master_saturator_inspection.py` | `2026-06-12_master_saturator_inspection.md` | `2026-06-saturator/` |
 | `xy/sampler_sample_inspection.py` | `test_sampler_sample_inspection.py` | `2026-06-12_sampler_oneshot_inspection.md` | `2026-06-oneshot/` |
 | `xy/project_config_inspection.py` | `test_project_config_inspection.py` | `2026-06-13_project_config_inspection.md`, `2026-06-13_global_header_inspection.md` | `2026-06-project-config/`, `2026-06-global-header/` |
+| `xy/bar_menu_inspection.py` | `test_bar_menu_inspection.py` | `2026-06-13_bar_menu_inspection.md`, `2026-06-14_bar_length_inspection.md` | `2026-06-bar-menu/`, `2026-06-bar-length/` |
 
 Contributor workflow: `docs/workflows/contributor_inspection_workflow.md`.
 
@@ -56,11 +57,13 @@ Contributor workflow: `docs/workflows/contributor_inspection_workflow.md`.
 | Preset reference inference | `xy/project_inspection.py` (heuristic) | `ImageProject.set_preset` (donor copy) |
 | Track preset path @ `+0x453F` | `xy/preset_path_inspection.py` | gap — donor `set_preset` only |
 | Drum sample path read | `xy/drum_sample_inspection.py` | indirect via `set_preset`; no per-slot path API |
-| Static mixer / master bus read | `xy/mixer_static_inspection.py` | gap |
+| Static mixer / master bus read | `xy/mixer_static_inspection.py` | `ImageProject.set_track_*_byte/raw`, `set_master_*_byte/raw` |
 | Scene volumes + mutes read | `xy/scene_volume_inspection.py` | partial write via `build_arrangement` |
-| Master EQ / saturator read | `xy/master_eq_inspection.py`, `xy/master_saturator_inspection.py` | partial (`set_master_eq`) |
-| Sampler one-shot read | `xy/sampler_sample_inspection.py` | gap |
-| Project config read | `xy/project_config_inspection.py` | partial (`set_groove`, `set_midi_channel`, `set_scene_length_mode`, `set_project_transpose`, `set_time_signature`, `set_voice_allocation`) |
+| Master EQ / saturator read | `xy/master_eq_inspection.py`, `xy/master_saturator_inspection.py` | `set_master_eq`, `set_master_saturator_*_byte/raw` |
+| Sampler one-shot read | `xy/sampler_sample_inspection.py` | `set_sampler_sample_edit` |
+| Project config/global header read | `xy/project_config_inspection.py` | `set_groove`, `set_groove_amount`, `set_click_volume`, `set_scene_length_mode`, `set_project_transpose`, `set_time_signature`, `set_voice_allocation`, `set_midi_channel`, `set_active_scene`, `set_active_song` |
+| Bar menu read | `xy/bar_menu_inspection.py` | `set_pattern_steps`, `set_default_step_length_ticks`, `set_track_quantization_raw`, `set_track_groove_ui`, `set_plock_shape_raw` |
+| Confirmed aux fields | aux probe tests | ergonomic wrappers where discrete labels are proven; raw-word setters where bucket boundaries remain open |
 | Human report | `tools/inspect_xy.py` | — |
 
 Detailed guide cross-reference: `docs/format/opxy_user_guide_save_audit.md`.
@@ -114,13 +117,13 @@ Field offsets: `docs/format/decoded_image_map.md`.
 - [x] Quantized note records (tick, gate, note, velocity, flags) —
   decoded vector at track+`0x456F`, `ImageProject.add_note`
 - [x] 120-note pattern cap enforced on write — `ImageProject.add_note`
-- [x] Bars per pattern (`bars << 4` @ track+`0x01`) — `set_bars`
-- [x] Track scale byte (subset: 1/2, 1/2, 16 observed) — `set_track_scale`
+- [x] Bars per pattern / active steps (full bars: `16`, `32`, `48`, `64` at track+`0x01`) — `set_bars`, `set_pattern_steps`
+- [x] Track scale byte (subset: 1/2, 1, 2, 16 observed) — `set_track_scale`
 - [~] Track scale full enum (3, 4, 6, 8) — partial — `opxy_user_guide_save_audit.md`
 - [x] Final-bar / partial-bar length — total active steps at track+`0x01`;
   `steps = (bars - 1) * 16 + final_bar_steps` — BAR-LEN fixtures
-- [~] Per-track quantization amount — raw byte pinned at track+`0x07`;
-  UI 0/1/2/25/50/75/98/99/100 captured, exact scaling still partial — BAR fixtures
+- [x] Per-track quantization amount — raw byte at track+`0x07`;
+  UI display `floor(raw * 100 / 255)` — BAR fixtures
 - [x] Default step length (persistent) — u16 ticks at track+`0x02`;
   `240` default, `480` max — `xy/bar_menu_inspection.py`
 - [x] Per-track groove override — index byte at track+`0x08`;
@@ -185,7 +188,8 @@ Field offsets: `docs/format/decoded_image_map.md`.
 
 - [~] High-level sample table structure — partial — `docs/format/decoded_image_map.md`
 - [x] One-shot loop/crossfade/tune/gain/direction per slot — P2-B `g0`–`g14` +
-  `g-tune-*`, `decode_sampler_tune_tenths`, `.tune_ui` (header @ `+0x3943`) — gap
+  `g-tune-*`, `decode_sampler_tune_tenths`, `.tune_ui` (header @ `+0x3943`);
+  write via `ImageProject.set_sampler_sample_edit`
 - [ ] Multisampler zone boundaries / root key — gap
 
 ## 10. Scenes, songs, arrangement
@@ -205,21 +209,285 @@ Field offsets: `docs/format/decoded_image_map.md`.
 ## 11. Mix, saturator, master
 
 - [x] Master EQ — `xy/master_eq_inspection.py`, P2-F
-- [x] Track static volume/pan/send FX1/FX2 **read** @ `+0x38FE`/`+0x38FA`/`+0x38B2`/`+0x38B6`
-  — `xy/mixer_static_inspection.py`, P2-A f0–f24 (T1–T8 confirmed)
-- [x] Master perc/melody/compressor/master **read** @ global `+0x88`/`+0x8C`/`+0x90`/`+0x94`
-  — same module
+- [x] Track static volume/pan/send FX1/FX2 **read/write** @ `+0x38FE`/`+0x38FA`/`+0x38B2`/`+0x38B6`
+  — `xy/mixer_static_inspection.py`, P2-A f0–f24; write via
+  `set_track_volume_*`, `set_track_pan_*`, `set_track_send_fx1_*`,
+  `set_track_send_fx2_*`
+- [x] Master perc/melody/compressor/master **read/write** @ global
+  `+0x88`/`+0x8C`/`+0x90`/`+0x94` — write via `set_master_percussion_*`,
+  `set_master_melody_*`, `set_master_compressor_*`, `set_master_volume_*`
 - [x] Master saturator gain/clip/tone/mix — `read_master_saturator`, global
-  `0x78`/`0x7C`/`0x80`/`0x84`, P2-G `sat0`–`sat8`
+  `0x78`/`0x7C`/`0x80`/`0x84`, P2-G `sat0`–`sat8`; write via
+  `set_master_saturator_gain_*`, `set_master_saturator_clip_*`,
+  `set_master_saturator_tone_*`, `set_master_saturator_mix_*`
 
 ## 12. Auxiliary tracks (T9–T16)
 
-- [~] Generic track struct, notes, p-locks — same as instrument tracks
-- [ ] Brain (T9) settings / routing — gap
-- [ ] Punch-in FX (T10) — gap
-- [ ] External MIDI channel/bank/program/CC (T11) — gap
-- [ ] External CV (T12), audio (T13), tape (T14) — gap
-- [~] FX I/II (T15/T16) type enums and params — partial
+Guide source: OP–XY guide chapter 15 “auxiliary”. Aux mode holds 8 tracks:
+Brain, Punch-in FX, External MIDI, External CV, External Audio, Tape, FX I,
+and FX II. Guide aux track numbers 1–8 correspond to project tracks T9–T16.
+Guide-visible semantics only; storage offsets remain gaps unless cited below.
+
+### 12.0 Shared auxiliary-track substrate
+
+- [~] Generic auxiliary track struct, note sequencing, p-locks, step components —
+  generic note vector confirmed on T9 Brain, T10 Punch-in FX, and T12 External
+  CV; p-locks/step components still need aux-specific fixture coverage
+- [ ] Aux track identity / type enum for T9–T16 — verify whether fixed by slot
+  index only or persisted as engine/type byte
+- [ ] Aux M1/M2/M3/M4 module selector state persistence — gap
+- [ ] Aux-track keyboard note/event encoding differences vs instrument tracks —
+  gap
+- [~] Aux routing matrix common format: encoder banks T1–T4 / T5–T8 — source-track
+  send words confirmed for T13/T14/T15/T16 targets; Brain route mask confirmed;
+  full matrix UI ownership and per-aux semantics still partial
+- [x] Aux LFO common block: speed, amount, destination, parameter — raw words at
+  `+0x38B7`, `+0x38BB`, `+0x38BF`, `+0x38C3`; device-authored detents
+  confirmed for T13 generic destinations and T11 MIDI destinations; bucket
+  boundaries unverified for PC authoring; write via `set_aux_lfo_raw`,
+  `set_aux_lfo_destination`, `set_aux_lfo_param_dest`; AUX-LFO
+- [x] Aux filter common block: high-pass cutoff, low-pass cutoff — raw M3 words
+  at `+0x3897` and `+0x38A3`; params 2/3 also persist raw words at
+  `+0x389B` and `+0x389F`, but semantics remain unknown; write via
+  `set_aux_filter_raw`; AUX-FILTER
+- [x] Aux send levels to External Audio / Tape / FX I / FX II — source-track
+  words `+0x38A7`, `+0x38AB`, `+0x38AF`, `+0x38B3`; write via
+  `set_track_send_ext_*`, `set_track_send_tape_*`, existing FX send setters;
+  AUX-T13/AUX-T14/AUX-T15/AUX-T16
+
+### 12.1 T9 / aux 1 — Brain™
+
+Guide: Brain transposes a whole song or selected routed tracks. M1 exposes
+Brain scale/key controls; M2 exposes routing. Routed tracks are transposed and
+also participate in automatic key detection.
+
+- [ ] Brain enable / active state — gap
+- [~] Brain manual vs automatic key detection mode — raw word located at T9
+  `+0x3857`; semantic state mapping still partial; AUX-BRAIN
+- [~] Brain key enum — raw word located at T9 `+0x385B`; device-authored detents
+  fit the 12 displayed key names, but exact raw boundaries remain unresolved;
+  AUX-BRAIN
+- [~] Brain scale enum — raw word located at T9 `+0x385F`; device-authored
+  detents fit a 7-bucket hypothesis, but true boundaries remain open;
+  AUX-BRAIN
+- [~] Brain link target / linked instrument-track selection — raw word located
+  at T9 `+0x3863`; guide says links instrument tracks to Brain for live riffing;
+  semantic map still partial; AUX-BRAIN
+- [x] Brain routing mask T1–T8 — M2 routing, T9 `+0x09`, T1-low bit order;
+  write via `set_brain_route_mask` / `set_brain_routes`; AUX-BRAIN
+- [x] Brain transpose note/event encoding from musical keyboard — generic note
+  vector at T9 `+0x456F`; AUX-BRAIN
+- [ ] Brain recorded automation / p-lock support for key, scale, link, routing —
+  gap
+- [ ] Brain interaction with project transpose/global scale fields — gap
+
+### 12.2 T10 / aux 2 — Punch-in FX™
+
+Guide: Punch-in FX can be played, recorded, and performed from the keyboard.
+Lower octave targets percussion tracks; higher octave targets melodic tracks.
+Some effects use gyroscope and pitchbend. Per-track punch-ins can also be
+recorded from instrument tracks with Shift + keyboard and are stored on the
+Punch-in FX aux track.
+
+- [ ] Punch-in FX note/key map — low octave percussion group, high octave melodic
+  group; exact key → effect enum gap
+- [x] Punch-in FX event record format — recorded punch-ins use the generic
+  note vector at T10 `+0x456F`, `tests/test_t10_punch_in_fx_inspection.py`
+- [ ] Punch-in FX per-track vs group-wide target encoding — gap
+- [ ] Punch-in FX percussion/melodic grouping rule — guide-visible; storage gap
+- [ ] Punch-in FX gyroscope modulation capture / persistence — likely runtime-only
+  or event-modulated; gap
+- [ ] Punch-in FX pitchbend modulation capture / persistence — gap
+- [ ] Punch-in FX duration/gate behavior in sequencer — gap
+- [ ] Punch-in FX p-lock/step component compatibility — gap
+
+### 12.3 T11 / aux 3 — External MIDI
+
+Guide: External MIDI sequences notes to external devices over USB-C or multi-out.
+M1 controls MIDI channel, bank, and program. M2/M3 expose eight MIDI CC controls.
+Shift + encoder turns on or selects each CC message. M4 exposes an LFO with
+speed, amount, destination, and parameter.
+
+- [~] External MIDI generic notes/sequencer events — same track substrate likely;
+  needs fixture confirmation
+- [ ] External MIDI output port / transport target interaction with COM or
+  multi-out settings — probably device-global, not `.xy`; verify
+- [x] External MIDI channel current value — M1 dark gray encoder, T11
+  `+0x3857`; 16-bucket detent hypothesis matches captures; boundary-safe
+  formula not proven; raw write via `set_external_midi_m1_raw`; AUX-T11
+- [x] External MIDI bank value — M1 mid gray encoder, T11 `+0x385B`;
+  129-bucket detent hypothesis with index 0 = off matches captures;
+  boundary-safe formula not proven; raw write via `set_external_midi_m1_raw`;
+  AUX-T11
+- [x] External MIDI program value — M1 light gray encoder, T11 `+0x385F`;
+  129-bucket detent hypothesis with index 0 = off matches captures;
+  boundary-safe formula not proven; raw write via `set_external_midi_m1_raw`;
+  AUX-T11
+- [~] External MIDI CC slot table, 8 slots — table localized to T11
+  `+0x3877..+0x3896`; exact number/message word ownership still partial;
+  raw word write via `set_external_midi_cc_word`; AUX-T11
+- [ ] External MIDI CC slot enable/on state — Shift + encoder; gap
+- [ ] External MIDI CC number selection per slot — gap
+- [ ] External MIDI CC current value per slot — gap
+- [ ] External MIDI CC p-lock/automation lanes — guide-visible; storage gap
+- [x] External MIDI LFO speed — shared M4 word at T11 `+0x38B7`; AUX-LFO
+- [x] External MIDI LFO amount — shared M4 word at T11 `+0x38BB`; AUX-LFO
+- [x] External MIDI LFO destination module enum — T11 `+0x38BF`, off/cc1/cc2
+  detents confirmed; bucket boundaries unverified; AUX-LFO
+- [x] External MIDI LFO destination parameter enum — shared M4 word at T11
+  `+0x38C3`; T13 generic param-target detents confirmed; AUX-LFO
+- [ ] External MIDI bank/program send timing on project load vs pattern start —
+  device-behavior gap
+
+### 12.4 T12 / aux 4 — External CV
+
+Guide: External CV uses the multi-out jack; CV is on tip/left and gate is on
+ring/right. The keyboard and sequencer can play notes on a connected CV device.
+
+- [x] External CV generic notes/sequencer events — generic note vector at T12
+  `+0x456F`; octave stored in the ordinary note byte; AUX-T12
+- [ ] External CV output enable / multi-out mode dependency — likely device-global
+  plus project track data; gap
+- [ ] External CV pitch scaling / volts-per-octave assumptions — no project-file
+  field found in current T12 note probes; likely system/CV behavior, but gap
+- [ ] External CV gate polarity / level persistence — no project-file field
+  found in current T12 note probes; likely system/CV behavior, but gap
+- [~] External CV note-to-voltage mapping and transpose behavior — note pitch
+  persists as generic note byte; voltage calibration/transpose behavior gap
+- [ ] External CV pitchbend / glide / portamento support — gap
+- [ ] External CV p-lockable parameters, if any — gap
+- [ ] External CV interaction with project transpose and Brain routing — gap
+
+### 12.5 T13 / aux 5 — External Audio
+
+Guide: External Audio manages audio input and auxiliary output. M1 controls input
+source, analog input drive, input level, and mix to main output. M2 routes
+instrument tracks to aux audio output, with per-track input amount distinct from
+the main mix. M3 provides high-pass/low-pass filtering plus Tape and FX send
+levels. M4 provides LFO speed, amount, destination, and parameter.
+
+- [x] External Audio input source enum — T13 `+0x3857`; mic/default plus
+  headset, line, USB-C, main-output detents captured; bucket boundaries
+  unverified; write via `set_external_audio_source` or raw M1 setter; AUX-T13
+- [x] External Audio analog drive/gain — T13 `+0x385B`; 0/default and 20 dB
+  anchors captured; display boundaries unverified; raw write via
+  `set_external_audio_m1_raw`; AUX-T13
+- [x] External Audio input level — T13 `+0x38FB`; 0/99 anchors and baseline
+  75 captured; display boundaries unverified; raw write via
+  `set_external_audio_m1_raw`; AUX-T13
+- [x] External Audio main-output mix — T13 `+0x3863`; 0 and 99/default
+  anchors captured; display boundaries unverified; raw write via
+  `set_external_audio_m1_raw`; AUX-T13
+- [~] External Audio input activation / armed state — input-off/default and
+  input-on captures produced no dedicated setting beyond known save noise;
+  likely runtime-only or implicit, but not proven; AUX-T13
+- [~] External Audio routing mask T1–T8 to aux output — M2 sends are source-track
+  words at `+0x38A7`; explicit separate mask not found; AUX-T13
+- [x] External Audio per-routed-track send amount to aux output — source-track
+  `+0x38A7`; write via `set_track_send_ext_*`; AUX-T13
+- [x] External Audio high-pass cutoff — T13 `+0x3897`; AUX-FILTER
+- [x] External Audio low-pass cutoff — T13 `+0x38A3`; AUX-FILTER
+- [ ] External Audio Tape send level — Shift + mid gray encoder; gap
+- [ ] External Audio FX I send level — Shift + light gray encoder; gap
+- [ ] External Audio FX II send level — Shift + white encoder; gap
+- [x] External Audio LFO speed — T13 `+0x38B7`; AUX-LFO
+- [x] External Audio LFO amount — T13 `+0x38BB`; AUX-LFO
+- [x] External Audio LFO destination module enum — T13 `+0x38BF`,
+  syn/filter/amp detents confirmed; bucket boundaries unverified; AUX-LFO
+- [x] External Audio LFO destination parameter enum — T13 `+0x38C3`, param
+  targets 1-4 confirmed; bucket boundaries unverified; AUX-LFO
+
+### 12.6 T14 / aux 6 — Tape
+
+Guide: Tape plays clips from routed tracks. M1 controls pitch, speed, loop length,
+and wet/original mix. M2 routes tracks into Tape and allows per-track amount.
+M3 provides high-pass/low-pass filter plus FX send levels. M4 provides LFO speed,
+amount, destination, and parameter.
+
+- [ ] Tape clip/key map from musical keyboard — gap
+- [x] Tape pitch — T14 `+0x3857`; x1/default and x10 anchor captured;
+  display boundaries unverified; raw write via `set_tape_m1_raw`; AUX-T14
+- [x] Tape speed — T14 `+0x385B`; 50/default/200 anchors captured; display
+  boundaries unverified; raw write via `set_tape_m1_raw`; AUX-T14
+- [x] Tape loop length enum/scaling — T14 `+0x385F`; length 1/default and
+  length 10 anchors captured; bucket boundaries unverified; raw write via
+  `set_tape_m1_raw`; AUX-T14
+- [x] Tape wet/original mix — T14 `+0x3863`; 0/default and 99 anchors captured;
+  display boundaries unverified; raw write via `set_tape_m1_raw`; AUX-T14
+- [~] Tape routing mask T1–T8 — M2 sends are source-track words at `+0x38AB`;
+  explicit separate mask not found; AUX-T14
+- [x] Tape per-routed-track input amount — source-track `+0x38AB`; write via
+  `set_track_send_tape_*`; AUX-T14
+- [x] Tape high-pass cutoff — shared aux M3 word at `+0x3897`; AUX-FILTER
+- [x] Tape low-pass cutoff — shared aux M3 word at `+0x38A3`; AUX-FILTER
+- [ ] Tape FX I send level — Shift + light gray encoder; gap
+- [ ] Tape FX II send level — Shift + white encoder; gap
+- [x] Tape LFO speed — shared aux M4 word at `+0x38B7`; AUX-LFO
+- [x] Tape LFO amount — shared aux M4 word at `+0x38BB`; AUX-LFO
+- [x] Tape LFO destination module enum — shared aux M4 word at `+0x38BF`;
+  T13 generic detents confirmed; bucket boundaries unverified; AUX-LFO
+- [x] Tape LFO destination parameter enum — shared aux M4 word at `+0x38C3`;
+  T13 param-target detents confirmed; bucket boundaries unverified; AUX-LFO
+
+### 12.7 T15 / aux 7 — FX I
+
+Guide: FX I and FX II are OP–XY’s two FX send tracks. Any sound-producing track
+can send into them, and FX I can send to FX II. M1 edits current FX engine
+parameters. M2 exposes routing. M3 provides high-pass/low-pass filtering, and
+FX I has a send level into FX II. M4 provides LFO speed, amount, destination,
+and parameter.
+
+- [~] FX I type enum and params — type byte at T15 `+0x14`; delay/reverb/
+  chorus/phaser/distortion/lofi type bytes and delay param block captured;
+  other engines' parameter schemas remain open; AUX-T15
+- [x] FX I selected engine ID — T15 `+0x14`; known type bytes captured;
+  write via `set_fx_type` / `set_fx_type_name`; AUX-T15
+- [~] FX I engine parameter block — T15 `+0x3857..+0x3863`; delay anchors
+  captured, per-engine schemas still partial; AUX-T15
+- [ ] FX I preview keyboard behavior: plays last selected instrument track —
+  runtime/UI behavior; persistence likely none
+- [~] FX I routing mask / send sources from sound-producing tracks — M2 sends
+  are source-track words at `+0x38AF`; explicit separate mask not found; AUX-T15
+- [x] FX I route amount per source track — source-track `+0x38AF`; write via
+  `set_track_send_fx1_*`; AUX-T15
+- [x] FX I high-pass cutoff — shared aux M3 word at `+0x3897`; AUX-FILTER
+- [x] FX I low-pass cutoff — shared aux M3 word at `+0x38A3`; AUX-FILTER
+- [ ] FX I → FX II send level — Shift + white encoder; not isolated from
+  ordinary source-track FX II send yet
+- [x] FX I LFO speed — shared aux M4 word at `+0x38B7`; AUX-LFO
+- [x] FX I LFO amount — shared aux M4 word at `+0x38BB`; AUX-LFO
+- [x] FX I LFO destination module enum — shared aux M4 word at `+0x38BF`;
+  T13 generic detents confirmed; bucket boundaries unverified; AUX-LFO
+- [x] FX I LFO destination parameter enum — shared aux M4 word at `+0x38C3`;
+  T13 param-target detents confirmed; bucket boundaries unverified; AUX-LFO
+
+### 12.8 T16 / aux 8 — FX II
+
+Guide: FX II is the second FX send track. It shares the FX-track structure:
+engine selection, M1 engine parameters, M2 routing, M3 high-pass/low-pass
+filtering, and M4 LFO modulation.
+
+- [~] FX II type enum and params — type byte at T16 `+0x14`; delay/reverb/
+  chorus/phaser/distortion/lofi type bytes and delay param block captured;
+  other engines' parameter schemas remain open; AUX-T16
+- [x] FX II selected engine ID — T16 `+0x14`; known type bytes captured;
+  write via `set_fx_type` / `set_fx_type_name`; AUX-T16
+- [~] FX II engine parameter block — T16 `+0x3857..+0x3863`; reverb baseline
+  and delay anchors captured, per-engine schemas still partial; AUX-T16
+- [ ] FX II preview keyboard behavior: plays last selected instrument track —
+  runtime/UI behavior; persistence likely none
+- [~] FX II routing mask / send sources from sound-producing tracks — M2 sends
+  are source-track words at `+0x38B3`; explicit separate mask not found; AUX-T16
+- [x] FX II route amount per source track — source-track `+0x38B3`; write via
+  `set_track_send_fx2_*`; AUX-T16
+- [x] FX II high-pass cutoff — shared aux M3 word at `+0x3897`; AUX-FILTER
+- [x] FX II low-pass cutoff — shared aux M3 word at `+0x38A3`; AUX-FILTER
+- [x] FX II LFO speed — shared aux M4 word at `+0x38B7`; AUX-LFO
+- [x] FX II LFO amount — shared aux M4 word at `+0x38BB`; AUX-LFO
+- [x] FX II LFO destination module enum — shared aux M4 word at `+0x38BF`;
+  T13 generic detents confirmed; bucket boundaries unverified; AUX-LFO
+- [x] FX II LFO destination parameter enum — shared aux M4 word at `+0x38C3`;
+  T13 param-target detents confirmed; bucket boundaries unverified; AUX-LFO
 
 ## 13. Players (arpeggio / maestro / hold)
 

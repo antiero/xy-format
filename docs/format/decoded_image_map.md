@@ -64,12 +64,15 @@ derived from scene row flags, not from `0x06`.
 | +0x02 | default step length, u16 LE ticks (`240` = UI 50, min capture `4`, max `480`) | BAR `bar-l-*` |
 | +0x03–0x0A | early header bytes; formerly used as a signature, but BAR fields can mutate this range | BAR |
 | +0x06 | **track scale** (0x01=½, 0x03=1, 0x05=2, 0x0E=16) | u20–u22 |
-| +0x07 | bar-page quantization raw byte (`0x00` UI 0, `0xFF` default/UI 100; middle captures include UI 25/50/75 = `0x41`/`0x81`/`0xC0`; exact scaling partial) | BAR `bar-q-*` |
+| +0x07 | bar-page quantization raw byte; UI display is `floor(raw * 100 / 255)` (`0x00` UI 0, `0x80/0x81` UI 50, `0xFE` UI 99, `0xFF` UI 100) | BAR `bar-q-*` |
 | +0x08 | per-track groove override index byte (`signed_raw = 3 * index` into the UI sequence, saturated to signed i8 at ±99) | BAR `bar-g*` |
+| +0x09 | **T9 Brain route mask** (`bit0=T1` … `bit7=T8`; default `0xFC` routes T3–T8, `0x00` none, `0xFF` all) | AUX-BRAIN |
 | +0x11 | u16: **8 = pristine, 0 = edited** — the raw "type 0x05/0x07 + `08 00` padding" was this field's RLE shadow; sticky (never returns to 8) | u51, u53, every edit file |
 | +0x1C | M4/LFO type selector (5 bytes change on LFO swap) | u32 |
 | +0x20 | M4 page on/off | u31, u33 |
 | +0x21 | filter type (SVF/Ladder) | u28 |
+| +0x38A7 | **send to T13 External Audio aux output** u32, stored on the source track | AUX-T13 |
+| +0x38AB | **send to T14 Tape** u32, stored on the source track | AUX-T14 |
 | +0x38AF | **send FX I** u32 (byte @ +0x38B2) | P2-A `f6`/`f7` |
 | +0x38B3 | **send FX II** u32 (byte @ +0x38B6) | P2-A `f8`/`f9` |
 | +0x38F7 | **track pan** u32 (byte @ +0x38FA; center `0x40`) | P2-A `f3`–`f5` |
@@ -78,15 +81,22 @@ derived from scene row flags, not from `0x06`.
 | +0x3056 | bar-page p-lock interpolation/shape raw byte (`0x00` default/min, `0x04`/`0x08` min+1/+2, `0xFF` max) | BAR `bar-s-*` |
 | +0x3057 + 16×(step−1) | **step-component slot, 16 bytes per step**, one byte per component type within the slot (portamento +9, bend +10, tonality +11, jump +12, param +13, conditional +14, …) | u8/u9, u59–u77 |
 | +0x3857 | engine parameter block: eight 4-byte q16-ish values for synth engines; tonal sampler keeps these centered at `0x40000000` even when preset `engine.params` are unique | u23–u25, u96, 2026-06-15 unique sampler preset |
+| +0x3857 / +0x385B / +0x385F / +0x3863 | **T9 Brain parameter words**: raw key/mode/scale/link fields are located; candidate bucket interpretations for `+0x385B` and `+0x385F` fit device-authored captures but still need PC-generated → device-verified confirmation | AUX-BRAIN |
+| +0x3857 / +0x385B / +0x385F | **T11 External MIDI M1**: channel, bank, program u32 words. Channel uses 16 buckets (index+1 = channel); bank/program use 129 buckets (0=off, 1-128=value). Device detents fit the hypothesized `floor(raw*N/0x80000000)` mapping, but bucket boundaries are unverified and not boundary-safe for PC authoring. | AUX-T11 |
+| +0x3857 / +0x385B / +0x3863 / +0x38FB | **T13 External Audio M1**: source, drive, mix, level. Source detents confirmed for mic/headset/line/USB-C/main; drive/level/mix endpoints or anchors captured. Display/bucket boundaries remain unverified. | AUX-T13 |
+| +0x3857 / +0x385B / +0x385F / +0x3863 | **T14 Tape M1**: pitch, speed, length, mix. Device-authored anchors captured; display/bucket boundaries remain unverified. | AUX-T14 |
 | +0x3877 | M2 amp envelope ADSR (16 bytes) | u26 |
 | +0x3897 | M3 filter/FX knobs: at least eight 4-byte lanes in sampler presets; unique capture maps params 0-4 and 6-7, while lane 5 serialized as `0x7FFFFFFF` | u30, 2026-06-15 unique sampler preset |
 | +0x38B7 | M4/LFO values: eight 4-byte q16 lanes in sampler presets | u32, u33, 2026-06-15 unique sampler preset |
+| +0x3877..+0x3896 | **T11 External MIDI CC map table**: eight u32 words touched by M2/M3 CC assignment captures. Table location and bucket-readable values confirmed; exact CC number vs CC message ownership remains partial. | AUX-T11 |
+| +0x3897 / +0x389B / +0x389F / +0x38A3 | **Aux M3 filter words**: HPF, param 2, param 3, LPF for T13–T16. T13 captures confirm HPF min/default `0x00000000`, HPF max `0x7FFFFFFF`; LPF min `0x00000000`, LPF max/default `0x7FFFFFFF`; param 2 mid `0x7C28F2FF`; param 3 mid `0x3570CA40`. Param 2/3 semantics remain unknown. | AUX-FILTER |
+| +0x38B7 / +0x38BB / +0x38BF / +0x38C3 | **Aux M4 LFO words**: speed, amount, destination, param-dest. T13 generic captures confirm speed min/default `0x40000000`, max `0x7FFFFFFF`; amount min/zero/max `0x00000000`/`0x40000000`/`0x7FFFFFFF`; generic dest syn/filter/amp `0x00000000`/`0x4AAAAAA9`/`0x75555553`; param targets 1-4 `0x07FFFFFF`/`0x27FFFFFD`/`0x47FFFFFB`/`0x77FFFFF8`. T11 MIDI-only dest off/cc1/cc2 uses `+0x38BF` values `0x00000000`/`0x3AAAAAA7`/`0x7AAAAAA3`. Bucket boundaries remain unverified for PC authoring. | AUX-LFO |
 | +0x38D7 | filter envelope ADSR (16 bytes) | u27 |
 | +0x38FF–0x393B | modulation/performance matrix: modwheel, aftertouch, pitchbend, velocity target/amount, velocity sensitivity, portamento type, width, high-pass | u83, u84, 2026-06-15 unique sampler preset |
 | +0x3917 / +0x392F | velocity sensitivity / track high-pass filter | u82, u40 |
 | +0x38F2 / +0x38F6 | T9–T16 project-config save side-effect (`0x00`→`0x40` in every PCFG variant; not the edited setting) | PCFG |
 | +0x3CBF | 2-byte UI-state (last-touched?) — co-changes with edits | u40, u66, u82 |
-| ~+0x456F | **note event area**: `[count u8]` + 12-byte note records `{u32 tick; u32 gate; u8 note; u8 vel; u8 flags[2]}` (tick 480/16th, gate 240 = default). Micro-timing lives in `tick` (non-grid values, u79/u87), not the flags. `flags[1]` always 0 in corpus; `flags[0]` 0 for programmed notes, 2 on some MIDI-recorded drum notes (n110); firmware **does** read them (device probe 07: `flags[0]=127` caused a note retrigger), but out-of-range values misbehave — writer emits 0,0 (device default). | u81 decode; corpus scan; probe 07 |
+| ~+0x456F | **note event area**: `[count u8]` + 12-byte note records `{u32 tick; u32 gate; u8 note; u8 vel; u8 flags[2]}` (tick 480/16th, gate 240 = default). Micro-timing lives in `tick` (non-grid values, u79/u87), not the flags. `flags[1]` always 0 in corpus; `flags[0]` 0 for programmed notes, 2 on some MIDI-recorded drum notes (n110); firmware **does** read them (device probe 07: `flags[0]=127` caused a note retrigger), but out-of-range values misbehave — writer emits 0,0 (device default). Confirmed on T9 Brain, T10 Punch-in FX, and T12 External CV probes. | u81 decode; corpus scan; probe 07; AUX-BRAIN; AUX-T10; AUX-T12 |
 | end | trailing zero region (raw-space "tail byte" = its run extension) | — |
 
 **Aux tracks**: T15 = FX1, T16 = FX2 — FX type changes substitute in the
@@ -254,7 +264,7 @@ string starts at `+0x395F`.
 Tonal sampler project-local window values are stored just before that table,
 inside `track+0x393F..+0x3956`. The 2026-06-15 unique preset capture confirms
 these values are copied from preset `regions[0]` when a sampler preset is
-loaded, except `+0x3953`, which remains derived/unknown:
+loaded:
 
 | track offset | captured meaning |
 |---|---|
@@ -263,12 +273,37 @@ loaded, except `+0x3953`, which remains derived/unknown:
 | +0x3947 | sample/window end |
 | +0x394B | loop start |
 | +0x394F | loop end |
-| +0x3953 | unresolved helper/derived value |
+| +0x3953 | loop crossfade raw u32; preset `loop.crossfade` frames normalized by `framecount` to a q31-like word using single-precision float math |
 
 Do not use tonal sampler `patch.json engine.params` as sample-window state:
 the unique capture intentionally set non-default `engine.params`, but
 `track+0x3857..+0x3876` remained centered defaults. Generated projects should
 author the pre-slot window block directly.
+
+Exact `patch.json` preset-load lane map from
+`src/sampler-project-state/2026-06-15/smp07_t7_unique_sampler_preset_loaded.xy`:
+
+| track offsets | patch.json source |
+|---|---|
+| `+0x3877..+0x3883` | `envelope.amp.attack/decay/sustain/release` |
+| `+0x388B` | `engine.portamento.amount` |
+| `+0x388F` | `engine.bendrange` |
+| `+0x3893` | `engine.volume` |
+| `+0x3897..+0x38B3` | `fx.params[0..7]`, except lane 5 (`+0x38AB`) became `0x7FFFFFFF` in the active ladder capture rather than `fx.params[5]` |
+| `+0x38B7..+0x38D3` | `lfo.params[0..7]` |
+| `+0x38D7..+0x38E3` | `envelope.filter.attack/decay/sustain/release` |
+| `+0x38FF..+0x3913` | modwheel, aftertouch, pitchbend target/amount pairs |
+| `+0x3917` | `engine.velocity.sensitivity` |
+| `+0x391B` | `engine.portamento.type` |
+| `+0x3923` | `engine.width` |
+| `+0x392F` | `engine.highpass` |
+| `+0x3933..+0x3937` | velocity modulation target/amount |
+| `+0x393F..+0x3953` | region frame/window/crossfade values |
+| `+0x3957` | sampler `regions[0].pitch.keycenter` root/key byte; conflict probes show this wins over `hikey` |
+| `+0x395A` | sampler patch-load loop bits: `0x40` from `loop.enabled=false`, `0x80` from `loop.onrelease=true` |
+| `+0x395B` | sampler `regions[0].tune` signed cents byte |
+| `+0x395C` | sampler `regions[0].gain` byte |
+| `+0x395E` | sampler `regions[0].reverse` direction byte |
 
 Preset name field follows the table. (The "amb kit" sampler corpus referenced
 in older notes is not present in the repo; slot internals can be mapped from
@@ -287,7 +322,7 @@ order (v0 kick a … v23 chi).
 |---|---|---|
 | +0x00 | **tune** | u8 root note, default 0x3c, **±48 semitones** |
 | +0x02 | key assignment | u8 (MIDI key this voice triggers) |
-| +0x03 | **play mode** | u8: 1=key, 2=oneshot, 3=mute group, 4=loop |
+| +0x03 | **play mode** | u8; patch.json string labels confirmed by preset-load experiment: `gate=0`, `key=1`, `oneshot=1`, `group=2`, `loop=3`; numeric JSON values are not preserved as raw bytes |
 | +0x05 | *(unused in M3 probes)* | stays 0 when pan/fade edited on v23 |
 | +0x06 | **pan** | signed byte, device ±100 (`d1`/`d2` captures) |
 | +0x7C | **gain / loop-crossfade (fade)** | u32; pad fade UI on v23 → **v22** `+0x7C`; encode `ui×0x0147AF00`, max `0x7FFFFFFF`; decode `(u32>>8)//0x0147AF` — M3 log |
@@ -309,6 +344,12 @@ start/loop_start/end/gain (validated: tune reproduces the capture byte-exact).
 Read API: `xy/drum_sample_inspection.py` (`DrumVoiceSample`,
 `inspect_drum_samples`).
 
+Preset-loaded clean 24-region drum kits use a shifted sample-window layout:
+voice 0 `framecount`/start/end/loop words live in the pre-table header
+`track+0x393F/+0x3943/+0x3947/+0x394B/+0x394F`, while voices 1-23 duplicate
+their `sample.end`/`framecount` values into the previous slot at both `+0x68`
+and `+0x70`. This is distinct from the direct edit-field writer/read API above.
+
 ### One-shot Sampler (`0x02`) — sample-edit header (P2-B)
 
 Voice-0 path still @ `track+0x3957`, slot `+0x08`. **Start/end/loop** for
@@ -316,21 +357,23 @@ Sampler are **not** at drum `slot+0x68`/`+0x70`; they precede the table:
 
 | track offset | field | probes |
 |---|---|---|
-| `+0x3943` | sample start u16 LE | `g3` |
-| `+0x3947` | sample end u16 LE | `g4` |
-| `+0x394B` | loop start u16 LE | `g5` |
-| `+0x394F` | loop end u16 LE | `g6` |
-| `+0x3956` | loop crossfade u8 | `g11` (`96` ≈ 75% UI) |
-| `+0x3957` | tune u8 | `0x3C` + aux=`N×10` (≥0); `0x3D` + aux=`100−N×10` (<0); `g-tune-*` |
-| `+0x395B` | tune aux u8 | paired with `+0x3957`; see tune table in P2-B log |
-| `+0x395A` | loop type u8 | `0x80` infinite · `0x40` off · `0x00` until-release |
+| `+0x393F` | framecount u32 LE | `g0`, preset corpus |
+| `+0x3943` | sample start u32 LE | `g3`, preset corpus |
+| `+0x3947` | sample end u32 LE | `g4`, preset corpus |
+| `+0x394B` | loop start u32 LE | `g5`, preset corpus |
+| `+0x394F` | loop end u32 LE | `g6`, preset corpus |
+| `+0x3953` | loop crossfade raw u32 | `g11` = `0x60000000` (`96` high byte ≈ 75% UI); preset-load `loop.crossfade` uses single-precision float normalization by `framecount` |
+| `+0x3956` | loop crossfade high byte | legacy/coarse UI view of `+0x3953` |
+| `+0x3957` | tune/root u8 | direct sample edit tune byte; patch.json preset loads use `pitch.keycenter` as root/key byte here |
+| `+0x395B` | tune aux u8 | direct sample edit tune aux; patch.json preset loads use signed `regions[0].tune` cents here (`4 -> +0.04`, `-5 -> -0.05` / `0xFB`) |
+| `+0x395A` | loop type u8 | direct sampler edit labels: `0x80` infinite · `0x40` off · `0x00` until-release; patch.json preset loads compose bits `0x40` from `loop.enabled=false` and `0x80` from `loop.onrelease=true` |
 | `+0x395C` | gain u8 | `g8`/`g9` |
 | `+0x395E` | direction u8 | `g7` |
 
 API: `xy/sampler_sample_inspection.py`. Log:
 `docs/logs/2026-06-12_sampler_oneshot_inspection.md`.
 
-### Preset assignment (validated)
+### Preset assignment (validated low-level primitive)
 
 Loading a kit/preset = copying the donor's preset-identity regions into
 the target struct at the same offsets:
@@ -339,6 +382,18 @@ except header, pristine flag, p-lock table, step components, and the
 note vector. Validated against u116 (boop kit on T4/T7/T8): donor-copy
 reproduces the device file except UI-session bytes.
 `ImageProject.set_preset()` implements this.
+
+The donor must be a pristine single-pattern, zero-note preset-load track.
+Generated project tracks are not safe preset donors because `+0x4570..end`
+is post-note-count storage; copying it from a track with events creates a
+target whose note count and note-tail bytes disagree. `ImageProject.set_preset()`
+now rejects non-pristine donors instead of producing that impossible state.
+
+This is a fallback for exact device-authored preset-load state, not the
+preferred generated-authoring abstraction. As sampler, drum, pattern, scene,
+and song fields become decoded, JSON/spec authoring should compile those
+semantic fields into image edits directly and reserve donor-copy for fields
+that are still opaque but known to be internally coherent.
 
 ## Open
 

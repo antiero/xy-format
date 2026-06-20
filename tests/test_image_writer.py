@@ -163,6 +163,18 @@ def test_set_preset_matches_device_kit_load():
             assert rel in UI_OK, f"non-UI residual at image+{i:#x} (track-rel {rel:#x})"
 
 
+def test_set_preset_rejects_non_pristine_donor_track(tmp_path):
+    """Generated projects contain note vectors, so they are unsafe preset donors."""
+    donor = ImageProject.from_file(BASE)
+    donor.add_note(2, step=1, note=48)
+    donor_path = tmp_path / "donor-with-notes.xy"
+    donor.save(str(donor_path))
+
+    target = ImageProject.from_file(BASE)
+    with pytest.raises(ValueError, match="donor track must be pristine"):
+        target.set_preset(2, str(donor_path), donor_track=2)
+
+
 def test_spec_to_xy_image_reproduces_whitney_probe():
     import subprocess, sys, tempfile, os
     spec = Path("specs/midi-to-xy/Whitney Houston - I Wanna Dance With Somebody song.json")

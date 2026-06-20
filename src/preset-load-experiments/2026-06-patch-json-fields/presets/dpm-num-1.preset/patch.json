@@ -1,0 +1,106 @@
+{
+  "engine": {
+    "bendrange": 4096,
+    "highpass": 0,
+    "modulation": {
+      "aftertouch": {
+        "amount": 0,
+        "target": 0
+      },
+      "modwheel": {
+        "amount": 0,
+        "target": 0
+      },
+      "pitchbend": {
+        "amount": 0,
+        "target": 0
+      },
+      "velocity": {
+        "amount": 0,
+        "target": 0
+      }
+    },
+    "params": [
+      16384,
+      16384,
+      16384,
+      16384,
+      16384,
+      16384,
+      16384,
+      16384
+    ],
+    "playmode": "mono",
+    "portamento.amount": 0,
+    "portamento.type": 0,
+    "transpose": 0,
+    "tuning.root": 0,
+    "tuning.scale": 0,
+    "velocity.sensitivity": 0,
+    "volume": 32767,
+    "width": 0
+  },
+  "envelope": {
+    "amp": {
+      "attack": 0,
+      "decay": 0,
+      "sustain": 32767,
+      "release": 0
+    },
+    "filter": {
+      "attack": 0,
+      "decay": 0,
+      "sustain": 0,
+      "release": 0
+    }
+  },
+  "fx": {
+    "active": false,
+    "params": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      32767,
+      0,
+      0
+    ],
+    "type": "z lowpass"
+  },
+  "lfo": {
+    "active": false,
+    "params": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "type": "value"
+  },
+  "octave": -2,
+  "platform": "OP-XY",
+  "regions": [
+    {
+      "fade.in": 0,
+      "fade.out": 0,
+      "framecount": 98807,
+      "hikey": 53,
+      "lokey": 53,
+      "pan": 0,
+      "pitch.keycenter": 60,
+      "playmode": 1,
+      "reverse": false,
+      "sample": "probe.wav",
+      "sample.end": 98807,
+      "transpose": 0,
+      "tune": 0
+    }
+  ],
+  "type": "drum",
+  "version": 4
+}

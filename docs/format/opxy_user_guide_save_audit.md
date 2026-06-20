@@ -41,7 +41,7 @@ Primary repo references:
 | Project settings | global transpose, time signature, voice allocation, per-track MIDI channel | Core project settings decoded by PCFG/HDR probes. |
 | Tempo | BPM, groove type/amount, metronome level/on-off | BPM, groove type/amount, time signature, click volume, and metronome persistence decoded. |
 | Patterns/sequencer | notes, chords, gate, microtiming, bars, track scale, p-locks, step components | Decoded. |
-| Bar page | quantization, default length, per-track groove, lock smoothing, final-bar length | Decoded; quantization scaling and p-lock shape UI labels remain partial. |
+| Bar page | quantization, default length, per-track groove, lock smoothing, final-bar length | Quantization, final-bar length, default step length, per-track groove, and p-lock shape decoded. |
 | Players | arpeggio, maestro, hold | Gap. |
 | Instrument | engine, preset, M1 params, envelopes, filter, LFO, preset settings | Main regions decoded; several shift/subfunction values are partial. |
 | Auxiliary tracks | Brain, Punch-in FX, External MIDI/CV/Audio, Tape, FX I/II | Track structs exist; many aux-specific parameter labels/enums are gaps. |
@@ -74,8 +74,8 @@ Guide refs: section 11.1 p.39; section 11.2 p.40.
 |---|---|---|
 | Tempo | BPM/tap tempo. | Decoded: global `0x00`, u16 LE tenths of BPM in decoded image. |
 | Groove type | Shuffle/half-shuffle/danish/bombora/wobbly/gaussian/accents/island nod/disfunk/roll over/prophetic. | Decoded location: global `0x03`; only some enum values are named from captures. |
-| Groove amount | Amount of selected groove. | Partial. `docs/format/header.md` lists header `0x0C` and related `0x10-0x17` words as groove/metronome related; decoded-image map only promotes groove type. |
-| Metronome volume/toggle | Click level and enabled state. | Volume decoded at global `0x04`; enabled/on-off state remains partial. |
+| Groove amount | Amount of selected groove. | Decoded: signed global `0x02`; writer: `ImageProject.set_groove_amount()`. |
+| Metronome volume/toggle | Click level and enabled state. | Click volume decoded at global `0x04`; off and minimum volume both persist as `0x00`, and probes did not reveal a separate toggle byte. |
 
 ### Sequencer, Pattern, and Bar State
 
@@ -92,10 +92,10 @@ Guide refs: section 7.1 p.22-23; section 7.2 p.24; section 7.3 p.25; section 7.4
 | Change sequence octave/semitone | Mass note transposition. | Operation over note values, not a separate field unless project transpose is used. |
 | Parameter lock | Per-step parameter value. | Decoded: p-lock table at track `+0x2A0`, 64 rows x 84 bytes, 42 u16 columns. |
 | Track scale | One step duration: 1, 2, 3, 4, 6, 8, 16, 1/2 per guide. | Partial. Location decoded at track `+0x06`; observed values include 1, 2, 16, and 1/2. Missing confirmed enum bytes for 3, 4, 6, 8. |
-| Add/remove bars | 1-4 bars per pattern. | Decoded at track `+0x01` (`bars << 4`). |
+| Add/remove bars | 1-4 bars per pattern. | Decoded at track `+0x01` as total active steps. Full bars are `16`, `32`, `48`, `64`; partial final bars use `(bar_count - 1) * 16 + final_bar_steps`. |
 | Duplicate bar | Copy notes/locks/components between step ranges. | Operation over decoded structures; no separate field. |
 | Sequence length / final-bar length | Number of active steps when last bar is shortened. | Decoded (BAR-LEN). Track `+0x01` stores total active steps: `(bar_count - 1) * 16 + final_bar_steps`. |
-| Track quantization | Recording quantize amount; affects whether nudge is allowed at 100. | Partial (BAR). Raw byte at track `+0x07`; UI 0/1/2/25/50/75/98/99/100 captured, exact scaling still partial. |
+| Track quantization | Recording quantize amount; affects whether nudge is allowed at 100. | Decoded (BAR). Raw byte at track `+0x07`; displayed UI is `floor(raw * 100 / 255)`. |
 | Default step length | Length of newly step-sequenced notes. | Decoded (BAR). U16 ticks at track `+0x02`; default `240`, max `480`, one detent near center = 4 ticks. |
 | Per-track groove override | Bar-page groove overriding tempo swing. | Decoded (BAR). Raw index byte at track `+0x08`; storage is `3 * index` into the displayed UI sequence, saturated at ±99. |
 | P-lock smoothing/shape | Interpolation/smoothing between p-locks. | Decoded raw storage (BAR) at track `+0x3056`; UI curve names/icons still not mapped. |
@@ -159,9 +159,9 @@ guide-visible aux semantics are still the largest project-format gap.
 | Aux track/function | What should save | Current decode |
 |---|---|---|
 | T9 Brain | Manual/auto, key, scale, linked tracks, routing, recorded Brain sequence. | Gap/partial. Track struct exists; no promoted field map for Brain settings/routing. |
-| T10 Punch-in FX | Percussion/melodic mode, punch effect assignments/recorded triggers. | Gap/partial. Track notes/p-locks can exist; punch-specific params are not mapped. |
-| T11 External MIDI | MIDI channel, bank, program, eight assignable CC controls. | Partial. Notes and p-locks are generic; external-track channel/bank/program/CC assignment fields are not promoted. |
-| T12 External CV | CV/gate behavior and track params. | Gap/partial. |
+| T10 Punch-in FX | Percussion/melodic mode, punch effect assignments/recorded triggers. | Partial. Recorded punch triggers use the generic note vector at T10 `+0x456F`; full punch key/effect map and modulation behavior remain gaps. |
+| T11 External MIDI | MIDI channel, bank, program, eight assignable CC controls. | Partial. Channel/bank/program words are located at T11 `+0x3857/+0x385B/+0x385F`; CC assignment table localizes to `+0x3877..+0x3896`, but exact number/message ownership remains partial. T11 note-vector confirmation fixture was not captured yet. |
+| T12 External CV | CV/gate behavior and track params. | Partial. Sequenced CV notes use the generic note vector at T12 `+0x456F`; no project-file CV mode/gate/calibration fields are confirmed. |
 | T13 External Audio | Input level/drive/filters/sends. | Gap/partial. `unnamed 126` captures CC12 input on T13; there is no source-corpus CC13 drive capture yet. |
 | T14 Tape | Tape parameters and sends. | Gap/partial. |
 | T15/T16 FX I/II | FX type and parameters. | Partial. Aux track identity and params are structurally decoded; exact type enums/parameter scaling for chorus/delay/distortion/lofi/phaser/reverb need full tables. |
@@ -202,7 +202,7 @@ Guide refs: section 18.1 p.77-78; section 18.2 p.79-82; section 18.3 p.83-84; se
 | Function | What should save | Current decode |
 |---|---|---|
 | Sample folder | External WAV/AIFF files and folders. | Outside `.xy` except project sample-path references. |
-| One-shot synth sampler | Sample path, start, loop start/end, end, direction, tune, loop crossfade, gain, loop type. | **Decoded (P2-B):** header @ `track+0x3943`…`+0x3956`; path/tune/gain/direction/loop-type @ voice-0 `+0x3957`. Tune UI scaling partial. |
+| One-shot synth sampler | Sample path, framecount, start, loop start/end, end, direction, tune, loop crossfade, gain, loop type. | **Decoded (P2-B + preset corpus):** header @ `track+0x393F`…`+0x3956`; path/tune/gain/direction/loop-type @ voice-0 `+0x3957`. Tune UI scaling partial. |
 | Drum sampler sample assignment | 24 key slots with path strings. | Decoded: 24 x 128-byte slots at track `+0x3957`; sample path at slot `+0x08`. |
 | Drum sampler edit controls | Tune, start, end, play mode, direction, pan, fade, gain. | **Decoded:** tune `+0x00`, play mode `+0x03`, direction `+0x07`, pan `+0x06` (M3 ±100), start `+0x68`, end `+0x70`, gain/fade `+0x7C` (fade on preceding slot for pad voices, M3). |
 | Drum clear/copy/paste/select multiple | Assignment/table operations. | Operation over decoded slot table; multi-select UI state itself is not relevant unless saved as UI state. |
@@ -253,7 +253,7 @@ These are the guide-visible features that should be prioritized if the goal is
 | P1 | Mod-routing destination enum and signed scaling | section 14.5 p.51, section 22.9 p.118 | Region known, but target IDs/amount scaling incomplete. | Pitchbend/modwheel/aftertouch/velocity target+amount matrix with fixed nonzero amounts. |
 | P2 | Aux/static mix labels beyond P2-A fields | section 17.1-section 17.4 p.70-73 | Main static mixer, master compressor/output, EQ, and saturator are mapped; aux-specific labels and some send semantics remain partial. | One save per aux-visible control from initialized project; use decoded diff against baseline. |
 | P2 | LFO type/subfunction enum table | section 14.4 p.45-50 | Region known; user-facing labels incomplete. | LFO type sweep and one capture per shift/click subfunction. |
-| P2 | External MIDI engine channel/bank/program and CC assignment fields | section 20.4 p.96, section 15.3 p.56 | Needed for external-device authoring. | External engine track with channel/bank/program set to unusual values; then CC assignment on/off values. |
+| P2 | External MIDI CC assignment ownership and boundary-safe writer values | section 20.4 p.96, section 15.3 p.56 | M1 channel/bank/program offsets are located, and the CC table range is located; exact CC number/message word ownership and PC-generated boundary behavior remain open. | One clean capture per CC word from a reset baseline, plus PC-generated boundary checks for channel/bank/program buckets. |
 | P2 | Active song/scene/project selector and guide 9-song vs decoded 14-slot footer reconciliation | section 12.1 p.41, section 16.4 p.68, section 23 p.122 | Core model works for Song 1 chains, but selector/count semantics and unused footer slots need cleanup. | Create songs 1-9 with unique one-scene chains; save after selecting each. |
 | P3 | User preset file format and internal project display name | section 10.1 p.36, section 14.6 p.52 | Useful for library tooling, less critical for `.xy` musical playback. | Save/rename user preset and project; compare filesystem artifacts plus project body. |
 | P3 | Device-global COM/system settings | section 19.1-section 19.5 p.87-91 | Probably not `.xy`, but should be proven to avoid false expectations. | Change COM/system settings and resave same project; confirm no project-body delta. |

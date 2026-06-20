@@ -157,3 +157,24 @@ from .sampler_sample_inspection import (  # noqa: F401
     inspect_sampler_samples_bytes,
     read_sampler_sample_edit,
 )
+from .patch_json import (  # noqa: F401
+    DrumKitPatch,
+    DrumPadPatch,
+    PatchJsonSoundPatchOptions,
+    SamplerPatch,
+    apply_patch_json_confirmed_sound_state,
+    apply_patch_json_file,
+    apply_patch_json_sound,
+    apply_patch_json_text,
+    apply_sound_patch,
+    drum_kit_patch_from_patch_json,
+    sampler_patch_from_patch_json,
+    sound_patch_from_patch_json_file,
+    sound_patch_from_patch_json_text,
+    sound_patch_from_patch_json,
+)
+from .patch_sound_state import (  # noqa: F401
+    PatchSoundState,
+    inspect_patch_sound_state_bytes,
+    read_patch_sound_state,
+)

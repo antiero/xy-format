@@ -133,9 +133,37 @@ class ImageProject:
         """1-based track number -> struct base offset (header byte 0)."""
         return self._starts[track - 1]
 
+    def pattern_start(self, track: int, pattern: int = 1) -> int:
+        """1-based track/pattern -> physical pattern struct base offset."""
+        if not 1 <= track <= TRACK_COUNT:
+            raise ValueError("track must be 1..16")
+        if not 1 <= pattern <= 9:
+            raise ValueError("pattern must be 1..9")
+        starts = pattern_starts_from_image(self.image)
+        if not starts:
+            raise ValueError("could not locate pattern structs")
+        index = 0
+        for current_track in range(1, TRACK_COUNT + 1):
+            if index >= len(starts):
+                raise ValueError("pattern struct table ended early")
+            leader = starts[index]
+            count = self.image[leader]
+            if not 1 <= count <= 9:
+                count = 1
+            if current_track == track:
+                if pattern > count:
+                    raise ValueError(f"track {track} only has {count} pattern(s)")
+                return starts[index + pattern - 1]
+            index += count
+        raise ValueError("track must be 1..16")
+
     # --- field edits -----------------------------------------------------
     def mark_edited(self, track: int) -> None:
         s = self.track_start(track)
+        self.image[s + OFF_PRISTINE : s + OFF_PRISTINE + 2] = b"\x00\x00"
+
+    def mark_pattern_edited(self, track: int, pattern: int = 1) -> None:
+        s = self.pattern_start(track, pattern)
         self.image[s + OFF_PRISTINE : s + OFF_PRISTINE + 2] = b"\x00\x00"
 
     def set_pattern_steps(self, track: int, steps: int) -> None:
@@ -170,6 +198,11 @@ class ImageProject:
         s = self.track_start(track)
         self.image[s + OFF_QUANTIZATION] = raw
         self.mark_edited(track)
+
+    def set_track_quantization_ui(self, track: int, ui_value: int) -> None:
+        from .bar_menu_inspection import encode_track_quantization_ui
+
+        self.set_track_quantization_raw(track, encode_track_quantization_ui(ui_value))
 
     def set_track_groove_raw(self, track: int, raw: int) -> None:
         if not 0 <= raw <= 0xFF:
@@ -238,6 +271,14 @@ class ImageProject:
     GLOBAL_VOICES = 0x4D  # per-track voice allocation T1..T8, 0=auto
     GLOBAL_MIDI = 0x55      # per-track channel array (T1=0x55 .. T16=0x64)
     GLOBAL_EQ = (0x68, 0x6C, 0x70)  # master EQ low/mid/high, u32 each (default 0x40)
+    GLOBAL_MASTER_PERC = 0x85
+    GLOBAL_MASTER_MELODY = 0x89
+    GLOBAL_MASTER_COMP = 0x8D
+    GLOBAL_MASTER_VOL = 0x91
+    GLOBAL_SAT_GAIN = 0x75
+    GLOBAL_SAT_CLIP = 0x79
+    GLOBAL_SAT_TONE = 0x7D
+    GLOBAL_SAT_MIX = 0x81
 
     @staticmethod
     def _u32(value: int, *, where: str = "value") -> bytes:
@@ -303,13 +344,123 @@ class ImageProject:
             if val is not None:
                 self.image[off : off + 4] = self._u32(val, where="master EQ value")
 
+    @staticmethod
+    def _encode_mix_u32_from_byte(byte: int, *, min_u32: int = 0) -> int:
+        if not 0 <= byte <= 0x7F:
+            raise ValueError("mix byte must be in 0..0x7F")
+        if byte == 0:
+            return min_u32
+        if byte == 0x7F:
+            return 0x7FFFFFFF
+        return byte << 24
+
+    def _set_global_u32(self, offset: int, value: int) -> None:
+        if not 0 <= value <= 0xFFFFFFFF:
+            raise ValueError("u32 value must be in 0..0xFFFFFFFF")
+        self.image[offset : offset + 4] = value.to_bytes(4, "little")
+
+    def _set_track_u32(self, track: int, offset: int, value: int) -> None:
+        if not 0 <= value <= 0xFFFFFFFF:
+            raise ValueError("u32 value must be in 0..0xFFFFFFFF")
+        s = self.track_start(track)
+        self.image[s + offset : s + offset + 4] = value.to_bytes(4, "little")
+        self.mark_edited(track)
+
+    def set_track_volume_raw(self, track: int, value: int) -> None:
+        self._set_track_u32(track, 0x38FB, value)
+
+    def set_track_pan_raw(self, track: int, value: int) -> None:
+        self._set_track_u32(track, 0x38F7, value)
+
+    def set_track_send_fx1_raw(self, track: int, value: int) -> None:
+        self._set_track_u32(track, 0x38AF, value)
+
+    def set_track_send_fx2_raw(self, track: int, value: int) -> None:
+        self._set_track_u32(track, 0x38B3, value)
+
+    def set_track_send_ext_raw(self, track: int, value: int) -> None:
+        """Set source-track send to T13 External Audio aux output."""
+        self._set_track_u32(track, 0x38A7, value)
+
+    def set_track_send_tape_raw(self, track: int, value: int) -> None:
+        """Set source-track send to T14 Tape."""
+        self._set_track_u32(track, 0x38AB, value)
+
+    def set_track_volume_byte(self, track: int, byte: int) -> None:
+        self.set_track_volume_raw(track, self._encode_mix_u32_from_byte(byte))
+
+    def set_track_pan_byte(self, track: int, byte: int) -> None:
+        self.set_track_pan_raw(track, self._encode_mix_u32_from_byte(byte))
+
+    def set_track_send_fx1_byte(self, track: int, byte: int) -> None:
+        self.set_track_send_fx1_raw(track, self._encode_mix_u32_from_byte(byte))
+
+    def set_track_send_fx2_byte(self, track: int, byte: int) -> None:
+        self.set_track_send_fx2_raw(track, self._encode_mix_u32_from_byte(byte))
+
+    def set_track_send_ext_byte(self, track: int, byte: int) -> None:
+        self.set_track_send_ext_raw(track, self._encode_mix_u32_from_byte(byte))
+
+    def set_track_send_tape_byte(self, track: int, byte: int) -> None:
+        self.set_track_send_tape_raw(track, self._encode_mix_u32_from_byte(byte))
+
+    def set_master_percussion_raw(self, value: int) -> None:
+        self._set_global_u32(self.GLOBAL_MASTER_PERC, value)
+
+    def set_master_melody_raw(self, value: int) -> None:
+        self._set_global_u32(self.GLOBAL_MASTER_MELODY, value)
+
+    def set_master_compressor_raw(self, value: int) -> None:
+        self._set_global_u32(self.GLOBAL_MASTER_COMP, value)
+
+    def set_master_volume_raw(self, value: int) -> None:
+        self._set_global_u32(self.GLOBAL_MASTER_VOL, value)
+
+    def set_master_percussion_byte(self, byte: int) -> None:
+        self.set_master_percussion_raw(self._encode_mix_u32_from_byte(byte, min_u32=0x00A3D70A))
+
+    def set_master_melody_byte(self, byte: int) -> None:
+        self.set_master_melody_raw(self._encode_mix_u32_from_byte(byte, min_u32=0x00A3D70A))
+
+    def set_master_compressor_byte(self, byte: int) -> None:
+        self.set_master_compressor_raw(self._encode_mix_u32_from_byte(byte, min_u32=0x00A3D70A))
+
+    def set_master_volume_byte(self, byte: int) -> None:
+        self.set_master_volume_raw(self._encode_mix_u32_from_byte(byte, min_u32=0x00A3D70A))
+
+    def set_master_saturator_gain_raw(self, value: int) -> None:
+        self._set_global_u32(self.GLOBAL_SAT_GAIN, value)
+
+    def set_master_saturator_clip_raw(self, value: int) -> None:
+        self._set_global_u32(self.GLOBAL_SAT_CLIP, value)
+
+    def set_master_saturator_tone_raw(self, value: int) -> None:
+        self._set_global_u32(self.GLOBAL_SAT_TONE, value)
+
+    def set_master_saturator_mix_raw(self, value: int) -> None:
+        self._set_global_u32(self.GLOBAL_SAT_MIX, value)
+
+    def set_master_saturator_gain_byte(self, byte: int) -> None:
+        self.set_master_saturator_gain_raw(self._encode_mix_u32_from_byte(byte))
+
+    def set_master_saturator_clip_byte(self, byte: int) -> None:
+        self.set_master_saturator_clip_raw(self._encode_mix_u32_from_byte(byte))
+
+    def set_master_saturator_tone_byte(self, byte: int) -> None:
+        self.set_master_saturator_tone_raw(self._encode_mix_u32_from_byte(byte))
+
+    def set_master_saturator_mix_byte(self, byte: int) -> None:
+        self.set_master_saturator_mix_raw(self._encode_mix_u32_from_byte(byte))
+
     # --- per-track sound / engine (track-relative offsets) ----------------
     TRK_SCALE = 0x06
     TRK_ENGINE = 0x14
+    TRK_LFO_TYPE = 0x1C
     TRK_M4_PAGE = 0x20
+    TRK_LFO_ON = TRK_M4_PAGE
     TRK_FILTER_TYPE = 0x21
     TRK_FILTER_ON = 0x25
-    TRK_PARAMS = 0x3857     # 4 engine params, u32 each
+    TRK_PARAMS = 0x3857     # 8 engine params, u32 each
     TRK_AMP_ENV = {
         "attack": 0x3877,
         "decay": 0x387B,
@@ -322,6 +473,8 @@ class ImageProject:
         "pitch_bend_range": 0x388F,   # CC30 current lane
         "engine_volume": 0x3893,      # CC31 current lane
     }
+    TRK_FX_PARAMS = (0x3897, 0x389B, 0x389F, 0x38A3, 0x38A7, 0x38AB, 0x38AF, 0x38B3)
+    TRK_LFO_PARAMS = (0x38B7, 0x38BB, 0x38BF, 0x38C3, 0x38C7, 0x38CB, 0x38CF, 0x38D3)
     TRK_SENDS = {
         "ext": 0x38A7,    # CC36 current lane
         "tape": 0x38AB,   # CC37 current lane; inferred by lane order
@@ -344,14 +497,66 @@ class ImageProject:
         "sustain": 0x38DF,
         "release": 0x38E3,
     }
+    TRK_MODULATION = {
+        "modwheel_target": 0x38FF,
+        "modwheel_amount": 0x3903,
+        "aftertouch_target": 0x3907,
+        "aftertouch_amount": 0x390B,
+        "pitchbend_target": 0x390F,
+        "pitchbend_amount": 0x3913,
+        "velocity_sensitivity": 0x3917,
+        "portamento_type": 0x391B,
+        "tuning_scale": 0x391F,
+        "width": 0x3923,
+        "tuning_root": 0x392B,
+        "highpass": 0x392F,
+        "velocity_target": 0x3933,
+        "velocity_amount": 0x3937,
+    }
     TRK_MIX = {
         "pan": 0x38F7,     # CC10 current lane
         "volume": 0x38FB,  # CC7 current lane
     }
+    TRK_MIDI_CC_TABLE = 0x3877
+    TRK_AUX_FILTER = 0x3897
+    TRK_AUX_LFO = 0x38B7
     TRK_STEPCOMP = 0x3057   # 16 B per step
     TRK_PLOCK = 0x2A0       # 84 B per step row, u16 cells
     # encoded track-scale byte (0x01=½× .. 0x0E=16×); pass raw for others.
     SCALE_BYTES = {0.5: 0x01, 1: 0x03, 2: 0x05, 16: 0x0E}
+    EXTERNAL_AUDIO_SOURCES = {
+        "mic": 0x00000000,
+        "headset": 0x1FFFFFFE,
+        "hp": 0x1FFFFFFE,
+        "line": 0x46666662,
+        "usb-c": 0x5FFFFFFA,
+        "usbc": 0x5FFFFFFA,
+        "main": 0x79999992,
+    }
+    FX_TYPES = {
+        "delay": 0x00,
+        "reverb": 0x05,
+        "chorus": 0x0C,
+        "phaser": 0x0D,
+        "distortion": 0x0E,
+        "lofi": 0x0F,
+    }
+    AUX_LFO_DEST_GENERIC = {
+        "syn": 0x00000000,
+        "filter": 0x4AAAAAA9,
+        "amp": 0x75555553,
+    }
+    AUX_LFO_DEST_T11 = {
+        "off": 0x00000000,
+        "cc1": 0x3AAAAAA7,
+        "cc2": 0x7AAAAAA3,
+    }
+    AUX_LFO_PARAM_DEST = {
+        1: 0x07FFFFFF,
+        2: 0x27FFFFFD,
+        3: 0x47FFFFFB,
+        4: 0x77FFFFF8,
+    }
 
     STEP_COMPONENTS = {
         "pulse": 0, "hold": 1, "multiply": 2, "velocity": 3, "ramp_up": 4,
@@ -376,15 +581,37 @@ class ImageProject:
         self.image[self.track_start(track) + self.TRK_SCALE] = b & 0xFF
         self.mark_edited(track)
 
-    def set_engine(self, track: int, engine_id: int) -> None:
-        self.image[self.track_start(track) + self.TRK_ENGINE] = engine_id & 0xFF
-        self.mark_edited(track)
+    def set_engine(self, track: int, engine_id: int, *, pattern: int = 1) -> None:
+        s = self.pattern_start(track, pattern)
+        self.image[s + self.TRK_ENGINE] = engine_id & 0xFF
+        self.mark_pattern_edited(track, pattern)
 
-    def set_engine_param(self, track: int, index: int, value: int) -> None:
-        """index 1..4; value is the device's internal (fixed-point) u32."""
-        o = self.track_start(track) + self.TRK_PARAMS + (index - 1) * 4
+    @staticmethod
+    def _q16(value: int) -> int:
+        if not isinstance(value, int) or isinstance(value, bool):
+            raise TypeError("q16 value must be an integer")
+        if not 0 <= value <= 0x7FFF:
+            raise ValueError("q16 value must be in 0..0x7FFF")
+        return value << 16
+
+    def set_engine_param(self, track: int, index: int, value: int, *, pattern: int = 1) -> None:
+        """index 1..8; value is the device's internal (fixed-point) u32."""
+        if not 1 <= index <= 8:
+            raise ValueError("engine param index must be 1..8")
+        o = self.pattern_start(track, pattern) + self.TRK_PARAMS + (index - 1) * 4
         self.image[o : o + 4] = self._u32(value, where=f"track {track} engine param {index}")
-        self.mark_edited(track)
+        self.mark_pattern_edited(track, pattern)
+
+    def set_engine_param_q16(
+        self,
+        track: int,
+        index: int,
+        value: int,
+        *,
+        pattern: int = 1,
+    ) -> None:
+        """Set a patch.json-style q16 engine param value (0..0x7FFF)."""
+        self.set_engine_param(track, index, self._q16(value), pattern=pattern)
 
     def set_engine_params(
         self,
@@ -394,15 +621,31 @@ class ImageProject:
         param2: int | None = None,
         param3: int | None = None,
         param4: int | None = None,
+        param5: int | None = None,
+        param6: int | None = None,
+        param7: int | None = None,
+        param8: int | None = None,
+        pattern: int = 1,
     ) -> None:
-        for index, value in enumerate((param1, param2, param3, param4), start=1):
+        for index, value in enumerate(
+            (param1, param2, param3, param4, param5, param6, param7, param8),
+            start=1,
+        ):
             if value is not None:
-                self.set_engine_param(track, index, value)
+                self.set_engine_param(track, index, value, pattern=pattern)
 
-    def _write_track_u32(self, track: int, offset: int, value: int, *, where: str) -> None:
-        o = self.track_start(track) + offset
+    def _write_track_u32(
+        self,
+        track: int,
+        offset: int,
+        value: int,
+        *,
+        where: str,
+        pattern: int = 1,
+    ) -> None:
+        o = self.pattern_start(track, pattern) + offset
         self.image[o : o + 4] = self._u32(value, where=where)
-        self.mark_edited(track)
+        self.mark_pattern_edited(track, pattern)
 
     def set_m2_shift(
         self,
@@ -412,6 +655,7 @@ class ImageProject:
         portamento: int | None = None,
         pitch_bend_range: int | None = None,
         engine_volume: int | None = None,
+        pattern: int = 1,
     ) -> None:
         """Set M2 shift/current lanes.
 
@@ -432,6 +676,7 @@ class ImageProject:
                     self.TRK_M2_SHIFT[name],
                     value,
                     where=f"track {track} M2 {name}",
+                    pattern=pattern,
                 )
 
     def set_amp_envelope(
@@ -442,6 +687,7 @@ class ImageProject:
         decay: int | None = None,
         sustain: int | None = None,
         release: int | None = None,
+        pattern: int = 1,
     ) -> None:
         """Set M2 amp envelope ADSR current lanes."""
         for name, value in {
@@ -456,6 +702,7 @@ class ImageProject:
                     self.TRK_AMP_ENV[name],
                     value,
                     where=f"track {track} amp envelope {name}",
+                    pattern=pattern,
                 )
 
     def set_filter_knobs(
@@ -530,6 +777,7 @@ class ImageProject:
         decay: int | None = None,
         sustain: int | None = None,
         release: int | None = None,
+        pattern: int = 1,
     ) -> None:
         """Set filter envelope ADSR current lanes."""
         for name, value in {
@@ -544,6 +792,108 @@ class ImageProject:
                     self.TRK_FILTER_ENV[name],
                     value,
                     where=f"track {track} filter envelope {name}",
+                    pattern=pattern,
+                )
+
+    def set_fx_state(
+        self,
+        track: int,
+        *,
+        type: int | None = None,
+        active: bool | None = None,
+        params: list[int] | tuple[int, ...] | None = None,
+        pattern: int = 1,
+    ) -> None:
+        """Set preset-local FX header and q16 params confirmed by the corpus."""
+        if type is not None or active is not None:
+            self.set_filter(track, type=type, enabled=active, pattern=pattern)
+        if params is not None:
+            if len(params) > len(self.TRK_FX_PARAMS):
+                raise ValueError("FX params must contain at most 8 values")
+            for index, value in enumerate(params):
+                raw = 0x7FFFFFFF if index == 5 else self._q16(value)
+                self._write_track_u32(
+                    track,
+                    self.TRK_FX_PARAMS[index],
+                    raw,
+                    where=f"track {track} FX param {index + 1}",
+                    pattern=pattern,
+                )
+
+    def set_lfo_state(
+        self,
+        track: int,
+        *,
+        type: int | None = None,
+        active: bool | None = None,
+        params: list[int] | tuple[int, ...] | None = None,
+        pattern: int = 1,
+    ) -> None:
+        """Set preset-local LFO header and q16 params confirmed by the corpus."""
+        s = self.pattern_start(track, pattern)
+        if type is not None:
+            self.image[s + self.TRK_LFO_TYPE] = type & 0xFF
+        if active is not None:
+            self.image[s + self.TRK_LFO_ON] = 1 if active else 0
+        if type is not None or active is not None:
+            self.mark_pattern_edited(track, pattern)
+        if params is not None:
+            if len(params) > len(self.TRK_LFO_PARAMS):
+                raise ValueError("LFO params must contain at most 8 values")
+            for index, value in enumerate(params):
+                self._write_track_u32(
+                    track,
+                    self.TRK_LFO_PARAMS[index],
+                    self._q16(value),
+                    where=f"track {track} LFO param {index + 1}",
+                    pattern=pattern,
+                )
+
+    def set_patch_modulation_state(
+        self,
+        track: int,
+        *,
+        modwheel_target: int | None = None,
+        modwheel_amount: int | None = None,
+        aftertouch_target: int | None = None,
+        aftertouch_amount: int | None = None,
+        pitchbend_target: int | None = None,
+        pitchbend_amount: int | None = None,
+        velocity_sensitivity: int | None = None,
+        portamento_type: int | None = None,
+        tuning_scale: int | None = None,
+        width: int | None = None,
+        tuning_root: int | None = None,
+        highpass: int | None = None,
+        velocity_target: int | None = None,
+        velocity_amount: int | None = None,
+        pattern: int = 1,
+    ) -> None:
+        """Set confirmed patch.json q16 modulation/settings lanes."""
+        values = {
+            "modwheel_target": modwheel_target,
+            "modwheel_amount": modwheel_amount,
+            "aftertouch_target": aftertouch_target,
+            "aftertouch_amount": aftertouch_amount,
+            "pitchbend_target": pitchbend_target,
+            "pitchbend_amount": pitchbend_amount,
+            "velocity_sensitivity": velocity_sensitivity,
+            "portamento_type": portamento_type,
+            "tuning_scale": tuning_scale,
+            "width": width,
+            "tuning_root": tuning_root,
+            "highpass": highpass,
+            "velocity_target": velocity_target,
+            "velocity_amount": velocity_amount,
+        }
+        for name, value in values.items():
+            if value is not None:
+                self._write_track_u32(
+                    track,
+                    self.TRK_MODULATION[name],
+                    self._q16(value),
+                    where=f"track {track} patch {name}",
+                    pattern=pattern,
                 )
 
     def set_track_mix(
@@ -563,13 +913,179 @@ class ImageProject:
                     where=f"track {track} mix {name}",
                 )
 
-    def set_filter(self, track: int, *, type: int | None = None, enabled: bool | None = None) -> None:
-        s = self.track_start(track)
+    def set_brain_route_mask(self, mask: int) -> None:
+        """Set T9 Brain route mask (`bit0=T1` … `bit7=T8`)."""
+        if not 0 <= mask <= 0xFF:
+            raise ValueError("Brain route mask must be u8")
+        self.image[self.track_start(9) + 0x09] = mask
+        self.mark_edited(9)
+
+    def set_brain_routes(self, tracks: list[int] | tuple[int, ...] | set[int]) -> None:
+        """Set T9 Brain routed instrument tracks from 1-based T1..T8 numbers."""
+        mask = 0
+        for track in tracks:
+            if not 1 <= track <= 8:
+                raise ValueError("Brain routes must be instrument tracks 1..8")
+            mask |= 1 << (track - 1)
+        self.set_brain_route_mask(mask)
+
+    def set_external_midi_m1_raw(
+        self,
+        *,
+        channel: int | None = None,
+        bank: int | None = None,
+        program: int | None = None,
+    ) -> None:
+        """Set confirmed T11 M1 raw words. Bucket boundaries are not implied."""
+        if channel is not None:
+            self.set_engine_param(11, 1, channel)
+        if bank is not None:
+            self.set_engine_param(11, 2, bank)
+        if program is not None:
+            self.set_engine_param(11, 3, program)
+
+    def set_external_midi_cc_word(self, slot: int, value: int) -> None:
+        """Set one raw T11 CC-table word (slot 1..8).
+
+        The table location is confirmed; exact number/message/on-state ownership
+        is still partial, so this stays a raw-word API.
+        """
+        if not 1 <= slot <= 8:
+            raise ValueError("External MIDI CC slot must be 1..8")
+        self._set_track_u32(11, self.TRK_MIDI_CC_TABLE + (slot - 1) * 4, value)
+
+    def set_external_audio_m1_raw(
+        self,
+        *,
+        source: int | None = None,
+        drive: int | None = None,
+        level: int | None = None,
+        mix: int | None = None,
+    ) -> None:
+        """Set confirmed T13 External Audio M1 raw words."""
+        if source is not None:
+            self.set_engine_param(13, 1, source)
+        if drive is not None:
+            self.set_engine_param(13, 2, drive)
+        if mix is not None:
+            self.set_engine_param(13, 4, mix)
+        if level is not None:
+            self.set_track_volume_raw(13, level)
+
+    def set_external_audio_source(self, source: str) -> None:
+        """Set T13 input source from captured labels: mic/headset/line/usb-c/main."""
+        try:
+            raw = self.EXTERNAL_AUDIO_SOURCES[source.lower()]
+        except KeyError as exc:
+            valid = ", ".join(sorted(self.EXTERNAL_AUDIO_SOURCES))
+            raise ValueError(f"unknown external-audio source {source!r}; expected one of {valid}") from exc
+        self.set_external_audio_m1_raw(source=raw)
+
+    def set_tape_m1_raw(
+        self,
+        *,
+        pitch: int | None = None,
+        speed: int | None = None,
+        length: int | None = None,
+        mix: int | None = None,
+    ) -> None:
+        """Set confirmed T14 Tape M1 raw words."""
+        for index, value in enumerate((pitch, speed, length, mix), start=1):
+            if value is not None:
+                self.set_engine_param(14, index, value)
+
+    def set_aux_filter_raw(
+        self,
+        track: int,
+        *,
+        hpf: int | None = None,
+        param2: int | None = None,
+        param3: int | None = None,
+        lpf: int | None = None,
+        enable: bool = True,
+    ) -> None:
+        """Set shared aux M3 filter raw words on T13-T16."""
+        if track not in range(13, 17):
+            raise ValueError("aux filter is confirmed for tracks 13..16")
+        for index, value in enumerate((hpf, param2, param3, lpf)):
+            if value is not None:
+                self._set_track_u32(track, self.TRK_AUX_FILTER + index * 4, value)
+        if enable:
+            self.image[self.track_start(track) + self.TRK_FILTER_ON] = 1
+            self.mark_edited(track)
+
+    def set_aux_lfo_raw(
+        self,
+        track: int,
+        *,
+        speed: int | None = None,
+        amount: int | None = None,
+        destination: int | None = None,
+        param_dest: int | None = None,
+        enable: bool = True,
+    ) -> None:
+        """Set shared aux M4 LFO raw words on T9-T16.
+
+        Device-authored detents are known for T13 generic destinations and T11
+        MIDI destinations; bucket boundaries are deliberately not encoded here.
+        """
+        if track not in range(9, 17):
+            raise ValueError("aux LFO is confirmed for tracks 9..16")
+        for index, value in enumerate((speed, amount, destination, param_dest)):
+            if value is not None:
+                self._set_track_u32(track, self.TRK_AUX_LFO + index * 4, value)
+        if enable:
+            self.image[self.track_start(track) + self.TRK_M4_PAGE] = 1
+            self.mark_edited(track)
+
+    def set_aux_lfo_destination(self, track: int, destination: str) -> None:
+        """Set the captured aux LFO destination label for T11 or generic aux tracks."""
+        key = destination.lower()
+        table = self.AUX_LFO_DEST_T11 if track == 11 else self.AUX_LFO_DEST_GENERIC
+        try:
+            raw = table[key]
+        except KeyError as exc:
+            valid = ", ".join(sorted(table))
+            raise ValueError(f"unknown aux LFO destination {destination!r}; expected one of {valid}") from exc
+        self.set_aux_lfo_raw(track, destination=raw)
+
+    def set_aux_lfo_param_dest(self, track: int, param: int) -> None:
+        """Set captured aux LFO parameter target 1..4."""
+        try:
+            raw = self.AUX_LFO_PARAM_DEST[param]
+        except KeyError as exc:
+            raise ValueError("aux LFO param target must be 1..4") from exc
+        self.set_aux_lfo_raw(track, param_dest=raw)
+
+    def set_fx_type(self, track: int, type_byte: int) -> None:
+        """Set T15/T16 FX engine type byte."""
+        if track not in (15, 16):
+            raise ValueError("FX type setter is confirmed for tracks 15 and 16")
+        self.set_engine(track, type_byte)
+
+    def set_fx_type_name(self, track: int, name: str) -> None:
+        """Set T15/T16 FX type from captured labels."""
+        try:
+            type_byte = self.FX_TYPES[name.lower()]
+        except KeyError as exc:
+            valid = ", ".join(sorted(self.FX_TYPES))
+            raise ValueError(f"unknown FX type {name!r}; expected one of {valid}") from exc
+        self.set_fx_type(track, type_byte)
+
+    def set_filter(
+        self,
+        track: int,
+        *,
+        type: int | None = None,
+        enabled: bool | None = None,
+        pattern: int = 1,
+    ) -> None:
+        s = self.pattern_start(track, pattern)
         if type is not None:
             self.image[s + self.TRK_FILTER_TYPE] = type & 0xFF
         if enabled is not None:
             self.image[s + self.TRK_FILTER_ON] = 1 if enabled else 0
-        self.mark_edited(track)
+        self.mark_pattern_edited(track, pattern)
 
     def set_track_block(self, track: int, offset: int, data: bytes) -> None:
         """Generic in-place block write (envelopes/filter/mod-routing blocks
@@ -620,25 +1136,67 @@ class ImageProject:
 
     # --- drum-voice parameters (decoded from device capture + manual) -----
     # 24 voice slots, 128 B each, at track+0x3957 (the drum sampler table).
+    PRESET_PATH = 0x453F
+    PRESET_PATH_MAX = 64
     DRUM_TABLE = 0x3957
     DRUM_SLOT = 0x80
     DRUM_TUNE = 0x00       # u8 root note, default 0x3c, ±48 semitones
-    DRUM_PLAY_MODE = 0x03  # u8: 1=key, 2=oneshot, 3=mute group, 4=loop
+    DRUM_KEY = 0x02        # u8 MIDI key assignment
+    DRUM_PLAY_MODE = 0x03  # u8; preset corpus confirms patch.json oneshot = 1
     DRUM_DIRECTION = 0x07  # u8: 0=forward, 1=backward
+    DRUM_PATH = 0x08       # 72 B latin-1 sample path
     DRUM_START = 0x68      # u32 sample start, default 0
     DRUM_LOOP_START = 0x6C  # u32 candidate sample loop-start lane, default 0
     DRUM_END = 0x70        # u32 sample end, default 0xFFFFFFFF
     DRUM_PAN = 0x06        # signed byte pan (−100..+100 observed on device)
     DRUM_GAIN = 0x7C       # u32 sample gain / loop-crossfade, default 0 (max 0x7FFFFFFF)
+    SAMPLER_ENGINE = 0x02
+    DRUM_ENGINE = 0x03
+    SAMPLER_FRAMECOUNT = 0x393F
+    SAMPLER_SAMPLE_START = 0x3943
+    SAMPLER_SAMPLE_END = 0x3947
+    SAMPLER_LOOP_START = 0x394B
+    SAMPLER_LOOP_END = 0x394F
+    SAMPLER_LOOP_CROSSFADE_RAW = 0x3953
+    SAMPLER_LOOP_CROSSFADE = 0x3956
+    SAMPLER_SLOT_TUNE = 0x00
+    SAMPLER_SLOT_LOOP_TYPE = 0x03
+    SAMPLER_SLOT_TUNE_AUX = 0x04
+    SAMPLER_SLOT_GAIN = 0x05
+    SAMPLER_SLOT_DIRECTION = 0x07
+    SAMPLER_SLOT_PATH = 0x08
+
+    @staticmethod
+    def _latin1_bytes(value: str, max_len: int, *, where: str) -> bytes:
+        raw = value.encode("latin1")
+        if len(raw) >= max_len:
+            raise ValueError(f"{where} must be shorter than {max_len} bytes")
+        return raw + b"\x00" * (max_len - len(raw))
+
+    def _write_latin1(self, offset: int, value: str, max_len: int, *, where: str) -> None:
+        self.image[offset : offset + max_len] = self._latin1_bytes(value, max_len, where=where)
+
+    def set_preset_path(self, track: int, path: str, *, pattern: int = 1) -> None:
+        s = self.pattern_start(track, pattern)
+        self._write_latin1(
+            s + self.PRESET_PATH,
+            path,
+            self.PRESET_PATH_MAX,
+            where=f"track {track} pattern {pattern} preset path",
+        )
+        self.mark_pattern_edited(track, pattern)
 
     def set_drum_voice(
         self,
         track: int,
         voice: int,
         *,
+        pattern: int = 1,
         tune: int | None = None,
         play_mode: int | None = None,
         direction: int | None = None,
+        key_assignment: int | None = None,
+        path: str | None = None,
         pan: int | None = None,
         fade: int | None = None,
         start: int | None = None,
@@ -653,20 +1211,35 @@ class ImageProject:
         **preceding** voice slot's +0x7C u32 (e.g. pad voice 23 → slot 22)."""
         from .drum_sample_inspection import drum_fade_storage_voice, encode_drum_fade_ui
 
-        s = self.track_start(track) + self.DRUM_TABLE + voice * self.DRUM_SLOT
+        if not 0 <= voice < 24:
+            raise ValueError("drum voice must be 0..23")
+        base = self.pattern_start(track, pattern)
+        self.image[base + self.TRK_ENGINE] = self.DRUM_ENGINE
+        s = base + self.DRUM_TABLE + voice * self.DRUM_SLOT
         if tune is not None:
             self.image[s + self.DRUM_TUNE] = (0x3C + tune) & 0xFF
         if play_mode is not None:
             self.image[s + self.DRUM_PLAY_MODE] = play_mode
         if direction is not None:
             self.image[s + self.DRUM_DIRECTION] = 1 if direction else 0
+        if key_assignment is not None:
+            if not 0 <= key_assignment <= 0xFF:
+                raise ValueError("drum key assignment must be 0..255")
+            self.image[s + self.DRUM_KEY] = key_assignment
+        if path is not None:
+            self._write_latin1(
+                s + self.DRUM_PATH,
+                path,
+                72,
+                where=f"track {track} drum voice {voice} path",
+            )
         if pan is not None:
             self.image[s + self.DRUM_PAN] = pan & 0xFF
         if fade is not None:
             storage = drum_fade_storage_voice(voice)
             if storage < 0:
                 raise ValueError(f"fade storage voice for drum voice {voice} is invalid")
-            gain_s = self.track_start(track) + self.DRUM_TABLE + storage * self.DRUM_SLOT
+            gain_s = base + self.DRUM_TABLE + storage * self.DRUM_SLOT
             encoded = encode_drum_fade_ui(fade)
             self.image[gain_s + self.DRUM_GAIN : gain_s + self.DRUM_GAIN + 4] = encoded.to_bytes(
                 4, "little"
@@ -693,7 +1266,99 @@ class ImageProject:
                 gain,
                 where=f"track {track} drum voice {voice} gain",
             )
-        self.mark_edited(track)
+        self.mark_pattern_edited(track, pattern)
+
+    def set_sampler_sample_edit(
+        self,
+        track: int,
+        *,
+        pattern: int = 1,
+        preset_path: str | None = None,
+        path: str | None = None,
+        framecount: int | None = None,
+        sample_start: int | None = None,
+        sample_end: int | None = None,
+        loop_start: int | None = None,
+        loop_end: int | None = None,
+        loop_crossfade: int | None = None,
+        loop_crossfade_raw: int | None = None,
+        root_key: int | None = None,
+        tune_cents: int | None = None,
+        tune_tenths: int | None = None,
+        loop_type: int | None = None,
+        gain: int | None = None,
+        direction: int | None = None,
+    ) -> None:
+        """Set confirmed one-shot Sampler sample-edit fields.
+
+        Numeric point fields are raw u32/u8 storage values from the P2-B probes.
+        ``root_key`` and ``tune_cents`` match patch.json preset loading;
+        ``tune_tenths`` uses the direct sample-edit tune encoder.
+        """
+        from .sampler_sample_inspection import encode_sampler_tune_tenths
+
+        s = self.pattern_start(track, pattern)
+        self.image[s + self.TRK_ENGINE] = self.SAMPLER_ENGINE
+        if preset_path is not None:
+            self._write_latin1(
+                s + self.PRESET_PATH,
+                preset_path,
+                self.PRESET_PATH_MAX,
+                where=f"track {track} pattern {pattern} preset path",
+            )
+
+        def write_u32(rel: int, value: int) -> None:
+            if not 0 <= value <= 0xFFFFFFFF:
+                raise ValueError("sampler point value must be u32")
+            self.image[s + rel : s + rel + 4] = value.to_bytes(4, "little")
+
+        if framecount is not None:
+            write_u32(self.SAMPLER_FRAMECOUNT, framecount)
+        if sample_start is not None:
+            write_u32(self.SAMPLER_SAMPLE_START, sample_start)
+        if sample_end is not None:
+            write_u32(self.SAMPLER_SAMPLE_END, sample_end)
+        if loop_start is not None:
+            write_u32(self.SAMPLER_LOOP_START, loop_start)
+        if loop_end is not None:
+            write_u32(self.SAMPLER_LOOP_END, loop_end)
+        if loop_crossfade_raw is not None:
+            write_u32(self.SAMPLER_LOOP_CROSSFADE_RAW, loop_crossfade_raw)
+        elif loop_crossfade is not None:
+            if not 0 <= loop_crossfade <= 0xFF:
+                raise ValueError("sampler loop crossfade must be u8")
+            write_u32(self.SAMPLER_LOOP_CROSSFADE_RAW, loop_crossfade << 24)
+
+        slot = s + self.DRUM_TABLE
+        if path is not None:
+            self._write_latin1(
+                slot + self.SAMPLER_SLOT_PATH,
+                path,
+                72,
+                where=f"track {track} pattern {pattern} sampler path",
+            )
+        if root_key is not None:
+            if not 0 <= root_key <= 0xFF:
+                raise ValueError("sampler root key must be u8")
+            self.image[slot + self.SAMPLER_SLOT_TUNE] = root_key
+        if tune_cents is not None:
+            if not -128 <= tune_cents <= 0xFF:
+                raise ValueError("sampler patch tune cents must fit in a signed or unsigned byte")
+            self.image[slot + self.SAMPLER_SLOT_TUNE_AUX] = tune_cents & 0xFF
+        if tune_tenths is not None:
+            tune_byte, tune_aux = encode_sampler_tune_tenths(tune_tenths)
+            self.image[slot + self.SAMPLER_SLOT_TUNE] = tune_byte
+            self.image[slot + self.SAMPLER_SLOT_TUNE_AUX] = tune_aux
+        for offset, value, label in (
+            (self.SAMPLER_SLOT_LOOP_TYPE, loop_type, "loop type"),
+            (self.SAMPLER_SLOT_GAIN, gain, "gain"),
+            (self.SAMPLER_SLOT_DIRECTION, direction, "direction"),
+        ):
+            if value is not None:
+                if not 0 <= value <= 0xFF:
+                    raise ValueError(f"sampler {label} must be u8")
+                self.image[slot + offset] = value
+        self.mark_pattern_edited(track, pattern)
 
     # --- preset / instrument assignment -----------------------------------
     # Loading a kit/preset copies the donor's preset-identity regions into
@@ -712,6 +1377,12 @@ class ImageProject:
             dstarts = [m.start() - 3 for m in SIG_RE.finditer(dimg)]
         ds = dstarts[donor_track - 1]
         donor = dimg[ds : ds + 17876]
+        if donor[0] != 1 or donor[OFF_NOTE_COUNT] != 0:
+            raise ValueError(
+                "set_preset donor track must be pristine: "
+                f"track {donor_track} has pattern_count={donor[0]} "
+                f"note_count={donor[OFF_NOTE_COUNT]}"
+            )
         s = self.track_start(track)
         for a, b in self.PRESET_REGIONS:
             self.image[s + a : s + b] = donor[a:b]

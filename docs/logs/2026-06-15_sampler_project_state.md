@@ -23,7 +23,7 @@ track+0x3943  sample/window start
 track+0x3947  sample/window end
 track+0x394B  loop start
 track+0x394F  loop end
-track+0x3953  unknown derived/helper value
+track+0x3953  loop crossfade raw u32
 track+0x3957  8-byte tonal sampler slot header
 track+0x395F  sample path string
 ```
@@ -92,10 +92,11 @@ The sampler frame/window values also align directly:
 | `sample.end` | `88926` | `+0x3947` |
 | `loop.start` | `24701` | `+0x394B` |
 | `loop.end` | `74105` | `+0x394F` |
+| `loop.crossfade` | `2048` | `+0x3953` as `0x02A73100` |
 
 `+0x3943` remained `0`, consistent with sample/window start. `+0x3953`
-became `0x02A73100`, so it is not a raw copy of `loop.crossfade = 2048`.
-It remains a derived/helper field.
+became `0x02A73100`; this is `loop.crossfade = 2048` normalized by
+`framecount = 98807` to a q31-like raw word.
 
 Important negative result: the generated preset's `engine.params` values
 (`2048, 5120, 8192, ...`) did not populate `+0x3857..+0x3876`; all eight
@@ -128,9 +129,10 @@ project also needs the pre-slot sample/window block to be coherent.
 
 ## Open Questions
 
-1. `track+0x3953` is `0x2698` after direct sample load but `0` after
-   preset save/load. It may be a derived helper, preview/cache value, or
-   default crossfade/window helper. It is not pinned yet.
+1. `track+0x3953` is the sampler loop-crossfade raw word for preset loads,
+   but direct sample load writes `0x2698` even when the saved preset later has
+   `loop.crossfade = 0`. That direct-load default still needs a follow-up
+   capture before we claim exact UI semantics.
 2. The 8-byte slot header at `track+0x3957` is `3c 00 3c 80 00 00 00 00`
    for this one-zone tonal sampler. It likely includes root/key/flag state,
    but needs a pitch/key-range capture to label confidently.

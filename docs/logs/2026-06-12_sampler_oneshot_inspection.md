@@ -8,9 +8,10 @@
 ## Summary
 
 Sampler engine (`0x02`) stores the **sample path** in voice-0 of the shared
-24×128 B table @ `track+0x3957` (same anchor as drum kits). **Start, end, loop
-points, and loop crossfade** live in a per-track header **before** that table
-(`track+0x3943`…`+0x3956`) — not at drum offsets `slot+0x68` / `+0x70`.
+24×128 B table @ `track+0x3957` (same anchor as drum kits). **Framecount,
+start, end, loop points, and loop crossfade** live in a per-track header
+**before** that table (`track+0x393F`…`+0x3956`) — not at drum offsets
+`slot+0x68` / `+0x70`.
 
 Preset used: **`nt-acidic`** (`8faux8/nt-acidic`).
 
@@ -18,10 +19,11 @@ Preset used: **`nt-acidic`** (`8faux8/nt-acidic`).
 
 | Offset | Field | Encoding | Probes |
 | --- | --- | --- | --- |
-| `+0x3943` | sample start | u16 LE | `g3` → `0x17C4` |
-| `+0x3947` | sample end | u16 LE | `g4` → `0x76B1` |
-| `+0x394B` | loop start | u16 LE | `g5` → `0x4D1A` |
-| `+0x394F` | loop end | u16 LE | `g6` → `0x78AC` (end @ `+0x3947` unchanged) |
+| `+0x393F` | framecount | u32 LE | `g0` → `0x00017DF4` |
+| `+0x3943` | sample start | u32 LE | `g3` → `0x000017C4` |
+| `+0x3947` | sample end | u32 LE | `g4` → `0x000176B1` |
+| `+0x394B` | loop start | u32 LE | `g5` → `0x00014D1A` |
+| `+0x394F` | loop end | u32 LE | `g6` → `0x000178AC` (end @ `+0x3947` unchanged) |
 | `+0x3956` | loop crossfade | u8; `96` ≈ 75% UI (`×100/128`) | `g11` |
 | `+0x3957` | tune | u8 | `g1` → `0xFF` min |
 | `+0x395B` | tune aux | u8 | `g2` → `0x5A` max (with tune `0`) |
@@ -40,6 +42,11 @@ Preset used: **`nt-acidic`** (`8faux8/nt-acidic`).
 | max (`g2`) | `0x00` | `0x5A` (`609` tenths) |
 
 `decode_sampler_tune_tenths()` / `.tune_ui` on `SamplerSampleEdit`.
+
+Earlier notes described the window fields as u16 because the P2-B probes only
+changed low bytes. The preset corpus later confirmed these are full u32
+frame-count/window fields; the `nt-acidic` baseline already contained high-byte
+data (`sample_end = 0x00017DF4`).
 
 **Loop type** is separate from loop start/end (shift+light-grey encoder). When
 loop end equals sample end, behaviour matches “loop off” on device.

@@ -41,6 +41,20 @@ def encode_track_groove_ui(ui_value: int) -> int:
     return raw & 0xFF
 
 
+def quantization_ui_from_raw(raw: int) -> int:
+    if not 0 <= raw <= 0xFF:
+        raise ValueError("quantization raw value must be 0..255")
+    return (raw * 100) // 255
+
+
+def encode_track_quantization_ui(ui_value: int) -> int:
+    if not 0 <= ui_value <= 100:
+        raise ValueError("quantization UI value must be 0..100")
+    if ui_value == 0:
+        return 0
+    return ((ui_value * 255) + 99) // 100
+
+
 @dataclass(frozen=True)
 class TrackBarMenu:
     track: int
@@ -68,8 +82,13 @@ class TrackBarMenu:
 
     @property
     def quantization_ui_approx(self) -> int:
-        """Approximate UI percent; BAR probes pin the byte but not full scaling."""
-        return round(self.quantization_raw * 100 / 255)
+        """Compatibility alias for the exact UI percent."""
+        return self.quantization_ui
+
+    @property
+    def quantization_ui(self) -> int:
+        return quantization_ui_from_raw(self.quantization_raw)
+
 
     @property
     def groove_signed_raw(self) -> int:

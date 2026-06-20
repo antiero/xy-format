@@ -4,6 +4,8 @@ import pytest
 
 from xy.rle import decode_project
 from xy.sampler_sample_inspection import (
+    decode_sampler_loop_crossfade_frames,
+    encode_sampler_loop_crossfade_frames,
     LOOP_TYPE_INFINITE,
     LOOP_TYPE_OFF,
     LOOP_TYPE_UNTIL_RELEASE,
@@ -11,10 +13,10 @@ from xy.sampler_sample_inspection import (
     SAMPLER_TUNE_NEGATIVE_BYTE,
     SamplerSampleEdit,
     TRACK_LOOP_CROSSFADE_U8,
-    TRACK_LOOP_END_U16,
-    TRACK_LOOP_START_U16,
-    TRACK_SAMPLE_END_U16,
-    TRACK_SAMPLE_START_U16,
+    TRACK_LOOP_END_U32,
+    TRACK_LOOP_START_U32,
+    TRACK_SAMPLE_END_U32,
+    TRACK_SAMPLE_START_U32,
     VOICE_TABLE_OFFSET,
     SLOT_DIRECTION,
     SLOT_GAIN,
@@ -41,10 +43,12 @@ def test_baseline_sampler_fields() -> None:
     sample = _baseline()
     assert sample.engine_id == 0x02
     assert "nt-acidic" in sample.path
+    assert sample.framecount == 0x17DF4
     assert sample.sample_start == 0
-    assert sample.sample_end == 0x7DF4
-    assert sample.loop_start == 0x6EC5
-    assert sample.loop_end == 0x7DF4
+    assert sample.sample_end == 0x17DF4
+    assert sample.loop_start == 0x16EC5
+    assert sample.loop_end == 0x17DF4
+    assert sample.loop_crossfade_raw == 0
     assert sample.loop_crossfade == 0
     assert sample.tune_byte == 0x3C
     assert sample.tune_aux_byte == 0
@@ -59,9 +63,9 @@ def test_baseline_sampler_fields() -> None:
         ("g1.xy", {"tune_byte": 0xFF}),
         ("g2.xy", {"tune_byte": 0x00, "tune_aux_byte": 0x5A}),
         ("g3.xy", {"sample_start": 0x17C4}),
-        ("g4.xy", {"sample_end": 0x76B1, "loop_end": 0x76B1}),
-        ("g5.xy", {"loop_start": 0x4D1A}),
-        ("g6.xy", {"loop_end": 0x78AC, "sample_end": 0x7DF4}),
+        ("g4.xy", {"sample_end": 0x176B1, "loop_end": 0x176B1}),
+        ("g5.xy", {"loop_start": 0x14D1A}),
+        ("g6.xy", {"loop_end": 0x178AC, "sample_end": 0x17DF4}),
         ("g7.xy", {"direction": 1}),
         ("g8.xy", {"gain": 0xE2}),
         ("g9.xy", {"gain": 0x14}),
@@ -106,18 +110,18 @@ def _track_region_diffs(base: bytes, var: bytes, track_base: int) -> list[int]:
     [
         ("g1.xy", {VOICE_TABLE_OFFSET + SLOT_TUNE}),
         ("g2.xy", {VOICE_TABLE_OFFSET + SLOT_TUNE, VOICE_TABLE_OFFSET + SLOT_TUNE_AUX}),
-        ("g3.xy", {TRACK_SAMPLE_START_U16, TRACK_SAMPLE_START_U16 + 1}),
+        ("g3.xy", {TRACK_SAMPLE_START_U32, TRACK_SAMPLE_START_U32 + 1}),
         (
             "g4.xy",
             {
-                TRACK_SAMPLE_END_U16,
-                TRACK_SAMPLE_END_U16 + 1,
-                TRACK_LOOP_END_U16,
-                TRACK_LOOP_END_U16 + 1,
+                TRACK_SAMPLE_END_U32,
+                TRACK_SAMPLE_END_U32 + 1,
+                TRACK_LOOP_END_U32,
+                TRACK_LOOP_END_U32 + 1,
             },
         ),
-        ("g5.xy", {TRACK_LOOP_START_U16, TRACK_LOOP_START_U16 + 1}),
-        ("g6.xy", {TRACK_LOOP_END_U16, TRACK_LOOP_END_U16 + 1}),
+        ("g5.xy", {TRACK_LOOP_START_U32, TRACK_LOOP_START_U32 + 1}),
+        ("g6.xy", {TRACK_LOOP_END_U32, TRACK_LOOP_END_U32 + 1}),
         ("g7.xy", {VOICE_TABLE_OFFSET + SLOT_DIRECTION}),
         ("g8.xy", {VOICE_TABLE_OFFSET + SLOT_GAIN}),
         ("g9.xy", {VOICE_TABLE_OFFSET + SLOT_GAIN}),
@@ -192,3 +196,42 @@ def test_tune_probe_diffs_are_isolated(filename: str, allowed_rel: set[int]) -> 
     _, var = decode_project((PROBES / filename).read_bytes())
     rel = {i - track_base for i in _track_region_diffs(base, var, track_base)}
     assert rel == allowed_rel, rel
+
+
+def test_sampler_sample_edit_writer_roundtrips_through_reader() -> None:
+    project = ImageProject.from_file(str(BASELINE))
+    project.set_sampler_sample_edit(
+        1,
+        framecount=0x20000,
+        sample_start=100,
+        sample_end=0x12345,
+        loop_start=0x10020,
+        loop_end=0x12300,
+        loop_crossfade=96,
+        tune_tenths=-5,
+        loop_type=LOOP_TYPE_OFF,
+        gain=0x7F,
+        direction=1,
+    )
+
+    reread = ImageProject(project.header, bytearray(decode_project(project.to_bytes())[1]))
+    reread._rescan()
+    sample = read_sampler_sample_edit(reread)
+    assert sample.framecount == 0x20000
+    assert sample.sample_start == 100
+    assert sample.sample_end == 0x12345
+    assert sample.loop_start == 0x10020
+    assert sample.loop_end == 0x12300
+    assert sample.loop_crossfade_raw == 0x60000000
+    assert sample.loop_crossfade == 96
+    assert sample.loop_crossfade_percent == 75
+    assert sample.tune_tenths == -5
+    assert sample.loop_type_byte == LOOP_TYPE_OFF
+    assert sample.gain == 0x7F
+    assert sample.direction == 1
+
+
+def test_sampler_loop_crossfade_frame_encoder_matches_unique_preset_capture() -> None:
+    raw = encode_sampler_loop_crossfade_frames(2048, 98807)
+    assert raw == 0x02A73100
+    assert decode_sampler_loop_crossfade_frames(raw, 98807) == 2048
