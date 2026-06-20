@@ -7,7 +7,13 @@ import {
   patternEffectiveLength16ths,
   sceneLength16ths,
 } from '../src/lib/xy/timing';
-import { collectPlaybackEvents, crossesPlaybackPosition } from '../src/lib/xy/playback';
+import {
+  collectLanePlaybackEvents,
+  collectPlaybackEvents,
+  collectScenePlaybackLanes,
+  crossesPlaybackPosition,
+  laneLoopLength16ths,
+} from '../src/lib/xy/playback';
 import type { XYPatternViewModel, XYSceneViewModel, XYTrackViewModel } from '../src/lib/xy/projectViewModel';
 
 describe('timing model', () => {
@@ -79,5 +85,69 @@ describe('timing model', () => {
     });
     expect(crossesPlaybackPosition(1, 47, 2, true)).toBe(true);
     expect(crossesPlaybackPosition(20, 10, 12, false)).toBe(false);
+  });
+
+  it('builds DAW lanes only from scene tracks with note data', () => {
+    const project = {
+      activeSceneIndex: 0,
+      tracks: [
+        {
+          index: 0,
+          label: 'T1',
+          colorRole: 'red',
+          kind: 'instrument',
+          patterns: [
+            {
+              index: 0,
+              totalSteps: 16,
+              trackScale: '1',
+              trackScaleLabel: '1',
+              effectiveLength16ths: 16,
+              notes: [{ id: 'kick', tick: 0, gateTicks: 480, note: 53, velocity: 100 }],
+            },
+          ],
+        },
+        {
+          index: 1,
+          label: 'T2',
+          colorRole: 'white',
+          kind: 'instrument',
+          patterns: [
+            {
+              index: 0,
+              totalSteps: 16,
+              trackScale: '1',
+              trackScaleLabel: '1',
+              effectiveLength16ths: 16,
+              notes: [],
+            },
+          ],
+        },
+        {
+          index: 2,
+          label: 'T3',
+          colorRole: 'white',
+          kind: 'instrument',
+          patterns: [
+            {
+              index: 0,
+              totalSteps: 16,
+              trackScale: '2',
+              trackScaleLabel: '2',
+              effectiveLength16ths: 32,
+              notes: [{ id: 'bass', tick: 480, gateTicks: 480, note: 43, velocity: 90 }],
+            },
+          ],
+        },
+      ],
+      scenes: [{ length16ths: 32, patternByTrack: [0, 0, 0], mutedTracks: [false, false, true] }],
+    } as never;
+
+    const lanes = collectScenePlaybackLanes(project);
+    expect(lanes.map((lane) => lane.trackLabel)).toEqual(['T1', 'T3']);
+    expect(laneLoopLength16ths(lanes)).toBe(32);
+    expect(collectLanePlaybackEvents(lanes).map((event) => event.note)).toEqual([53]);
+    expect(collectLanePlaybackEvents(lanes, new Set([0])).map((event) => event.note)).toEqual([]);
+    expect(collectLanePlaybackEvents(lanes, new Set(), new Set([2])).map((event) => event.note)).toEqual([]);
   });
 });

@@ -1,7 +1,7 @@
 import { get, writable } from 'svelte/store';
 import { applyEdit, type XYEdit, type XYProjectViewModel } from '../lib/xy/projectViewModel';
 
-export type WorkspaceMode = 'project' | 'pattern' | 'arrange' | 'inspect';
+export type WorkspaceMode = 'project' | 'daw' | 'pattern' | 'arrange' | 'inspect';
 export type SceneClipboard = {
   patternByTrack: number[];
   mutedTracks: boolean[];

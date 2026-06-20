@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onDestroy, onMount } from 'svelte';
   import ProjectWorkspace from './components/ProjectWorkspace.svelte';
+  import DawWorkspace from './components/DawWorkspace.svelte';
   import PatternWorkspace from './components/PatternWorkspace.svelte';
   import ArrangeWorkspace from './components/ArrangeWorkspace.svelte';
   import InspectWorkspace from './components/InspectWorkspace.svelte';
@@ -16,6 +17,7 @@
 
   const modes: { id: WorkspaceMode; label: string }[] = [
     { id: 'project', label: 'Project' },
+    { id: 'daw', label: 'DAW' },
     { id: 'pattern', label: 'Pattern' },
     { id: 'arrange', label: 'Arrange' },
     { id: 'inspect', label: 'Inspect' },
@@ -28,7 +30,7 @@
     try {
       const project = await loadXYFile(file);
       projectStore.set(project);
-      activeModeStore.set('project');
+      activeModeStore.set('daw');
     } catch (error) {
       console.error(error);
       loadError = error instanceof Error ? error.message : 'Could not parse this .xy file.';
@@ -75,6 +77,8 @@
       void handleDownload();
     } else if (key === 'p' && !event.metaKey && !event.ctrlKey) {
       activeModeStore.set('pattern');
+    } else if (key === 'd' && !event.metaKey && !event.ctrlKey) {
+      activeModeStore.set('daw');
     } else if (key === 'a' && !event.metaKey && !event.ctrlKey) {
       activeModeStore.set('arrange');
     }
@@ -146,6 +150,8 @@
     <div class="workspace-frame">
       {#if $activeModeStore === 'project'}
         <ProjectWorkspace project={$projectStore} />
+      {:else if $activeModeStore === 'daw'}
+        <DawWorkspace project={$projectStore} />
       {:else if $activeModeStore === 'pattern'}
         <PatternWorkspace project={$projectStore} />
       {:else if $activeModeStore === 'arrange'}

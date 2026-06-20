@@ -670,6 +670,356 @@ button.primary {
   border-color: var(--xy-line-bright);
 }
 
+.daw-console {
+  display: grid;
+  gap: 14px;
+  min-width: 0;
+}
+
+.daw-transport {
+  display: grid;
+  grid-template-columns: auto minmax(160px, 240px) auto minmax(180px, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  border-top: 1px solid var(--xy-line);
+  border-bottom: 1px solid var(--xy-line);
+  padding: 10px 0;
+}
+
+.daw-scene-select {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  gap: 8px;
+  color: var(--xy-text-dim);
+  text-transform: uppercase;
+  font-size: 11px;
+}
+
+.daw-lanes {
+  position: relative;
+  overflow: auto;
+  border: 1px solid var(--xy-line);
+  background:
+    linear-gradient(90deg, rgba(255,255,255,0.035) 1px, transparent 1px),
+    #080808;
+  background-size: 48px 48px;
+}
+
+.daw-timeline,
+.daw-lane {
+  display: grid;
+  grid-template-columns: 320px minmax(760px, 1fr);
+  min-width: 1080px;
+}
+
+.daw-timeline {
+  position: sticky;
+  top: 0;
+  z-index: 4;
+  background: #080808;
+  border-bottom: 1px solid var(--xy-line);
+}
+
+.daw-track-spacer,
+.daw-bars {
+  min-height: 34px;
+  display: flex;
+  align-items: center;
+}
+
+.daw-track-spacer {
+  padding-left: 12px;
+  color: var(--xy-text-dim);
+  text-transform: uppercase;
+  font-size: 11px;
+  border-right: 1px solid var(--xy-line);
+}
+
+.daw-bars {
+  position: relative;
+}
+
+.daw-bars span {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  border-left: 1px solid rgba(247,247,242,0.24);
+  padding-left: 5px;
+  color: var(--xy-text-dim);
+  font-size: 10px;
+}
+
+.daw-lane {
+  border-bottom: 1px solid var(--xy-line);
+}
+
+.daw-lane.scene-muted,
+.daw-lane.muted {
+  opacity: 0.45;
+}
+
+.daw-lane.soloed .daw-lane-label {
+  border-left-color: var(--xy-red-led);
+}
+
+.daw-lane-label {
+  min-height: 48px;
+  display: grid;
+  grid-template-columns: 10px 38px 34px 34px 38px 58px 52px;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 8px 7px 12px;
+  border-right: 1px solid var(--xy-line);
+  border-left: 2px solid transparent;
+  background: #101010;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+.daw-lane-label strong {
+  color: var(--xy-text);
+}
+
+.daw-lane-label span {
+  color: var(--xy-text-muted);
+}
+
+.daw-lane-label button,
+.arrange-track-row button,
+.song-ribbon button {
+  min-height: 28px;
+  padding: 0 8px;
+}
+
+.daw-lane-roll {
+  position: relative;
+  min-height: 48px;
+  background-image:
+    linear-gradient(to right, rgba(255,255,255,0.13) 1px, transparent 1px),
+    linear-gradient(to right, rgba(255,255,255,0.045) 1px, transparent 1px);
+  background-size: 384px 100%, 24px 100%;
+}
+
+.daw-lane-length {
+  position: absolute;
+  inset: 0 auto 0 0;
+  background: rgba(247,247,242,0.035);
+  border-right: 1px solid rgba(247,247,242,0.15);
+  pointer-events: none;
+}
+
+.daw-note {
+  position: absolute;
+  top: 16px;
+  height: 16px;
+  min-height: 16px;
+  padding: 0;
+  background: var(--xy-white-led);
+  border: 0;
+  box-shadow: 0 0 8px rgba(247,247,242,0.18);
+}
+
+.daw-playhead {
+  position: absolute;
+  top: 34px;
+  bottom: 0;
+  z-index: 5;
+  width: 2px;
+  background: transparent;
+  pointer-events: none;
+}
+
+.daw-playhead.active {
+  background: var(--xy-red-led);
+  box-shadow: 0 0 10px rgba(255,43,31,0.5);
+}
+
+.daw-empty {
+  min-height: 160px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 24px;
+  color: var(--xy-text-muted);
+}
+
+.ignored-tracks {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  flex-wrap: wrap;
+  color: var(--xy-text-dim);
+  text-transform: uppercase;
+  font-size: 11px;
+}
+
+.ignored-tracks i {
+  border: 1px solid var(--xy-line);
+  padding: 5px 7px;
+  color: var(--xy-text-muted);
+  font-style: normal;
+}
+
+.arrange-focus-layout {
+  display: grid;
+  grid-template-columns: 300px minmax(380px, 1fr) 340px;
+  gap: 16px;
+  min-height: 0;
+}
+
+.scene-bank-panel,
+.scene-detail-panel,
+.song-flow-panel {
+  min-width: 0;
+  border-top: 1px solid var(--xy-line);
+  padding-top: 14px;
+}
+
+.scene-action-row,
+.song-controls {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+
+.scene-present-strip {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  min-height: 32px;
+  margin-bottom: 12px;
+  color: var(--xy-text-dim);
+  text-transform: uppercase;
+  font-size: 11px;
+}
+
+.scene-present-strip button {
+  min-width: 34px;
+  padding: 0;
+}
+
+.scene-keypad {
+  display: grid;
+  grid-template-columns: repeat(9, 1fr);
+  gap: 5px;
+}
+
+.scene-keypad button {
+  aspect-ratio: 1;
+  min-height: 0;
+  padding: 4px;
+  display: grid;
+  place-items: center;
+  gap: 2px;
+  background: #111;
+  color: var(--xy-text-dim);
+  font-variant-numeric: tabular-nums;
+}
+
+.scene-keypad button.present {
+  color: var(--xy-text);
+  border-color: rgba(255,43,31,0.48);
+}
+
+.scene-keypad button.present::before {
+  content: "";
+  width: 7px;
+  height: 7px;
+  background: var(--xy-red-led);
+  box-shadow: 0 0 8px rgba(255,43,31,0.5);
+}
+
+.scene-keypad button.active,
+.scene-present-strip button.active,
+.song-ribbon button.active,
+.daw-lane-label button.active,
+.arrange-track-row button.active,
+.song-controls button.active {
+  background: var(--xy-white-led);
+  border-color: var(--xy-white-led);
+  color: #050505;
+}
+
+.scene-keypad button i {
+  min-height: 10px;
+  color: var(--xy-text-dim);
+  font-style: normal;
+  font-size: 8px;
+}
+
+.scene-track-editor {
+  display: grid;
+  gap: 1px;
+  border: 1px solid var(--xy-line);
+  background: var(--xy-line);
+}
+
+.arrange-track-row {
+  min-height: 42px;
+  display: grid;
+  grid-template-columns: 82px minmax(72px, 120px) 70px 48px 72px;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  background: #101010;
+  font-size: 11px;
+  color: var(--xy-text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.arrange-track-row.muted {
+  background: #120909;
+}
+
+.arrange-track-id {
+  min-height: 28px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  justify-content: start;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+.arrange-track-id:hover:not(:disabled) {
+  background: transparent;
+}
+
+.song-ribbon {
+  display: flex;
+  gap: 7px;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+}
+
+.song-ribbon button {
+  min-width: 56px;
+  display: grid;
+  gap: 2px;
+  padding: 6px 8px;
+  justify-items: start;
+}
+
+.song-ribbon span {
+  color: var(--xy-text-dim);
+  font-size: 10px;
+}
+
+.song-ribbon strong {
+  font-size: 18px;
+  line-height: 1;
+}
+
+.song-step-editor {
+  display: grid;
+  gap: 10px;
+  border-top: 1px solid var(--xy-line);
+  padding-top: 12px;
+}
+
 .scene-matrix {
   max-height: calc(100vh - 210px);
   overflow: auto;
@@ -861,8 +1211,14 @@ button.primary {
 @media (max-width: 1100px) {
   .editor-layout,
   .arrange-layout,
+  .arrange-focus-layout,
   .inspect-grid {
     grid-template-columns: 1fr;
+  }
+
+  .daw-transport {
+    grid-template-columns: 1fr;
+    align-items: stretch;
   }
 
   .side-rail {
@@ -873,6 +1229,10 @@ button.primary {
 
   .scene-matrix {
     max-height: 520px;
+  }
+
+  .scene-keypad {
+    grid-template-columns: repeat(11, 1fr);
   }
 }
 
@@ -912,6 +1272,33 @@ button.primary {
 
   .side-rail {
     grid-template-columns: 1fr;
+  }
+
+  .daw-timeline,
+  .daw-lane {
+    grid-template-columns: 320px minmax(620px, 1fr);
+    min-width: 940px;
+  }
+
+  .daw-lane-label {
+    grid-template-columns: 10px 32px 30px 30px;
+  }
+
+  .daw-lane-label span:nth-of-type(n + 4),
+  .daw-lane-label button {
+    display: none;
+  }
+
+  .scene-keypad {
+    grid-template-columns: repeat(6, 1fr);
+  }
+
+  .arrange-track-row {
+    grid-template-columns: 74px minmax(74px, 1fr) 58px 60px;
+  }
+
+  .arrange-track-row span:nth-of-type(2) {
+    display: none;
   }
 
   .launch-surface {

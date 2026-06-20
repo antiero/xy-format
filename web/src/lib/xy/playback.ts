@@ -18,6 +18,20 @@ export type PlaybackEvent = {
   duration16ths: number;
 };
 
+export type PlaybackLane = {
+  trackIndex: number;
+  trackLabel: string;
+  colorRole: 'white' | 'red';
+  kind: 'instrument' | 'aux';
+  patternIndex: number;
+  patternLabel: string;
+  noteCount: number;
+  sceneMuted: boolean;
+  scaleLabel: string;
+  length16ths: number;
+  events: PlaybackEvent[];
+};
+
 function noteEvent(trackIndex: number, pattern: XYPatternViewModel): PlaybackEvent[] {
   const factor = scaleTo16thsPerStep(pattern.trackScale) ?? 1;
   return pattern.notes.map((note) => {
@@ -33,6 +47,52 @@ function noteEvent(trackIndex: number, pattern: XYPatternViewModel): PlaybackEve
       duration16ths: Math.max(1 / 16, (note.gateTicks / STEP_TICKS) * factor),
     };
   });
+}
+
+export function collectScenePlaybackLanes(
+  project: XYProjectViewModel,
+  sceneIndex = project.activeSceneIndex,
+): PlaybackLane[] {
+  const scene = project.scenes[sceneIndex];
+  if (!scene) return [];
+
+  return project.tracks
+    .map((track) => {
+      const patternIndex = scene.patternByTrack[track.index] ?? 0;
+      const pattern = track.patterns[patternIndex];
+      if (!pattern || pattern.notes.length === 0) return null;
+      return {
+        trackIndex: track.index,
+        trackLabel: track.label,
+        colorRole: track.colorRole,
+        kind: track.kind,
+        patternIndex,
+        patternLabel: `P${patternIndex + 1}`,
+        noteCount: pattern.notes.length,
+        sceneMuted: scene.mutedTracks[track.index] ?? false,
+        scaleLabel: pattern.trackScaleLabel,
+        length16ths: pattern.effectiveLength16ths,
+        events: noteEvent(track.index, pattern),
+      } satisfies PlaybackLane;
+    })
+    .filter((lane): lane is PlaybackLane => lane !== null);
+}
+
+export function laneLoopLength16ths(lanes: PlaybackLane[]): number {
+  return Math.max(16, ...lanes.map((lane) => lane.length16ths));
+}
+
+export function collectLanePlaybackEvents(
+  lanes: PlaybackLane[],
+  mutedTrackIndexes: ReadonlySet<number> = new Set(),
+  soloTrackIndexes: ReadonlySet<number> = new Set(),
+): PlaybackEvent[] {
+  return lanes
+    .filter((lane) => !lane.sceneMuted)
+    .filter((lane) => !mutedTrackIndexes.has(lane.trackIndex))
+    .filter((lane) => soloTrackIndexes.size === 0 || soloTrackIndexes.has(lane.trackIndex))
+    .flatMap((lane) => lane.events)
+    .sort((a, b) => a.start16ths - b.start16ths);
 }
 
 export function patternLoopLength16ths(pattern: XYPatternViewModel): number {
