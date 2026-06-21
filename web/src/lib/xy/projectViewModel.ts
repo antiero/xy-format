@@ -10,9 +10,12 @@ import {
   decodePatternSteps,
   decodeTrackScale,
   noteToDisplayPosition,
-  normalizeTickToPattern,
+  patternTimingMode,
   patternEffectiveLength16ths,
   sceneLength16ths,
+  tickToDisplayTick,
+  tickToDisplayStep,
+  type PatternTimingMode,
   WRITABLE_TRACK_SCALE_BYTES,
 } from "./timing";
 import { validateProject } from "./validation";
@@ -50,6 +53,8 @@ export type XYNoteViewModel = {
   note: number;
   noteName: string;
   velocity: number;
+  flags0: number;
+  flags1: number;
   start16ths: number;
   duration16ths: number;
 };
@@ -65,6 +70,7 @@ export type XYPatternViewModel = {
   trackScaleLabel: string;
   trackScaleKnown: boolean;
   trackScaleWriteSupported: boolean;
+  timingMode: PatternTimingMode;
   effectiveLength16ths: number;
   notes: XYNoteViewModel[];
   plocks: XYPLockSummary[];
@@ -134,10 +140,22 @@ export type XYEdit =
       note: Partial<XYNoteViewModel>;
     }
   | {
+      type: "add-notes";
+      trackIndex: number;
+      patternIndex: number;
+      notes: Partial<XYNoteViewModel>[];
+    }
+  | {
       type: "delete-note";
       trackIndex: number;
       patternIndex: number;
       noteId: string;
+    }
+  | {
+      type: "delete-notes";
+      trackIndex: number;
+      patternIndex: number;
+      noteIds: string[];
     }
   | {
       type: "update-note";
@@ -145,6 +163,15 @@ export type XYEdit =
       patternIndex: number;
       noteId: string;
       patch: Partial<XYNoteViewModel>;
+    }
+  | {
+      type: "update-notes";
+      trackIndex: number;
+      patternIndex: number;
+      patches: {
+        noteId: string;
+        patch: Partial<XYNoteViewModel>;
+      }[];
     }
   | {
       type: "set-pattern-steps";
@@ -227,26 +254,58 @@ function colorRole(index: number): "white" | "red" {
 
 function makeNoteView(
   raw: RawNoteRecord,
-  pattern: Pick<XYPatternViewModel, "trackScale" | "totalSteps">,
+  pattern: Pick<XYPatternViewModel, "trackScale" | "totalSteps" | "timingMode">,
 ): XYNoteViewModel {
   const pos = noteToDisplayPosition(
     { tick: raw.tick, gateTicks: raw.gate },
     pattern,
   );
-  const displayTick = normalizeTickToPattern(raw.tick, pattern.totalSteps);
+  const displayStep = tickToDisplayStep(raw.tick, pattern.totalSteps);
+  const displayTick = tickToDisplayTick(raw.tick, pattern.totalSteps);
   return {
     id: raw.id,
     noteIndex: raw.index,
     tick: raw.tick,
     displayTick,
-    displayStep: Math.floor(displayTick / STEP_TICKS),
+    displayStep,
     gateTicks: raw.gate,
     note: raw.note,
     noteName: noteName(raw.note),
     velocity: raw.velocity,
+    flags0: raw.flags0,
+    flags1: raw.flags1,
     start16ths: pos.start16ths,
     duration16ths: pos.duration16ths,
   };
+}
+
+export function patternHasStepData(pattern: XYPatternViewModel): boolean {
+  return (
+    pattern.notes.length > 0 ||
+    pattern.plocks.length > 0 ||
+    pattern.stepComponents.length > 0
+  );
+}
+
+export function trackHasStepData(track: XYTrackViewModel): boolean {
+  return track.patterns.some(patternHasStepData);
+}
+
+export function trackPatternDataCount(track: XYTrackViewModel): number {
+  return track.patterns.filter(patternHasStepData).length;
+}
+
+export function projectTracksWithStepData(
+  project: XYProjectViewModel,
+): XYTrackViewModel[] {
+  return project.tracks.filter(trackHasStepData);
+}
+
+export function projectPatternDataCount(project: XYProjectViewModel): number {
+  return projectTracksWithStepData(project).reduce(
+    (total, track) => total + trackPatternDataCount(track),
+    0,
+  );
 }
 
 function buildPattern(
@@ -257,6 +316,7 @@ function buildPattern(
   const meta = project.getPatternMetadata(track, patternIndex);
   const decodedSteps = decodePatternSteps(meta.steps);
   const decodedScale = decodeTrackScale(meta.scaleRaw);
+  const rawNotes = project.getNotes(track, patternIndex);
   const basePattern: XYPatternViewModel = {
     index: patternIndex,
     bars: decodedSteps.bars,
@@ -268,15 +328,14 @@ function buildPattern(
     trackScaleLabel: decodedScale.label,
     trackScaleKnown: decodedScale.known,
     trackScaleWriteSupported: decodedScale.supportedForWrite,
+    timingMode: patternTimingMode(rawNotes),
     effectiveLength16ths: 0,
     notes: [],
     plocks: [],
     stepComponents: [],
   };
   basePattern.effectiveLength16ths = patternEffectiveLength16ths(basePattern);
-  basePattern.notes = project
-    .getNotes(track, patternIndex)
-    .map((note) => makeNoteView(note, basePattern));
+  basePattern.notes = rawNotes.map((note) => makeNoteView(note, basePattern));
   return basePattern;
 }
 
@@ -382,6 +441,47 @@ function findNote(
   return note;
 }
 
+function findNotes(
+  project: XYProjectViewModel,
+  trackIndex: number,
+  patternIndex: number,
+  noteIds: string[],
+): XYNoteViewModel[] {
+  const wanted = new Set(noteIds);
+  return (
+    project.tracks[trackIndex]?.patterns[patternIndex]?.notes.filter(
+      (candidate) => wanted.has(candidate.id),
+    ) ?? []
+  );
+}
+
+function addNoteToImage(
+  project: XYProjectViewModel,
+  trackIndex: number,
+  patternIndex: number,
+  note: Partial<XYNoteViewModel>,
+): void {
+  const pattern = project.tracks[trackIndex].patterns[patternIndex];
+  const factor =
+    pattern.trackScale === "unknown"
+      ? 1
+      : pattern.effectiveLength16ths / pattern.totalSteps;
+  const tick =
+    note.tick ?? Math.round(((note.start16ths ?? 0) / factor) * STEP_TICKS);
+  const gate =
+    note.gateTicks ??
+    Math.max(1, Math.round(((note.duration16ths ?? 1) / factor) * STEP_TICKS));
+  project.imageProject.addNote(trackIndex + 1, {
+    tick,
+    gate,
+    note: note.note ?? 60,
+    velocity: note.velocity ?? 100,
+    flags0: note.flags0 ?? 0,
+    flags1: note.flags1 ?? 0,
+    patternIndex,
+  });
+}
+
 export function applyEdit(
   project: XYProjectViewModel,
   edit: XYEdit,
@@ -415,28 +515,14 @@ export function applyEdit(
       selection.selectedNoteId = edit.noteId;
       break;
     case "add-note": {
-      const pattern =
-        project.tracks[edit.trackIndex].patterns[edit.patternIndex];
-      const factor =
-        pattern.trackScale === "unknown"
-          ? 1
-          : pattern.effectiveLength16ths / pattern.totalSteps;
-      const tick =
-        edit.note.tick ??
-        Math.round(((edit.note.start16ths ?? 0) / factor) * STEP_TICKS);
-      const gate =
-        edit.note.gateTicks ??
-        Math.max(
-          1,
-          Math.round(((edit.note.duration16ths ?? 1) / factor) * STEP_TICKS),
-        );
-      imageProject.addNote(edit.trackIndex + 1, {
-        tick,
-        gate,
-        note: edit.note.note ?? 60,
-        velocity: edit.note.velocity ?? 100,
-        patternIndex: edit.patternIndex,
-      });
+      addNoteToImage(project, edit.trackIndex, edit.patternIndex, edit.note);
+      modified = true;
+      break;
+    }
+    case "add-notes": {
+      for (const note of edit.notes) {
+        addNoteToImage(project, edit.trackIndex, edit.patternIndex, note);
+      }
       modified = true;
       break;
     }
@@ -452,6 +538,24 @@ export function applyEdit(
         edit.patternIndex,
         note.noteIndex,
       );
+      selection.selectedNoteId = undefined;
+      modified = true;
+      break;
+    }
+    case "delete-notes": {
+      const notes = findNotes(
+        project,
+        edit.trackIndex,
+        edit.patternIndex,
+        edit.noteIds,
+      ).sort((a, b) => b.noteIndex - a.noteIndex);
+      for (const note of notes) {
+        imageProject.deleteNote(
+          edit.trackIndex + 1,
+          edit.patternIndex,
+          note.noteIndex,
+        );
+      }
       selection.selectedNoteId = undefined;
       modified = true;
       break;
@@ -474,6 +578,29 @@ export function applyEdit(
           velocity: edit.patch.velocity,
         },
       );
+      modified = true;
+      break;
+    }
+    case "update-notes": {
+      for (const item of edit.patches) {
+        const note = findNote(
+          project,
+          edit.trackIndex,
+          edit.patternIndex,
+          item.noteId,
+        );
+        imageProject.updateNote(
+          edit.trackIndex + 1,
+          edit.patternIndex,
+          note.noteIndex,
+          {
+            tick: item.patch.tick,
+            gate: item.patch.gateTicks,
+            note: item.patch.note,
+            velocity: item.patch.velocity,
+          },
+        );
+      }
       modified = true;
       break;
     }
@@ -557,15 +684,15 @@ export function applyEdit(
 }
 
 export function projectSummary(project: XYProjectViewModel): string {
-  const patternCount = project.tracks.reduce(
-    (total, track) => total + track.patterns.length,
-    0,
-  );
+  const activeTracks = projectTracksWithStepData(project);
+  const patternCount = projectPatternDataCount(project);
   const presentScenes = project.scenes.filter((scene) => scene.present).length;
   const songCount = project.songs.filter(
     (song) => song.supported && song.sceneChain.length > 0,
   ).length;
+  const trackLabel = activeTracks.length === 1 ? "track" : "tracks";
+  const patternLabel = patternCount === 1 ? "pattern" : "patterns";
   const sceneLabel = presentScenes === 1 ? "scene" : "scenes";
   const songLabel = songCount === 1 ? "song chain" : "song chains";
-  return `${project.tracks.length} tracks · ${patternCount} patterns · ${presentScenes} ${sceneLabel} · ${songCount} ${songLabel}`;
+  return `${activeTracks.length} ${trackLabel} · ${patternCount} ${patternLabel} · ${presentScenes} ${sceneLabel} · ${songCount} ${songLabel}`;
 }

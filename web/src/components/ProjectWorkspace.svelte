@@ -2,7 +2,11 @@
   import { activeModeStore, dispatchProjectEdit } from "../stores/project";
   import { display16thsAsBars } from "../lib/xy/timing";
   import {
+    projectPatternDataCount,
     projectSummary,
+    projectTracksWithStepData,
+    patternHasStepData,
+    trackPatternDataCount,
     type XYProjectViewModel,
   } from "../lib/xy/projectViewModel";
   import { validationCounts } from "../lib/xy/validation";
@@ -15,6 +19,8 @@
     (max, scene) => Math.max(max, scene.length16ths),
     0,
   );
+  $: activeTracks = projectTracksWithStepData(project);
+  $: activePatternCount = projectPatternDataCount(project);
 
   function openTrack(trackIndex: number) {
     dispatchProjectEdit({ type: "set-active-track", trackIndex });
@@ -41,17 +47,12 @@
 
   <div class="summary-grid">
     <div class="metric">
-      <span class="metric-value">16</span>
-      <span class="metric-label">tracks</span>
+      <span class="metric-value">{activeTracks.length}</span>
+      <span class="metric-label">active tracks</span>
     </div>
     <div class="metric">
-      <span class="metric-value"
-        >{project.tracks.reduce(
-          (sum, track) => sum + track.patterns.length,
-          0,
-        )}</span
-      >
-      <span class="metric-label">patterns</span>
+      <span class="metric-value">{activePatternCount}</span>
+      <span class="metric-label">patterns with data</span>
     </div>
     <div class="metric">
       <span class="metric-value">{presentScenes.length}</span>
@@ -68,25 +69,29 @@
       <span>Project map</span>
       <span>{projectSummary(project)}</span>
     </div>
-    <div class="track-overview">
-      {#each project.tracks as track}
-        <button
-          class="track-row"
-          type="button"
-          on:click={() => openTrack(track.index)}
-        >
-          <span class="track-led" class:red={track.colorRole === "red"}></span>
-          <span class="track-name">{track.label}</span>
-          <span>{track.kind}</span>
-          <span
-            >{track.patterns.length} pattern{track.patterns.length === 1
-              ? ""
-              : "s"}</span
+    {#if activeTracks.length === 0}
+      <p class="empty-line">No step data found in this project.</p>
+    {:else}
+      <div class="track-overview">
+        {#each activeTracks as track}
+          {@const patternCount = trackPatternDataCount(track)}
+          {@const firstDataPattern =
+            track.patterns.find(patternHasStepData) ?? track.patterns[0]}
+          <button
+            class="track-row"
+            type="button"
+            on:click={() => openTrack(track.index)}
           >
-          <span>{track.patterns[0]?.trackScaleLabel ?? "scale ?"}</span>
-        </button>
-      {/each}
-    </div>
+            <span class="track-led" class:red={track.colorRole === "red"}
+            ></span>
+            <span class="track-name">{track.label}</span>
+            <span>{track.kind}</span>
+            <span>{patternCount} pattern{patternCount === 1 ? "" : "s"}</span>
+            <span>{firstDataPattern?.trackScaleLabel ?? "scale ?"}</span>
+          </button>
+        {/each}
+      </div>
+    {/if}
   </div>
 
   <div class="section-band">

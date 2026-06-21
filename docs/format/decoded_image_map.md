@@ -63,7 +63,7 @@ derived from scene row flags, not from `0x06`.
 | +0x01 | pattern length in sequencer steps (`steps = (bar_count - 1) * 16 + final_bar_steps`; `0x10`/`0x20`/`0x30`/`0x40` = full 1/2/3/4 bars) | BAR-LEN |
 | +0x02 | default step length, u16 LE ticks (`240` = UI 50, min capture `4`, max `480`) | BAR `bar-l-*` |
 | +0x03–0x0A | early header bytes; formerly used as a signature, but BAR fields can mutate this range | BAR |
-| +0x06 | **track scale** (0x01=½, 0x03=1, 0x05=2, 0x0E=16) | u20–u22 |
+| +0x06 | **track scale** (0x01=½, 0x03=1, 0x05=2, 0x07=4, 0x0B=8, 0x0E=16) | u20–u22, `spaceopus.xy` T8 P1, `bond.xy` scene 1 |
 | +0x07 | bar-page quantization raw byte; UI display is `floor(raw * 100 / 255)` (`0x00` UI 0, `0x80/0x81` UI 50, `0xFE` UI 99, `0xFF` UI 100) | BAR `bar-q-*` |
 | +0x08 | per-track groove override index byte (`signed_raw = 3 * index` into the UI sequence, saturated to signed i8 at ±99) | BAR `bar-g*` |
 | +0x09 | **T9 Brain route mask** (`bit0=T1` … `bit7=T8`; default `0xFC` routes T3–T8, `0x00` none, `0xFF` all) | AUX-BRAIN |

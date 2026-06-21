@@ -25,6 +25,9 @@ export const SONG_FOOTER_SLOTS = 14;
 export const SONG_DEFAULT_SLOT_SIZE = 4;
 export const SONG_MAX_CHAIN = 96;
 
+const TRACK_HEADER_MAGIC = [0xff, 0x00, 0xfc, 0x00];
+const TRACK_TO_SCENE_SLOT_DELTA = TRACK_BASE0 - SCENE_SLOT0;
+
 export type PatternNoteInput = {
   step: number;
   note: number;
@@ -69,6 +72,42 @@ export type SongChain = {
   loop: boolean;
   supported: boolean;
 };
+
+function hasBytesAt(
+  source: Uint8Array,
+  offset: number,
+  expected: number[],
+): boolean {
+  if (offset < 0 || offset + expected.length > source.length) return false;
+  return expected.every((value, index) => source[offset + index] === value);
+}
+
+function hasPlausiblePatternHeader(
+  image: Uint8Array,
+  start: number,
+  leaderOnly: boolean,
+): boolean {
+  if (start < 0 || start + OFF_NOTE_COUNT >= image.length) return false;
+  const countOrClone = image[start];
+  if (leaderOnly ? countOrClone < 1 || countOrClone > 9 : countOrClone > 9) {
+    return false;
+  }
+  const steps = image[start + OFF_PATTERN_STEPS];
+  if (steps < 1 || steps > 64) return false;
+  if (!hasBytesAt(image, start + 7, TRACK_HEADER_MAGIC)) return false;
+  return image[start + OFF_NOTE_COUNT] <= 120;
+}
+
+function scanPatternHeaders(image: Uint8Array, leaderOnly: boolean): number[] {
+  const starts: number[] = [];
+  const limit = image.length - OFF_NOTE_COUNT;
+  for (let start = 0; start < limit; start += 1) {
+    if (hasPlausiblePatternHeader(image, start, leaderOnly)) {
+      starts.push(start);
+    }
+  }
+  return starts;
+}
 
 function u32ToBytes(value: number): Uint8Array {
   const buf = new Uint8Array(4);
@@ -179,6 +218,11 @@ function patternStruct(
 }
 
 export function leaderStartsFromImage(image: Uint8Array): number[] {
+  const scanned = scanPatternHeaders(image, true);
+  if (scanned.length === TRACK_COUNT) {
+    return scanned;
+  }
+
   const leaders: number[] = [];
   let pos = TRACK_BASE0;
   for (let i = 0; i < TRACK_COUNT; i++) {
@@ -214,6 +258,18 @@ export function leaderStartsFromImage(image: Uint8Array): number[] {
 }
 
 export function patternStartsFromImage(image: Uint8Array): number[][] {
+  const leaders = leaderStartsFromImage(image);
+  if (leaders.length === TRACK_COUNT) {
+    const physicalStarts = scanPatternHeaders(image, false);
+    return leaders.map((leader, index) => {
+      const nextLeader = leaders[index + 1] ?? image.length;
+      const starts = physicalStarts.filter(
+        (start) => start >= leader && start < nextLeader,
+      );
+      return starts.length > 0 ? starts : [leader];
+    });
+  }
+
   const trackPatterns: number[][] = [];
   let pos = TRACK_BASE0;
   for (let i = 0; i < TRACK_COUNT; i++) {
@@ -332,6 +388,7 @@ export class ImageProject {
   public image: Uint8Array;
   private starts: number[] = [];
   private patternStarts: number[][] = [];
+  private sceneSlot0 = SCENE_SLOT0;
 
   constructor(header: Uint8Array, image: Uint8Array) {
     this.header = header;
@@ -348,8 +405,10 @@ export class ImageProject {
     const starts = leaderStartsFromImage(this.image);
     if (starts.length > 0) {
       this.starts = starts;
+      this.sceneSlot0 = Math.max(0, starts[0] - TRACK_TO_SCENE_SLOT_DELTA);
     } else {
       this.starts = [];
+      this.sceneSlot0 = SCENE_SLOT0;
     }
 
     const pStarts = patternStartsFromImage(this.image);
@@ -459,6 +518,8 @@ export class ImageProject {
       note,
       velocity = 100,
       gate = 240,
+      flags0 = 0,
+      flags1 = 0,
       patternIndex = 0,
     }: {
       step?: number;
@@ -466,6 +527,8 @@ export class ImageProject {
       note: number;
       velocity?: number;
       gate?: number;
+      flags0?: number;
+      flags1?: number;
       patternIndex?: number;
     },
   ): void {
@@ -490,8 +553,8 @@ export class ImageProject {
       ...gateBytes,
       note & 0x7f,
       velocity & 0x7f,
-      0,
-      0,
+      flags0 & 0xff,
+      flags1 & 0xff,
     ]);
 
     const insertAt = cpos + 1 + count * NOTE_SIZE;
@@ -542,7 +605,7 @@ export class ImageProject {
       const flags0 = this.image[offset + 10];
       const flags1 = this.image[offset + 11];
       notes.push({
-        id: `t${track - 1}:p${patternIndex}:n${i}:x${tick}:m${note}`,
+        id: `t${track - 1}:p${patternIndex}:n${i}`,
         index: i,
         tick,
         gate,
@@ -607,7 +670,7 @@ export class ImageProject {
 
   // --- scenes (arrangement) ---
   public getScenePattern(sceneIndex: number, trackIndex: number): number {
-    const slot = SCENE_SLOT0 + sceneIndex * SCENE_SLOT_SIZE;
+    const slot = this.sceneSlot0 + sceneIndex * SCENE_SLOT_SIZE;
     return this.image[slot + trackIndex - 1]; // Tracks are 1-indexed for the API but 0-indexed in array here
   }
 
@@ -616,13 +679,13 @@ export class ImageProject {
     trackIndex: number,
     patternIndex: number,
   ): void {
-    const slot = SCENE_SLOT0 + sceneIndex * SCENE_SLOT_SIZE;
+    const slot = this.sceneSlot0 + sceneIndex * SCENE_SLOT_SIZE;
     this.image[slot + trackIndex - 1] = patternIndex;
     this.image[slot + 32] = 1; // flag
   }
 
   public getSceneMute(sceneIndex: number, trackIndex: number): boolean {
-    const slot = SCENE_SLOT0 + sceneIndex * SCENE_SLOT_SIZE;
+    const slot = this.sceneSlot0 + sceneIndex * SCENE_SLOT_SIZE;
     return this.image[slot + 16 + trackIndex - 1] !== 0;
   }
 
@@ -631,18 +694,18 @@ export class ImageProject {
     trackIndex: number,
     muted: boolean,
   ): void {
-    const slot = SCENE_SLOT0 + sceneIndex * SCENE_SLOT_SIZE;
+    const slot = this.sceneSlot0 + sceneIndex * SCENE_SLOT_SIZE;
     this.image[slot + 16 + trackIndex - 1] = muted ? SCENE_MUTE_VALUE : 0;
     this.image[slot + 32] = 1;
   }
 
   public getScenePresent(sceneIndex: number): boolean {
-    const slot = SCENE_SLOT0 + sceneIndex * SCENE_SLOT_SIZE;
+    const slot = this.sceneSlot0 + sceneIndex * SCENE_SLOT_SIZE;
     return this.image[slot + 32] !== 0;
   }
 
   public setScenePresent(sceneIndex: number, present: boolean): void {
-    const slot = SCENE_SLOT0 + sceneIndex * SCENE_SLOT_SIZE;
+    const slot = this.sceneSlot0 + sceneIndex * SCENE_SLOT_SIZE;
     this.image[slot + 32] = present ? 1 : 0;
   }
 
@@ -667,7 +730,7 @@ export class ImageProject {
     patterns: number[],
     mutes: boolean[],
   ): void {
-    const slot = SCENE_SLOT0 + sceneIndex * SCENE_SLOT_SIZE;
+    const slot = this.sceneSlot0 + sceneIndex * SCENE_SLOT_SIZE;
     for (let i = 0; i < TRACK_COUNT; i++) {
       this.image[slot + i] = Math.max(0, Math.min(8, patterns[i] ?? 0));
       this.image[slot + 16 + i] = mutes[i] ? SCENE_MUTE_VALUE : 0;
@@ -679,8 +742,8 @@ export class ImageProject {
     sourceSceneIndex: number,
     targetSceneIndex: number,
   ): void {
-    const source = SCENE_SLOT0 + sourceSceneIndex * SCENE_SLOT_SIZE;
-    const target = SCENE_SLOT0 + targetSceneIndex * SCENE_SLOT_SIZE;
+    const source = this.sceneSlot0 + sourceSceneIndex * SCENE_SLOT_SIZE;
+    const target = this.sceneSlot0 + targetSceneIndex * SCENE_SLOT_SIZE;
     this.image.set(
       this.image.subarray(source, source + SCENE_SLOT_SIZE),
       target,

@@ -1,5 +1,5 @@
 import { STEP_TICKS } from "./image_writer";
-import { normalizeTickToPattern, scaleTo16thsPerStep } from "./timing";
+import { scaleTo16thsPerStep, tickToPlaybackPosition } from "./timing";
 import type {
   XYPatternViewModel,
   XYProjectViewModel,
@@ -38,7 +38,11 @@ function noteEvent(
 ): PlaybackEvent[] {
   const factor = scaleTo16thsPerStep(pattern.trackScale) ?? 1;
   return pattern.notes.map((note) => {
-    const tick = normalizeTickToPattern(note.tick, pattern.totalSteps);
+    const tick = tickToPlaybackPosition(
+      note.tick,
+      pattern.totalSteps,
+      pattern.timingMode,
+    );
     return {
       id: `${trackIndex}:${pattern.index}:${note.id}`,
       trackIndex,
@@ -52,18 +56,49 @@ function noteEvent(
   });
 }
 
+export function repeatPlaybackEvents(
+  events: PlaybackEvent[],
+  patternLength16ths: number,
+  loopLength16ths: number,
+): PlaybackEvent[] {
+  if (events.length === 0 || patternLength16ths <= 0 || loopLength16ths <= 0) {
+    return events;
+  }
+
+  const repeated: PlaybackEvent[] = [];
+  const repeatCount = Math.max(
+    1,
+    Math.ceil(loopLength16ths / patternLength16ths),
+  );
+  for (let repeat = 0; repeat < repeatCount; repeat += 1) {
+    const offset16ths = repeat * patternLength16ths;
+    for (const event of events) {
+      const start16ths = event.start16ths + offset16ths;
+      if (start16ths >= loopLength16ths) continue;
+      repeated.push({
+        ...event,
+        id: repeat === 0 ? event.id : `${event.id}:r${repeat}`,
+        start16ths,
+      });
+    }
+  }
+  return repeated.sort((a, b) => a.start16ths - b.start16ths);
+}
+
 export function collectScenePlaybackLanes(
   project: XYProjectViewModel,
   sceneIndex = project.activeSceneIndex,
 ): PlaybackLane[] {
   const scene = project.scenes[sceneIndex];
   if (!scene) return [];
+  const loopLength16ths = Math.max(16, scene.length16ths || 16);
 
   return project.tracks
     .map((track) => {
       const patternIndex = scene.patternByTrack[track.index] ?? 0;
       const pattern = track.patterns[patternIndex];
       if (!pattern || pattern.notes.length === 0) return null;
+      const events = noteEvent(track.index, pattern);
       return {
         trackIndex: track.index,
         trackLabel: track.label,
@@ -75,7 +110,11 @@ export function collectScenePlaybackLanes(
         sceneMuted: scene.mutedTracks[track.index] ?? false,
         scaleLabel: pattern.trackScaleLabel,
         length16ths: pattern.effectiveLength16ths,
-        events: noteEvent(track.index, pattern),
+        events: repeatPlaybackEvents(
+          events,
+          pattern.effectiveLength16ths,
+          loopLength16ths,
+        ),
       } satisfies PlaybackLane;
     })
     .filter((lane): lane is PlaybackLane => lane !== null);
@@ -144,7 +183,13 @@ export function collectPlaybackEvents(
       if (scene.mutedTracks[sceneTrackIndex]) return [];
       const pattern =
         project.tracks[sceneTrackIndex]?.patterns[scenePatternIndex];
-      return pattern ? noteEvent(sceneTrackIndex, pattern) : [];
+      return pattern
+        ? repeatPlaybackEvents(
+            noteEvent(sceneTrackIndex, pattern),
+            pattern.effectiveLength16ths,
+            Math.max(16, scene.length16ths || 16),
+          )
+        : [];
     })
     .sort((a, b) => a.start16ths - b.start16ths);
 }

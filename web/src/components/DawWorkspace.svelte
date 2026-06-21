@@ -10,6 +10,7 @@
   } from "../lib/xy/playback";
   import { display16thsAsBars } from "../lib/xy/timing";
   import {
+    announceDisplayMessage,
     currentTickStore,
     dispatchProjectEdit,
     isPlayingStore,
@@ -38,9 +39,6 @@
   $: laneWidth = Math.max(760, loopLength16ths * 24);
   $: progress =
     loopLength16ths > 0 ? Math.min(1, $currentTickStore / loopLength16ths) : 0;
-  $: ignoredTracks = project.tracks.filter(
-    (track) => !lanes.some((lane) => lane.trackIndex === track.index),
-  );
   $: activeLaneCount = lanes.filter(
     (lane) =>
       !lane.sceneMuted &&
@@ -112,6 +110,7 @@
   async function togglePlayback() {
     if ($isPlayingStore) {
       stopPlayback();
+      announceDisplayMessage("STOP", "neutral");
       return;
     }
 
@@ -125,11 +124,13 @@
       isPlayingStore.set(true);
       transportState = "playing";
       animationFrame = requestAnimationFrame(playbackFrame);
+      announceDisplayMessage(`SCENE ${scene.index + 1} PLAY`, "play");
     } catch (error) {
       transportState = "idle";
       isPlayingStore.set(false);
       playbackError =
         error instanceof Error ? error.message : "audio unavailable";
+      announceDisplayMessage("AUDIO UNAVAILABLE", "error");
     }
   }
 
@@ -148,6 +149,7 @@
     stopPlayback();
     lastPlaybackPosition16ths = 0;
     currentTickStore.set(0);
+    announceDisplayMessage("REWIND");
   }
 
   onDestroy(() => {
@@ -207,7 +209,6 @@
       <div class="transport-readout">
         <span>{project.tempoBpm.toFixed(1)} bpm</span>
         <span>{activeLaneCount}/{lanes.length} active</span>
-        <span>{ignoredTracks.length} ignored</span>
       </div>
 
       <div class="transport-meter" aria-hidden="true">
@@ -262,10 +263,15 @@
               >
             </div>
             <div class="daw-lane-roll" style={`width: ${laneWidth}px;`}>
-              <span
-                class="daw-lane-length"
-                style={`width: ${(lane.length16ths / loopLength16ths) * 100}%;`}
-              ></span>
+              {#each Array(Math.max(1, Math.ceil(loopLength16ths / lane.length16ths))) as _, repeat}
+                {@const offset16ths = repeat * lane.length16ths}
+                {#if offset16ths < loopLength16ths}
+                  <span
+                    class="daw-lane-length"
+                    style={`left: ${(offset16ths / loopLength16ths) * 100}%; width: ${(Math.min(lane.length16ths, loopLength16ths - offset16ths) / loopLength16ths) * 100}%;`}
+                  ></span>
+                {/if}
+              {/each}
               {#each lane.events as event}
                 <button
                   type="button"
@@ -285,14 +291,5 @@
         style={`left: ${LANE_HEADER_WIDTH + progress * laneWidth}px;`}
       ></div>
     </div>
-
-    {#if ignoredTracks.length > 0}
-      <div class="ignored-tracks">
-        <span>ignored empty</span>
-        {#each ignoredTracks as track}
-          <i>{track.label}</i>
-        {/each}
-      </div>
-    {/if}
   </div>
 </section>

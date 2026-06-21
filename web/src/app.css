@@ -50,7 +50,10 @@ select {
 
 button {
   border: 1px solid var(--xy-line);
-  background: #151515;
+  border-radius: 3px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.035), transparent 42%),
+    #151515;
   color: var(--xy-text);
   min-height: 34px;
   padding: 0 12px;
@@ -58,6 +61,9 @@ button {
   font-size: 11px;
   letter-spacing: 0;
   cursor: pointer;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.055),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.85);
   transition:
     background 120ms ease,
     border-color 120ms ease,
@@ -88,7 +94,7 @@ select {
   background: #070707;
   color: var(--xy-text);
   padding: 0 9px;
-  border-radius: 0;
+  border-radius: 3px;
 }
 
 input:focus,
@@ -121,6 +127,10 @@ button:focus-visible {
   background-size: 48px 48px;
 }
 
+.app-shell.launching {
+  background: #050505;
+}
+
 .app-shell.dragging {
   outline: 1px solid var(--xy-red-led);
   outline-offset: -8px;
@@ -129,7 +139,7 @@ button:focus-visible {
 .topbar {
   min-height: 72px;
   display: grid;
-  grid-template-columns: minmax(210px, 1fr) auto auto;
+  grid-template-columns: minmax(210px, 1fr) auto;
   align-items: center;
   gap: 20px;
   padding: 14px 22px;
@@ -152,6 +162,7 @@ button:focus-visible {
   width: 10px;
   height: 10px;
   display: inline-block;
+  border-radius: 50%;
   background: var(--xy-white-led);
   box-shadow: 0 0 10px rgba(247, 247, 242, 0.45);
 }
@@ -165,7 +176,6 @@ button:focus-visible {
 }
 
 .brand-lockup p,
-.launch-copy p,
 .empty-line {
   color: var(--xy-text-muted);
   margin: 0;
@@ -215,6 +225,39 @@ button.primary {
   font-weight: 700;
 }
 
+.instrument-panel {
+  display: grid;
+  grid-template-columns: minmax(320px, 520px) minmax(280px, 360px) minmax(
+      260px,
+      1fr
+    );
+  align-items: center;
+  gap: 18px;
+  padding: 16px 22px;
+  border-bottom: 1px solid var(--xy-line);
+  background: linear-gradient(180deg, #101010, #070707 68%, #040404);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.04),
+    inset 0 -1px 0 #000;
+}
+
+.instrument-display {
+  min-width: 0;
+}
+
+.instrument-modebar {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 8px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+.instrument-status {
+  justify-content: flex-end;
+}
+
 .modebar {
   padding: 10px 22px;
   border-bottom: 1px solid var(--xy-line);
@@ -224,20 +267,102 @@ button.primary {
 .modebar button.active,
 .segmented button.active,
 .quick-row button.active,
-.scale-grid button.active,
-.pad-button.active {
+.scale-grid button.active {
   background: var(--xy-white-led);
   border-color: var(--xy-white-led);
   color: #050505;
 }
 
+.mode-pad,
+.pad-button,
+.step-led,
+.scene-keypad button,
+.device-grid span {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+  border-color: #020202;
+  border-radius: 3px;
+  background: linear-gradient(180deg, #252525, #111 58%, #070707);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.06),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.95),
+    0 0 0 1px #000;
+}
+
+.mode-pad::before,
+.pad-button::before,
+.step-led::before,
+.scene-keypad button::before,
+.device-grid span::before {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  z-index: 0;
+  width: min(60%, 32px);
+  aspect-ratio: 1;
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  background:
+    radial-gradient(circle at 50% 19%, #050505 0 2px, transparent 2.5px),
+    linear-gradient(180deg, #3b3b3b, #1a1a1a 62%, #0b0b0b);
+  box-shadow:
+    inset 0 1px 1px rgba(255, 255, 255, 0.13),
+    inset 0 -2px 3px rgba(0, 0, 0, 0.72),
+    0 2px 3px rgba(0, 0, 0, 0.72);
+  opacity: 1;
+}
+
+.mode-pad {
+  min-height: 62px;
+  padding: 33px 6px 7px;
+  display: grid;
+  place-items: end center;
+  font-size: 10px;
+  color: var(--xy-text-muted);
+  text-shadow: 0 1px 0 #000;
+}
+
+.mode-pad::before {
+  top: 39%;
+  width: min(54%, 34px);
+}
+
+.mode-pad.active::before,
+.pad-button.active::before,
+.scene-keypad button.active::before {
+  background:
+    radial-gradient(circle at 50% 19%, #111 0 2px, transparent 2.5px),
+    linear-gradient(180deg, #f4f4ef, #b9bab2 62%, #7d7e76);
+  box-shadow:
+    inset 0 1px 1px rgba(255, 255, 255, 0.48),
+    inset 0 -2px 3px rgba(0, 0, 0, 0.3),
+    0 2px 4px rgba(0, 0, 0, 0.75);
+}
+
 .modebar button.active:hover:not(:disabled),
 .segmented button.active:hover:not(:disabled),
 .quick-row button.active:hover:not(:disabled),
-.scale-grid button.active:hover:not(:disabled),
-.pad-button.active:hover:not(:disabled) {
+.scale-grid button.active:hover:not(:disabled) {
   background: var(--xy-white-led);
   border-color: var(--xy-white-led);
+  color: #050505;
+}
+
+.instrument-modebar .mode-pad.active,
+.instrument-modebar .mode-pad.active:hover:not(:disabled) {
+  background: linear-gradient(180deg, #252525, #111 58%, #070707);
+  border-color: #050505;
+  color: var(--xy-text);
+}
+
+.pad-button.active,
+.pad-button.active:hover:not(:disabled),
+.scene-keypad button.active,
+.scene-keypad button.active:hover:not(:disabled) {
+  background: linear-gradient(180deg, #252525, #111 58%, #070707);
+  border-color: #050505;
   color: #050505;
 }
 
@@ -265,8 +390,7 @@ button.primary {
   padding-bottom: 14px;
 }
 
-.workspace-head h2,
-.launch-copy h2 {
+.workspace-head h2 {
   margin: 0;
   font-size: clamp(30px, 5vw, 72px);
   line-height: 0.92;
@@ -345,9 +469,7 @@ button.primary {
 }
 
 .track-led.red,
-.brand-led,
-.step-led.on,
-.device-grid span.red {
+.brand-led {
   background: var(--xy-red-led);
   box-shadow: 0 0 12px rgba(255, 43, 31, 0.55);
 }
@@ -429,13 +551,31 @@ button.primary {
 
 .pad-button {
   padding: 0;
-  min-height: 38px;
+  min-height: 48px;
+  display: grid;
+  place-items: center;
+  color: var(--xy-text-muted);
   font-variant-numeric: tabular-nums;
+}
+
+.pad-button::before {
+  width: min(58%, 32px);
+}
+
+.pad-button.active {
+  font-weight: 760;
 }
 
 .pad-button.red:not(.active) {
   color: var(--xy-red-led);
   border-color: rgba(255, 43, 31, 0.45);
+}
+
+.pad-button.red:not(.active)::before,
+.device-grid span.red::before {
+  background:
+    radial-gradient(circle at 50% 19%, #070101 0 2px, transparent 2.5px),
+    linear-gradient(180deg, #741f18, #35100d 62%, #120605);
 }
 
 .field-label {
@@ -491,16 +631,37 @@ button.primary {
 }
 
 .step-led {
-  min-height: 24px;
+  min-height: 34px;
   padding: 0;
   font-size: 10px;
   background: #242424;
   color: var(--xy-text-dim);
 }
 
+.step-led::before {
+  width: min(60%, 24px);
+  opacity: 0.7;
+}
+
 .step-led.inactive {
   background: #090909;
   color: #333;
+}
+
+.step-led.inactive::before {
+  opacity: 0.22;
+}
+
+.step-led.on {
+  color: #050505;
+  font-weight: 760;
+}
+
+.step-led.on::before {
+  background:
+    radial-gradient(circle at 50% 19%, #111 0 2px, transparent 2.5px),
+    linear-gradient(180deg, #f4f4ef, #b9bab2 62%, #7d7e76);
+  opacity: 1;
 }
 
 .step-led.selected,
@@ -575,6 +736,20 @@ button.primary {
 .roll-toolbar {
   justify-content: space-between;
   padding: 10px 0;
+  flex-wrap: wrap;
+}
+
+.roll-edit-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.roll-edit-actions button {
+  min-width: 56px;
+  padding: 0 9px;
 }
 
 .inline-range {
@@ -662,12 +837,59 @@ button.primary {
   background: var(--xy-white-led);
   border: 1px solid #050505;
   overflow: hidden;
+  cursor: grab;
+  touch-action: none;
+}
+
+.roll-note:hover:not(:disabled),
+.roll-note:focus-visible {
+  background: var(--xy-white-led);
+  border-color: var(--xy-red-led);
+}
+
+.roll-note:active {
+  cursor: grabbing;
+  transform: none;
+}
+
+.roll-note.dragging {
+  opacity: 0.82;
 }
 
 .roll-note span {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
   display: block;
   width: 100%;
   background: rgba(0, 0, 0, 0.32);
+  pointer-events: none;
+}
+
+.roll-note-handle {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  z-index: 2;
+  width: 7px;
+  background: rgba(255, 43, 31, 0.38);
+  opacity: 0;
+  cursor: ew-resize;
+}
+
+.roll-note:hover .roll-note-handle,
+.roll-note:focus-visible .roll-note-handle,
+.roll-note.selected .roll-note-handle {
+  opacity: 1;
+}
+
+.handle-start {
+  left: 0;
+}
+
+.handle-end {
+  right: 0;
 }
 
 .danger-button {
@@ -857,23 +1079,6 @@ button.primary {
   color: var(--xy-text-muted);
 }
 
-.ignored-tracks {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  flex-wrap: wrap;
-  color: var(--xy-text-dim);
-  text-transform: uppercase;
-  font-size: 11px;
-}
-
-.ignored-tracks i {
-  border: 1px solid var(--xy-line);
-  padding: 5px 7px;
-  color: var(--xy-text-muted);
-  font-style: normal;
-}
-
 .arrange-focus-layout {
   display: grid;
   grid-template-columns: 300px minmax(380px, 1fr) 340px;
@@ -936,15 +1141,18 @@ button.primary {
   border-color: rgba(255, 43, 31, 0.48);
 }
 
-.scene-keypad button.present::before {
+.scene-keypad button.present::after {
   content: "";
+  position: absolute;
+  top: 6px;
+  right: 6px;
   width: 7px;
   height: 7px;
+  border-radius: 50%;
   background: var(--xy-red-led);
   box-shadow: 0 0 8px rgba(255, 43, 31, 0.5);
 }
 
-.scene-keypad button.active,
 .scene-present-strip button.active,
 .song-ribbon button.active,
 .daw-lane-label button.active,
@@ -1161,26 +1369,35 @@ button.primary {
 .launch-surface {
   position: relative;
   flex: 1;
-  min-height: calc(100vh - 72px);
+  min-height: 100vh;
   display: grid;
-  grid-template-columns: minmax(280px, 0.8fr) minmax(360px, 1fr);
-  align-items: center;
-  gap: 4vw;
-  padding: 6vw;
+  place-items: center;
+  padding: clamp(72px, 9vh, 118px) 3vw;
   overflow: hidden;
+  background:
+    linear-gradient(rgba(247, 247, 242, 0.018) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(247, 247, 242, 0.012) 1px, transparent 1px),
+    #050505;
+  background-size: 80px 80px;
 }
 
-.launch-copy {
-  max-width: 560px;
+.launch-brand {
+  position: absolute;
+  top: 22px;
+  left: 24px;
+  z-index: 2;
   display: grid;
-  gap: 18px;
+  gap: 4px;
+  color: var(--xy-text-muted);
+  font-size: 10px;
+  line-height: 1;
+  text-transform: uppercase;
+  letter-spacing: 0;
 }
 
-.launch-actions {
-  margin-top: 8px;
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
+.launch-brand span:first-child {
+  color: var(--xy-text);
+  font-weight: 760;
 }
 
 .tempo-input {
@@ -1191,39 +1408,14 @@ button.primary {
   color: var(--xy-red-led);
 }
 
-.device-plane {
-  border: 1px solid var(--xy-line-bright);
-  background: #0b0b0b;
-  padding: clamp(18px, 3vw, 36px);
-  min-height: 320px;
-  display: grid;
-  align-content: center;
-  gap: 24px;
-  box-shadow: inset 0 0 0 1px #000;
-}
-
-.screen-line {
-  height: 96px;
-  background: linear-gradient(
-    90deg,
-    #111,
-    #4b4b4b 44%,
-    #f5f5ee 52%,
-    #333 63%,
-    #0d0d0d
-  );
-  border: 1px solid #333;
-}
-
-.device-grid {
-  display: grid;
-  grid-template-columns: repeat(16, 1fr);
-  gap: 8px;
-}
-
-.device-grid span {
-  aspect-ratio: 1;
-  background: #2c2c2c;
+.launch-error {
+  position: absolute;
+  left: 24px;
+  bottom: 52px;
+  max-width: min(520px, calc(100vw - 48px));
+  margin: 0;
+  font-size: 11px;
+  text-transform: uppercase;
 }
 
 .disclaimer {
@@ -1241,6 +1433,15 @@ button.primary {
   .arrange-focus-layout,
   .inspect-grid {
     grid-template-columns: 1fr;
+  }
+
+  .instrument-panel {
+    grid-template-columns: minmax(280px, 520px) minmax(240px, 1fr);
+  }
+
+  .instrument-status {
+    grid-column: 1 / -1;
+    justify-content: flex-start;
   }
 
   .daw-transport {
@@ -1269,10 +1470,34 @@ button.primary {
     position: static;
   }
 
+  .toolbar-actions {
+    align-items: stretch;
+  }
+
+  .instrument-panel {
+    grid-template-columns: 1fr;
+    padding: 14px 12px;
+  }
+
+  .instrument-modebar {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 6px;
+  }
+
+  .mode-pad {
+    min-height: 54px;
+    padding-top: 29px;
+    font-size: 9px;
+  }
+
   .workspace,
   .modebar {
     padding-left: 12px;
     padding-right: 12px;
+  }
+
+  .instrument-modebar {
+    padding: 0;
   }
 
   .workspace-head,
@@ -1329,14 +1554,10 @@ button.primary {
   }
 
   .launch-surface {
-    grid-template-columns: 1fr;
-    padding: 34px 18px 86px;
+    padding: 82px 12px 96px;
   }
 
-  .device-plane {
-    min-height: 220px;
-  }
-
+  .launch-brand,
   .disclaimer {
     left: 18px;
     right: 18px;

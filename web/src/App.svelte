@@ -1,5 +1,7 @@
 <script lang="ts">
   import { onDestroy, onMount } from "svelte";
+  import OpXyHardwareLauncher from "./components/OpXyHardwareLauncher.svelte";
+  import OpXyDisplay from "./components/OpXyDisplay.svelte";
   import ProjectWorkspace from "./components/ProjectWorkspace.svelte";
   import DawWorkspace from "./components/DawWorkspace.svelte";
   import PatternWorkspace from "./components/PatternWorkspace.svelte";
@@ -7,7 +9,13 @@
   import InspectWorkspace from "./components/InspectWorkspace.svelte";
   import {
     activeModeStore,
+    announceDisplayMessage,
+    currentTickStore,
+    displayMessageStore,
+    isPlayingStore,
     projectStore,
+    redoProjectEdit,
+    undoProjectEdit,
     type WorkspaceMode,
   } from "./stores/project";
   import { editedFileName, exportXYProject } from "./lib/xy/projectExporter";
@@ -25,6 +33,7 @@
   let importSummary: MidiImportSummary | null = null;
   let midiBpmOverride = "";
   let dragging = false;
+  let validationKey = "";
 
   const modes: { id: WorkspaceMode; label: string }[] = [
     { id: "project", label: "Project" },
@@ -37,6 +46,30 @@
   $: counts = $projectStore
     ? validationCounts($projectStore.validation)
     : { errors: 0, warnings: 0, info: 0 };
+  $: displayProgress = ((($currentTickStore % 64) + 64) % 64) / 64;
+  $: activeDisplayLabel = $projectStore
+    ? `${$projectStore.tracks[$projectStore.activeTrackIndex]?.label ?? "T1"} P${$projectStore.activePatternIndex + 1} S${$projectStore.activeSceneIndex + 1}`
+    : "OP-XY LAB";
+  $: {
+    if ($projectStore) {
+      const nextValidationKey = `${counts.errors}:${counts.warnings}`;
+      if (
+        validationKey &&
+        nextValidationKey !== validationKey &&
+        (counts.errors > 0 || counts.warnings > 0)
+      ) {
+        announceDisplayMessage(
+          counts.errors > 0
+            ? `${counts.errors} VALIDATION ERROR${counts.errors === 1 ? "" : "S"}`
+            : `${counts.warnings} VALIDATION WARNING${counts.warnings === 1 ? "" : "S"}`,
+          counts.errors > 0 ? "error" : "warn",
+        );
+      }
+      validationKey = nextValidationKey;
+    } else {
+      validationKey = "";
+    }
+  }
 
   function midiImportLabel(summary: MidiImportSummary): string {
     const tracks = summary.activeTracks.map((track) => `T${track}`).join("/");
@@ -49,6 +82,11 @@
     return bpm;
   }
 
+  function selectMode(mode: WorkspaceMode) {
+    activeModeStore.set(mode);
+    announceDisplayMessage(`${mode.toUpperCase()} MODE`);
+  }
+
   async function openXYFile(file: File) {
     loadError = "";
     importSummary = null;
@@ -56,18 +94,21 @@
       const project = await loadXYFile(file);
       projectStore.set(project);
       activeModeStore.set("daw");
+      announceDisplayMessage(`LOADED ${file.name}`, "ok");
     } catch (error) {
       console.error(error);
       loadError =
         error instanceof Error
           ? error.message
           : "Could not parse this .xy file.";
+      announceDisplayMessage("OPEN FAILED", "error");
     }
   }
 
   async function importMidiFile(file: File) {
     loadError = "";
     importSummary = null;
+    announceDisplayMessage(`IMPORT ${file.name}`, "neutral");
     try {
       const result = await loadMidiFileAsNewProject(file, {
         bpmOverride: parsedBpmOverride(),
@@ -75,12 +116,17 @@
       projectStore.set(result.project);
       importSummary = result.summary;
       activeModeStore.set("daw");
+      announceDisplayMessage(
+        `MIDI ${result.summary.importedNotes} NOTES`,
+        "ok",
+      );
     } catch (error) {
       console.error(error);
       loadError =
         error instanceof Error
           ? error.message
           : "Could not import this MIDI file.";
+      announceDisplayMessage("IMPORT FAILED", "error");
     }
   }
 
@@ -121,8 +167,10 @@
       counts.errors > 0 &&
       !window.confirm(`Export with ${counts.errors} validation error(s)?`)
     ) {
+      announceDisplayMessage("EXPORT CANCELLED", "warn");
       return;
     }
+    announceDisplayMessage("EXPORTING", "neutral");
     const blob = await exportXYProject(project);
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
@@ -132,6 +180,14 @@
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
+    announceDisplayMessage("EXPORT READY", "ok");
+  }
+
+  function isEditableTarget(target: EventTarget | null): boolean {
+    if (!(target instanceof HTMLElement)) return false;
+    return Boolean(
+      target.closest("input, textarea, select, [contenteditable]"),
+    );
   }
 
   function handleKeydown(event: KeyboardEvent) {
@@ -141,12 +197,34 @@
     if ((event.metaKey || event.ctrlKey) && key === "s") {
       event.preventDefault();
       void handleDownload();
-    } else if (key === "p" && !event.metaKey && !event.ctrlKey) {
-      activeModeStore.set("pattern");
+      return;
+    }
+
+    if (!isEditableTarget(event.target)) {
+      if ((event.metaKey || event.ctrlKey) && key === "z") {
+        event.preventDefault();
+        if (event.shiftKey) {
+          redoProjectEdit();
+        } else {
+          undoProjectEdit();
+        }
+        return;
+      }
+      if ((event.metaKey || event.ctrlKey) && key === "y") {
+        event.preventDefault();
+        redoProjectEdit();
+        return;
+      }
+    }
+
+    if (isEditableTarget(event.target)) return;
+
+    if (key === "p" && !event.metaKey && !event.ctrlKey) {
+      selectMode("pattern");
     } else if (key === "d" && !event.metaKey && !event.ctrlKey) {
-      activeModeStore.set("daw");
+      selectMode("daw");
     } else if (key === "a" && !event.metaKey && !event.ctrlKey) {
-      activeModeStore.set("arrange");
+      selectMode("arrange");
     }
   }
 
@@ -161,6 +239,7 @@
 
 <main
   class="app-shell"
+  class:launching={!$projectStore}
   class:dragging
   on:dragover|preventDefault={() => (dragging = true)}
   on:dragleave={() => (dragging = false)}
@@ -169,6 +248,7 @@
   <input
     type="file"
     accept=".xy"
+    tabindex="-1"
     bind:this={xyFileInput}
     on:change={handleXYFileUpload}
     class="visually-hidden"
@@ -176,22 +256,77 @@
   <input
     type="file"
     accept=".mid,.midi"
+    tabindex="-1"
     bind:this={midiFileInput}
     on:change={handleMidiFileUpload}
     class="visually-hidden"
   />
 
-  <header class="topbar">
-    <div class="brand-lockup">
-      <span class="brand-led"></span>
-      <div>
-        <h1>XY Project Lab</h1>
-        <p>unofficial OP-XY project-file utility</p>
+  {#if $projectStore}
+    <header class="topbar">
+      <div class="brand-lockup">
+        <span class="brand-led"></span>
+        <div>
+          <h1>XY Project Lab</h1>
+          <p>unofficial OP-XY project-file utility</p>
+        </div>
       </div>
-    </div>
 
-    {#if $projectStore}
-      <div class="project-status">
+      <div class="toolbar-actions">
+        <button type="button" on:click={() => xyFileInput.click()}
+          >open .xy</button
+        >
+        <input
+          class="tempo-input"
+          type="number"
+          min="10"
+          max="300"
+          step="0.1"
+          placeholder="BPM"
+          aria-label="MIDI BPM override"
+          bind:value={midiBpmOverride}
+        />
+        <button type="button" on:click={() => midiFileInput.click()}
+          >import MIDI</button
+        >
+        <button
+          type="button"
+          disabled={!$projectStore}
+          class="primary"
+          on:click={handleDownload}>export</button
+        >
+      </div>
+    </header>
+
+    <section class="instrument-panel" aria-label="OP-XY project controls">
+      <div class="instrument-display">
+        <OpXyDisplay
+          mode={$activeModeStore}
+          fileName={$projectStore.fileName}
+          modified={$projectStore.modified}
+          tempo={$projectStore.tempoBpm}
+          {counts}
+          isPlaying={$isPlayingStore}
+          progress={displayProgress}
+          message={$displayMessageStore}
+          activeLabel={activeDisplayLabel}
+        />
+      </div>
+
+      <nav class="modebar instrument-modebar" aria-label="Workspace mode">
+        {#each modes as mode}
+          <button
+            type="button"
+            class="mode-pad"
+            class:active={$activeModeStore === mode.id}
+            on:click={() => selectMode(mode.id)}
+          >
+            {mode.label}
+          </button>
+        {/each}
+      </nav>
+
+      <div class="project-status instrument-status">
         <span>{$projectStore.fileName}</span>
         <span>{$projectStore.modified ? "modified" : "clean"}</span>
         {#if importSummary}
@@ -203,48 +338,9 @@
         >
           {counts.errors}e · {counts.warnings}w
         </span>
+        <span>{projectSummary($projectStore)}</span>
       </div>
-    {/if}
-
-    <div class="toolbar-actions">
-      <button type="button" on:click={() => xyFileInput.click()}
-        >open .xy</button
-      >
-      <input
-        class="tempo-input"
-        type="number"
-        min="10"
-        max="300"
-        step="0.1"
-        placeholder="BPM"
-        aria-label="MIDI BPM override"
-        bind:value={midiBpmOverride}
-      />
-      <button type="button" on:click={() => midiFileInput.click()}
-        >import MIDI</button
-      >
-      <button
-        type="button"
-        disabled={!$projectStore}
-        class="primary"
-        on:click={handleDownload}>export</button
-      >
-    </div>
-  </header>
-
-  {#if $projectStore}
-    <nav class="modebar" aria-label="Workspace mode">
-      {#each modes as mode}
-        <button
-          type="button"
-          class:active={$activeModeStore === mode.id}
-          on:click={() => activeModeStore.set(mode.id)}
-        >
-          {mode.label}
-        </button>
-      {/each}
-      <span>{projectSummary($projectStore)}</span>
-    </nav>
+    </section>
 
     <div class="workspace-frame">
       {#if $activeModeStore === "project"}
@@ -260,43 +356,24 @@
       {/if}
     </div>
   {:else}
-    <section class="launch-surface">
-      <div class="launch-copy">
-        <p class="eyebrow">Local project editor</p>
-        <h2>XY Project Lab</h2>
-        <p>inspect, arrange and export OP-XY project files</p>
-        <div class="launch-actions">
-          <input
-            class="tempo-input"
-            type="number"
-            min="10"
-            max="300"
-            step="0.1"
-            placeholder="BPM"
-            aria-label="MIDI BPM override"
-            bind:value={midiBpmOverride}
-          />
-          <button
-            type="button"
-            class="primary"
-            on:click={() => midiFileInput.click()}>import MIDI</button
-          >
-          <button type="button" on:click={() => xyFileInput.click()}
-            >open .xy project</button
-          >
-        </div>
-        {#if loadError}
-          <p class="load-error">{loadError}</p>
-        {/if}
+    <section class="launch-surface" aria-label="OP-XY project launcher">
+      <div class="launch-brand" aria-label="XY Project Lab">
+        <span>xy project lab</span>
+        <span>op-xy project utility</span>
       </div>
-      <div class="device-plane" aria-hidden="true">
-        <div class="screen-line"></div>
-        <div class="device-grid">
-          {#each Array(64) as _, i}
-            <span class:red={i % 17 === 0}></span>
-          {/each}
-        </div>
-      </div>
+
+      <OpXyHardwareLauncher
+        tempo={Number(midiBpmOverride) || 120}
+        message={$displayMessageStore}
+        {dragging}
+        onOpenXY={() => xyFileInput.click()}
+        onImportMidi={() => midiFileInput.click()}
+      />
+
+      {#if loadError}
+        <p class="load-error launch-error">{loadError}</p>
+      {/if}
+
       <p class="disclaimer">
         Unofficial project-file utility for OP-XY. Teenage Engineering and OP-XY
         are trademarks of their respective owners.

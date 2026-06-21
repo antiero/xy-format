@@ -6,6 +6,9 @@ import type {
 } from "./projectViewModel";
 import { STEP_TICKS } from "./image_writer";
 
+export type PatternTimingMode = "step" | "raw";
+export const STEP_TIMING_TOLERANCE_TICKS = Math.round(STEP_TICKS * 0.15);
+
 export type DecodedPatternSteps = {
   raw: number;
   bars: number;
@@ -51,7 +54,8 @@ const READ_SCALE_BYTES: Record<number, XYTrackScale> = {
   0x01: "1/2",
   0x03: "1",
   0x05: "2",
-  0x07: "3",
+  0x07: "4",
+  0x0b: "8",
   0x0e: "16",
 };
 
@@ -104,6 +108,48 @@ export function normalizeTickToPattern(
   return ((signed % patternTicks) + patternTicks) % patternTicks;
 }
 
+export function clampTickToPatternDisplay(
+  rawTick: number,
+  totalSteps: number,
+): number {
+  const patternTicks = Math.max(1, totalSteps) * STEP_TICKS;
+  const signed = signedTick(rawTick);
+  return Math.max(0, Math.min(patternTicks - 1, signed));
+}
+
+export function tickToDisplayStep(rawTick: number, totalSteps: number): number {
+  const signed = signedTick(rawTick);
+  const nearestStep = Math.round(signed / STEP_TICKS);
+  return Math.max(0, Math.min(Math.max(1, totalSteps) - 1, nearestStep));
+}
+
+export function tickToDisplayTick(rawTick: number, totalSteps: number): number {
+  return tickToDisplayStep(rawTick, totalSteps) * STEP_TICKS;
+}
+
+export function tickToPlaybackPosition(
+  rawTick: number,
+  totalSteps: number,
+  timingMode: PatternTimingMode = "raw",
+): number {
+  return timingMode === "step"
+    ? tickToDisplayTick(rawTick, totalSteps)
+    : clampTickToPatternDisplay(rawTick, totalSteps);
+}
+
+export function patternTimingMode(
+  notes: Array<Pick<XYPatternViewModel["notes"][number], "tick">>,
+): PatternTimingMode {
+  if (notes.length === 0) return "step";
+  return notes.every((note) => {
+    const signed = signedTick(note.tick);
+    const nearestStepTick = Math.round(signed / STEP_TICKS) * STEP_TICKS;
+    return Math.abs(signed - nearestStepTick) <= STEP_TIMING_TOLERANCE_TICKS;
+  })
+    ? "step"
+    : "raw";
+}
+
 export function patternEffectiveLength16ths(
   pattern: XYPatternViewModel,
 ): number {
@@ -114,11 +160,15 @@ export function patternEffectiveLength16ths(
 export function noteToDisplayPosition(
   note: Pick<XYPatternViewModel["notes"][number], "tick" | "gateTicks">,
   pattern: Pick<XYPatternViewModel, "trackScale"> &
-    Partial<Pick<XYPatternViewModel, "totalSteps">>,
+    Partial<Pick<XYPatternViewModel, "totalSteps" | "timingMode">>,
 ): { start16ths: number; duration16ths: number } {
   const factor = scaleTo16thsPerStep(pattern.trackScale) ?? 1;
   const tick = pattern.totalSteps
-    ? normalizeTickToPattern(note.tick, pattern.totalSteps)
+    ? tickToPlaybackPosition(
+        note.tick,
+        pattern.totalSteps,
+        pattern.timingMode ?? "raw",
+      )
     : note.tick;
   return {
     start16ths: (tick / STEP_TICKS) * factor,
@@ -134,7 +184,15 @@ export function sceneLength16ths(
     0,
     ...scene.patternByTrack.map((patternIndex, trackIndex) => {
       const pattern = tracks[trackIndex]?.patterns[patternIndex];
-      return pattern ? pattern.effectiveLength16ths : 0;
+      if (
+        !pattern ||
+        (pattern.notes.length === 0 &&
+          pattern.plocks.length === 0 &&
+          pattern.stepComponents.length === 0)
+      ) {
+        return 0;
+      }
+      return pattern.effectiveLength16ths;
     }),
   );
 }

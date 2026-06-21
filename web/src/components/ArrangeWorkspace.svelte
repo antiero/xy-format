@@ -11,6 +11,7 @@
     XYProjectViewModel,
     XYSceneViewModel,
   } from "../lib/xy/projectViewModel";
+  import { patternHasStepData } from "../lib/xy/projectViewModel";
 
   export let project: XYProjectViewModel;
 
@@ -19,6 +20,11 @@
   $: scene = project.scenes[project.activeSceneIndex];
   $: song = project.songs[0] as SongChain;
   $: presentScenes = project.scenes.filter((candidate) => candidate.present);
+  $: sceneTracksWithData = project.tracks.filter((track) => {
+    const patternIndex = scene.patternByTrack[track.index];
+    const pattern = track.patterns[patternIndex];
+    return pattern ? patternHasStepData(pattern) : false;
+  });
   $: selectedSongStep = Math.max(
     0,
     Math.min(Math.max(0, song.sceneChain.length - 1), selectedSongStep),
@@ -203,46 +209,53 @@
       </div>
 
       <div class="scene-track-editor">
-        {#each project.tracks as track}
-          {@const patternIndex = scene.patternByTrack[track.index]}
-          {@const pattern = track.patterns[patternIndex]}
-          <div
-            class="arrange-track-row"
-            class:muted={scene.mutedTracks[track.index]}
-          >
-            <button
-              type="button"
-              class="arrange-track-id"
-              on:click={() => openPattern(track.index)}
+        {#if sceneTracksWithData.length === 0}
+          <p class="empty-line">No step data in this scene.</p>
+        {:else}
+          {#each sceneTracksWithData as track}
+            {@const patternIndex = scene.patternByTrack[track.index]}
+            {@const pattern = track.patterns[patternIndex]}
+            <div
+              class="arrange-track-row"
+              class:muted={scene.mutedTracks[track.index]}
             >
-              <span class="track-led" class:red={track.colorRole === "red"}
-              ></span>
-              <strong>{track.label}</strong>
-            </button>
-            <select
-              value={patternIndex}
-              on:change={(event) =>
-                setScenePattern(
-                  track.index,
-                  Number((event.target as HTMLSelectElement).value),
-                )}
-            >
-              {#each track.patterns as candidate}
-                <option value={candidate.index}>P{candidate.index + 1}</option>
-              {/each}
-            </select>
-            <span>{pattern ? `${pattern.notes.length} notes` : "missing"}</span>
-            <span>{pattern ? pattern.trackScaleLabel : "-"}</span>
-            <button
-              type="button"
-              class:active={scene.mutedTracks[track.index]}
-              on:click={() =>
-                setSceneMute(track.index, !scene.mutedTracks[track.index])}
-            >
-              {scene.mutedTracks[track.index] ? "muted" : "on"}
-            </button>
-          </div>
-        {/each}
+              <button
+                type="button"
+                class="arrange-track-id"
+                on:click={() => openPattern(track.index)}
+              >
+                <span class="track-led" class:red={track.colorRole === "red"}
+                ></span>
+                <strong>{track.label}</strong>
+              </button>
+              <select
+                value={patternIndex}
+                on:change={(event) =>
+                  setScenePattern(
+                    track.index,
+                    Number((event.target as HTMLSelectElement).value),
+                  )}
+              >
+                {#each track.patterns as candidate}
+                  <option value={candidate.index}>P{candidate.index + 1}</option
+                  >
+                {/each}
+              </select>
+              <span
+                >{pattern ? `${pattern.notes.length} notes` : "missing"}</span
+              >
+              <span>{pattern ? pattern.trackScaleLabel : "-"}</span>
+              <button
+                type="button"
+                class:active={scene.mutedTracks[track.index]}
+                on:click={() =>
+                  setSceneMute(track.index, !scene.mutedTracks[track.index])}
+              >
+                {scene.mutedTracks[track.index] ? "muted" : "on"}
+              </button>
+            </div>
+          {/each}
+        {/if}
       </div>
     </div>
 
