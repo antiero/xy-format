@@ -1,11 +1,11 @@
-import { STEP_TICKS } from './image_writer';
-import {
-  normalizeTickToPattern,
-  scaleTo16thsPerStep,
-} from './timing';
-import type { XYPatternViewModel, XYProjectViewModel } from './projectViewModel';
+import { STEP_TICKS } from "./image_writer";
+import { normalizeTickToPattern, scaleTo16thsPerStep } from "./timing";
+import type {
+  XYPatternViewModel,
+  XYProjectViewModel,
+} from "./projectViewModel";
 
-export type PlaybackScope = 'track' | 'scene';
+export type PlaybackScope = "track" | "scene";
 
 export type PlaybackEvent = {
   id: string;
@@ -21,8 +21,8 @@ export type PlaybackEvent = {
 export type PlaybackLane = {
   trackIndex: number;
   trackLabel: string;
-  colorRole: 'white' | 'red';
-  kind: 'instrument' | 'aux';
+  colorRole: "white" | "red";
+  kind: "instrument" | "aux";
   patternIndex: number;
   patternLabel: string;
   noteCount: number;
@@ -32,7 +32,10 @@ export type PlaybackLane = {
   events: PlaybackEvent[];
 };
 
-function noteEvent(trackIndex: number, pattern: XYPatternViewModel): PlaybackEvent[] {
+function noteEvent(
+  trackIndex: number,
+  pattern: XYPatternViewModel,
+): PlaybackEvent[] {
   const factor = scaleTo16thsPerStep(pattern.trackScale) ?? 1;
   return pattern.notes.map((note) => {
     const tick = normalizeTickToPattern(note.tick, pattern.totalSteps);
@@ -90,7 +93,10 @@ export function collectLanePlaybackEvents(
   return lanes
     .filter((lane) => !lane.sceneMuted)
     .filter((lane) => !mutedTrackIndexes.has(lane.trackIndex))
-    .filter((lane) => soloTrackIndexes.size === 0 || soloTrackIndexes.has(lane.trackIndex))
+    .filter(
+      (lane) =>
+        soloTrackIndexes.size === 0 || soloTrackIndexes.has(lane.trackIndex),
+    )
     .flatMap((lane) => lane.events)
     .sort((a, b) => a.start16ths - b.start16ths);
 }
@@ -106,7 +112,7 @@ export function playbackLoopLength16ths(
   patternIndex: number,
   sceneIndex = project.activeSceneIndex,
 ): number {
-  if (scope === 'track') {
+  if (scope === "track") {
     const pattern = project.tracks[trackIndex]?.patterns[patternIndex];
     return pattern ? patternLoopLength16ths(pattern) : 16;
   }
@@ -121,9 +127,13 @@ export function collectPlaybackEvents(
   patternIndex: number,
   sceneIndex = project.activeSceneIndex,
 ): PlaybackEvent[] {
-  if (scope === 'track') {
+  if (scope === "track") {
     const pattern = project.tracks[trackIndex]?.patterns[patternIndex];
-    return pattern ? noteEvent(trackIndex, pattern).sort((a, b) => a.start16ths - b.start16ths) : [];
+    return pattern
+      ? noteEvent(trackIndex, pattern).sort(
+          (a, b) => a.start16ths - b.start16ths,
+        )
+      : [];
   }
 
   const scene = project.scenes[sceneIndex];
@@ -132,7 +142,8 @@ export function collectPlaybackEvents(
   return scene.patternByTrack
     .flatMap((scenePatternIndex, sceneTrackIndex) => {
       if (scene.mutedTracks[sceneTrackIndex]) return [];
-      const pattern = project.tracks[sceneTrackIndex]?.patterns[scenePatternIndex];
+      const pattern =
+        project.tracks[sceneTrackIndex]?.patterns[scenePatternIndex];
       return pattern ? noteEvent(sceneTrackIndex, pattern) : [];
     })
     .sort((a, b) => a.start16ths - b.start16ths);

@@ -1,16 +1,20 @@
 <script lang="ts">
-  import { onDestroy } from 'svelte';
-  import { audioService } from '../lib/audio';
+  import { onDestroy } from "svelte";
+  import { audioService } from "../lib/audio";
   import {
     collectLanePlaybackEvents,
     collectScenePlaybackLanes,
     crossesPlaybackPosition,
     laneLoopLength16ths,
     type PlaybackEvent,
-  } from '../lib/xy/playback';
-  import { display16thsAsBars } from '../lib/xy/timing';
-  import { currentTickStore, dispatchProjectEdit, isPlayingStore } from '../stores/project';
-  import type { XYProjectViewModel } from '../lib/xy/projectViewModel';
+  } from "../lib/xy/playback";
+  import { display16thsAsBars } from "../lib/xy/timing";
+  import {
+    currentTickStore,
+    dispatchProjectEdit,
+    isPlayingStore,
+  } from "../stores/project";
+  import type { XYProjectViewModel } from "../lib/xy/projectViewModel";
 
   export let project: XYProjectViewModel;
 
@@ -21,17 +25,28 @@
   let animationFrame = 0;
   let lastFrameMs = 0;
   let lastPlaybackPosition16ths = 0;
-  let transportState: 'idle' | 'loading' | 'playing' = 'idle';
-  let playbackError = '';
+  let transportState: "idle" | "loading" | "playing" = "idle";
+  let playbackError = "";
 
   $: scene = project.scenes[project.activeSceneIndex];
   $: lanes = collectScenePlaybackLanes(project, scene.index);
   $: playbackEvents = collectLanePlaybackEvents(lanes, mutedTracks, soloTracks);
-  $: loopLength16ths = Math.max(scene.length16ths || 16, laneLoopLength16ths(lanes));
+  $: loopLength16ths = Math.max(
+    scene.length16ths || 16,
+    laneLoopLength16ths(lanes),
+  );
   $: laneWidth = Math.max(760, loopLength16ths * 24);
-  $: progress = loopLength16ths > 0 ? Math.min(1, $currentTickStore / loopLength16ths) : 0;
-  $: ignoredTracks = project.tracks.filter((track) => !lanes.some((lane) => lane.trackIndex === track.index));
-  $: activeLaneCount = lanes.filter((lane) => !lane.sceneMuted && !mutedTracks.has(lane.trackIndex) && (soloTracks.size === 0 || soloTracks.has(lane.trackIndex))).length;
+  $: progress =
+    loopLength16ths > 0 ? Math.min(1, $currentTickStore / loopLength16ths) : 0;
+  $: ignoredTracks = project.tracks.filter(
+    (track) => !lanes.some((lane) => lane.trackIndex === track.index),
+  );
+  $: activeLaneCount = lanes.filter(
+    (lane) =>
+      !lane.sceneMuted &&
+      !mutedTracks.has(lane.trackIndex) &&
+      (soloTracks.size === 0 || soloTracks.has(lane.trackIndex)),
+  ).length;
 
   function msPer16th(): number {
     return 15000 / Math.max(10, project.tempoBpm || 120);
@@ -41,7 +56,7 @@
     stopPlayback();
     mutedTracks = new Set();
     soloTracks = new Set();
-    dispatchProjectEdit({ type: 'set-active-scene', sceneIndex });
+    dispatchProjectEdit({ type: "set-active-scene", sceneIndex });
   }
 
   function toggleSet(source: Set<number>, value: number): Set<number> {
@@ -100,19 +115,21 @@
       return;
     }
 
-    playbackError = '';
-    transportState = 'loading';
+    playbackError = "";
+    transportState = "loading";
     try {
       await audioService.ensureReady();
-      lastPlaybackPosition16ths = $currentTickStore >= loopLength16ths ? 0 : $currentTickStore;
+      lastPlaybackPosition16ths =
+        $currentTickStore >= loopLength16ths ? 0 : $currentTickStore;
       lastFrameMs = performance.now();
       isPlayingStore.set(true);
-      transportState = 'playing';
+      transportState = "playing";
       animationFrame = requestAnimationFrame(playbackFrame);
     } catch (error) {
-      transportState = 'idle';
+      transportState = "idle";
       isPlayingStore.set(false);
-      playbackError = error instanceof Error ? error.message : 'audio unavailable';
+      playbackError =
+        error instanceof Error ? error.message : "audio unavailable";
     }
   }
 
@@ -123,7 +140,7 @@
     }
     audioService.stopAll();
     isPlayingStore.set(false);
-    transportState = 'idle';
+    transportState = "idle";
     lastFrameMs = 0;
   }
 
@@ -158,19 +175,31 @@
           type="button"
           class="transport-play"
           class:active={$isPlayingStore}
-          disabled={transportState === 'loading' || playbackEvents.length === 0}
+          disabled={transportState === "loading" || playbackEvents.length === 0}
           on:click={togglePlayback}
         >
-          {$isPlayingStore ? 'stop' : transportState === 'loading' ? 'load' : 'play all'}
+          {$isPlayingStore
+            ? "stop"
+            : transportState === "loading"
+              ? "load"
+              : "play all"}
         </button>
         <button type="button" on:click={rewindPlayback}>rew</button>
       </div>
 
       <label class="daw-scene-select">
         <span>scene</span>
-        <select value={scene.index} on:change={(event) => selectScene(Number((event.target as HTMLSelectElement).value))}>
+        <select
+          value={scene.index}
+          on:change={(event) =>
+            selectScene(Number((event.target as HTMLSelectElement).value))}
+        >
           {#each project.scenes as candidate}
-            <option value={candidate.index}>scene {candidate.index + 1}{candidate.present ? '' : ' · empty'}</option>
+            <option value={candidate.index}
+              >scene {candidate.index + 1}{candidate.present
+                ? ""
+                : " · empty"}</option
+            >
           {/each}
         </select>
       </label>
@@ -194,7 +223,9 @@
         <div class="daw-track-spacer">tracks</div>
         <div class="daw-bars" style={`width: ${laneWidth}px;`}>
           {#each Array(Math.ceil(loopLength16ths / 16)) as _, bar}
-            <span style={`left: ${(bar * 16 / loopLength16ths) * 100}%;`}>B{bar + 1}</span>
+            <span style={`left: ${((bar * 16) / loopLength16ths) * 100}%;`}
+              >B{bar + 1}</span
+            >
           {/each}
         </div>
       </div>
@@ -213,13 +244,22 @@
             class:soloed={soloTracks.has(lane.trackIndex)}
           >
             <div class="daw-lane-label">
-              <span class="track-led" class:red={lane.colorRole === 'red'}></span>
+              <span class="track-led" class:red={lane.colorRole === "red"}
+              ></span>
               <strong>{lane.trackLabel}</strong>
               <span>{lane.patternLabel}</span>
               <span>{lane.noteCount}</span>
               <span>{lane.scaleLabel}</span>
-              <button type="button" class:active={mutedTracks.has(lane.trackIndex)} on:click={() => toggleMute(lane.trackIndex)}>mute</button>
-              <button type="button" class:active={soloTracks.has(lane.trackIndex)} on:click={() => toggleSolo(lane.trackIndex)}>solo</button>
+              <button
+                type="button"
+                class:active={mutedTracks.has(lane.trackIndex)}
+                on:click={() => toggleMute(lane.trackIndex)}>mute</button
+              >
+              <button
+                type="button"
+                class:active={soloTracks.has(lane.trackIndex)}
+                on:click={() => toggleSolo(lane.trackIndex)}>solo</button
+              >
             </div>
             <div class="daw-lane-roll" style={`width: ${laneWidth}px;`}>
               <span

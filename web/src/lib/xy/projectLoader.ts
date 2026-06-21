@@ -1,5 +1,8 @@
-import { ImageProject } from './image_writer';
-import { buildProjectViewModel, type XYProjectViewModel } from './projectViewModel';
+import { ImageProject } from "./image_writer";
+import {
+  buildProjectViewModel,
+  type XYProjectViewModel,
+} from "./projectViewModel";
 
 export async function loadXYFile(file: File): Promise<XYProjectViewModel> {
   const buffer = await file.arrayBuffer();
@@ -7,7 +10,10 @@ export async function loadXYFile(file: File): Promise<XYProjectViewModel> {
   return buildProjectViewModel(imageProject, file.name, undefined, false);
 }
 
-export function loadXYBytes(bytes: Uint8Array, fileName = 'project.xy'): XYProjectViewModel {
+export function loadXYBytes(
+  bytes: Uint8Array,
+  fileName = "project.xy",
+): XYProjectViewModel {
   const imageProject = ImageProject.fromBytes(bytes);
   return buildProjectViewModel(imageProject, fileName, undefined, false);
 }

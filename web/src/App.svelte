@@ -1,36 +1,45 @@
 <script lang="ts">
-  import { onDestroy, onMount } from 'svelte';
-  import ProjectWorkspace from './components/ProjectWorkspace.svelte';
-  import DawWorkspace from './components/DawWorkspace.svelte';
-  import PatternWorkspace from './components/PatternWorkspace.svelte';
-  import ArrangeWorkspace from './components/ArrangeWorkspace.svelte';
-  import InspectWorkspace from './components/InspectWorkspace.svelte';
-  import { activeModeStore, projectStore, type WorkspaceMode } from './stores/project';
-  import { editedFileName, exportXYProject } from './lib/xy/projectExporter';
-  import { loadXYFile } from './lib/xy/projectLoader';
-  import { loadMidiFileAsNewProject, type MidiImportSummary } from './lib/xy/midiImporter';
-  import { projectSummary } from './lib/xy/projectViewModel';
-  import { validationCounts } from './lib/xy/validation';
+  import { onDestroy, onMount } from "svelte";
+  import ProjectWorkspace from "./components/ProjectWorkspace.svelte";
+  import DawWorkspace from "./components/DawWorkspace.svelte";
+  import PatternWorkspace from "./components/PatternWorkspace.svelte";
+  import ArrangeWorkspace from "./components/ArrangeWorkspace.svelte";
+  import InspectWorkspace from "./components/InspectWorkspace.svelte";
+  import {
+    activeModeStore,
+    projectStore,
+    type WorkspaceMode,
+  } from "./stores/project";
+  import { editedFileName, exportXYProject } from "./lib/xy/projectExporter";
+  import { loadXYFile } from "./lib/xy/projectLoader";
+  import {
+    loadMidiFileAsNewProject,
+    type MidiImportSummary,
+  } from "./lib/xy/midiImporter";
+  import { projectSummary } from "./lib/xy/projectViewModel";
+  import { validationCounts } from "./lib/xy/validation";
 
   let xyFileInput: HTMLInputElement;
   let midiFileInput: HTMLInputElement;
-  let loadError = '';
+  let loadError = "";
   let importSummary: MidiImportSummary | null = null;
-  let midiBpmOverride = '';
+  let midiBpmOverride = "";
   let dragging = false;
 
   const modes: { id: WorkspaceMode; label: string }[] = [
-    { id: 'project', label: 'Project' },
-    { id: 'daw', label: 'DAW' },
-    { id: 'pattern', label: 'Pattern' },
-    { id: 'arrange', label: 'Arrange' },
-    { id: 'inspect', label: 'Inspect' },
+    { id: "project", label: "Project" },
+    { id: "daw", label: "DAW" },
+    { id: "pattern", label: "Pattern" },
+    { id: "arrange", label: "Arrange" },
+    { id: "inspect", label: "Inspect" },
   ];
 
-  $: counts = $projectStore ? validationCounts($projectStore.validation) : { errors: 0, warnings: 0, info: 0 };
+  $: counts = $projectStore
+    ? validationCounts($projectStore.validation)
+    : { errors: 0, warnings: 0, info: 0 };
 
   function midiImportLabel(summary: MidiImportSummary): string {
-    const tracks = summary.activeTracks.map((track) => `T${track}`).join('/');
+    const tracks = summary.activeTracks.map((track) => `T${track}`).join("/");
     return `MIDI ${summary.patterns}p ${summary.totalBars}b ${summary.importedNotes}n ${tracks}`;
   }
 
@@ -41,35 +50,43 @@
   }
 
   async function openXYFile(file: File) {
-    loadError = '';
+    loadError = "";
     importSummary = null;
     try {
       const project = await loadXYFile(file);
       projectStore.set(project);
-      activeModeStore.set('daw');
+      activeModeStore.set("daw");
     } catch (error) {
       console.error(error);
-      loadError = error instanceof Error ? error.message : 'Could not parse this .xy file.';
+      loadError =
+        error instanceof Error
+          ? error.message
+          : "Could not parse this .xy file.";
     }
   }
 
   async function importMidiFile(file: File) {
-    loadError = '';
+    loadError = "";
     importSummary = null;
     try {
-      const result = await loadMidiFileAsNewProject(file, { bpmOverride: parsedBpmOverride() });
+      const result = await loadMidiFileAsNewProject(file, {
+        bpmOverride: parsedBpmOverride(),
+      });
       projectStore.set(result.project);
       importSummary = result.summary;
-      activeModeStore.set('daw');
+      activeModeStore.set("daw");
     } catch (error) {
       console.error(error);
-      loadError = error instanceof Error ? error.message : 'Could not import this MIDI file.';
+      loadError =
+        error instanceof Error
+          ? error.message
+          : "Could not import this MIDI file.";
     }
   }
 
   async function openFile(file: File) {
     const name = file.name.toLowerCase();
-    if (name.endsWith('.mid') || name.endsWith('.midi')) {
+    if (name.endsWith(".mid") || name.endsWith(".midi")) {
       await importMidiFile(file);
       return;
     }
@@ -80,14 +97,14 @@
     const target = event.target as HTMLInputElement;
     const file = target.files?.[0];
     if (file) await openXYFile(file);
-    target.value = '';
+    target.value = "";
   }
 
   async function handleMidiFileUpload(event: Event) {
     const target = event.target as HTMLInputElement;
     const file = target.files?.[0];
     if (file) await importMidiFile(file);
-    target.value = '';
+    target.value = "";
   }
 
   async function handleDrop(event: DragEvent) {
@@ -100,12 +117,15 @@
   async function handleDownload() {
     const project = $projectStore;
     if (!project) return;
-    if (counts.errors > 0 && !window.confirm(`Export with ${counts.errors} validation error(s)?`)) {
+    if (
+      counts.errors > 0 &&
+      !window.confirm(`Export with ${counts.errors} validation error(s)?`)
+    ) {
       return;
     }
     const blob = await exportXYProject(project);
     const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
+    const a = document.createElement("a");
     a.href = url;
     a.download = editedFileName(project.fileName);
     document.body.appendChild(a);
@@ -118,32 +138,32 @@
     const project = $projectStore;
     if (!project) return;
     const key = event.key.toLowerCase();
-    if ((event.metaKey || event.ctrlKey) && key === 's') {
+    if ((event.metaKey || event.ctrlKey) && key === "s") {
       event.preventDefault();
       void handleDownload();
-    } else if (key === 'p' && !event.metaKey && !event.ctrlKey) {
-      activeModeStore.set('pattern');
-    } else if (key === 'd' && !event.metaKey && !event.ctrlKey) {
-      activeModeStore.set('daw');
-    } else if (key === 'a' && !event.metaKey && !event.ctrlKey) {
-      activeModeStore.set('arrange');
+    } else if (key === "p" && !event.metaKey && !event.ctrlKey) {
+      activeModeStore.set("pattern");
+    } else if (key === "d" && !event.metaKey && !event.ctrlKey) {
+      activeModeStore.set("daw");
+    } else if (key === "a" && !event.metaKey && !event.ctrlKey) {
+      activeModeStore.set("arrange");
     }
   }
 
   onMount(() => {
-    window.addEventListener('keydown', handleKeydown);
+    window.addEventListener("keydown", handleKeydown);
   });
 
   onDestroy(() => {
-    window.removeEventListener('keydown', handleKeydown);
+    window.removeEventListener("keydown", handleKeydown);
   });
 </script>
 
 <main
   class="app-shell"
   class:dragging
-  on:dragover|preventDefault={() => dragging = true}
-  on:dragleave={() => dragging = false}
+  on:dragover|preventDefault={() => (dragging = true)}
+  on:dragleave={() => (dragging = false)}
   on:drop={handleDrop}
 >
   <input
@@ -173,18 +193,23 @@
     {#if $projectStore}
       <div class="project-status">
         <span>{$projectStore.fileName}</span>
-        <span>{$projectStore.modified ? 'modified' : 'clean'}</span>
+        <span>{$projectStore.modified ? "modified" : "clean"}</span>
         {#if importSummary}
           <span>{midiImportLabel(importSummary)}</span>
         {/if}
-        <span class:error={counts.errors > 0} class:warn={counts.errors === 0 && counts.warnings > 0}>
+        <span
+          class:error={counts.errors > 0}
+          class:warn={counts.errors === 0 && counts.warnings > 0}
+        >
           {counts.errors}e · {counts.warnings}w
         </span>
       </div>
     {/if}
 
     <div class="toolbar-actions">
-      <button type="button" on:click={() => xyFileInput.click()}>open .xy</button>
+      <button type="button" on:click={() => xyFileInput.click()}
+        >open .xy</button
+      >
       <input
         class="tempo-input"
         type="number"
@@ -195,8 +220,15 @@
         aria-label="MIDI BPM override"
         bind:value={midiBpmOverride}
       />
-      <button type="button" on:click={() => midiFileInput.click()}>import MIDI</button>
-      <button type="button" disabled={!$projectStore} class="primary" on:click={handleDownload}>export</button>
+      <button type="button" on:click={() => midiFileInput.click()}
+        >import MIDI</button
+      >
+      <button
+        type="button"
+        disabled={!$projectStore}
+        class="primary"
+        on:click={handleDownload}>export</button
+      >
     </div>
   </header>
 
@@ -215,13 +247,13 @@
     </nav>
 
     <div class="workspace-frame">
-      {#if $activeModeStore === 'project'}
+      {#if $activeModeStore === "project"}
         <ProjectWorkspace project={$projectStore} />
-      {:else if $activeModeStore === 'daw'}
+      {:else if $activeModeStore === "daw"}
         <DawWorkspace project={$projectStore} />
-      {:else if $activeModeStore === 'pattern'}
+      {:else if $activeModeStore === "pattern"}
         <PatternWorkspace project={$projectStore} />
-      {:else if $activeModeStore === 'arrange'}
+      {:else if $activeModeStore === "arrange"}
         <ArrangeWorkspace project={$projectStore} />
       {:else}
         <InspectWorkspace project={$projectStore} />
@@ -244,8 +276,14 @@
             aria-label="MIDI BPM override"
             bind:value={midiBpmOverride}
           />
-          <button type="button" class="primary" on:click={() => midiFileInput.click()}>import MIDI</button>
-          <button type="button" on:click={() => xyFileInput.click()}>open .xy project</button>
+          <button
+            type="button"
+            class="primary"
+            on:click={() => midiFileInput.click()}>import MIDI</button
+          >
+          <button type="button" on:click={() => xyFileInput.click()}
+            >open .xy project</button
+          >
         </div>
         {#if loadError}
           <p class="load-error">{loadError}</p>
@@ -259,7 +297,10 @@
           {/each}
         </div>
       </div>
-      <p class="disclaimer">Unofficial project-file utility for OP-XY. Teenage Engineering and OP-XY are trademarks of their respective owners.</p>
+      <p class="disclaimer">
+        Unofficial project-file utility for OP-XY. Teenage Engineering and OP-XY
+        are trademarks of their respective owners.
+      </p>
     </section>
   {/if}
 </main>

@@ -28,9 +28,14 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version-file: web/.nvmrc
           cache: 'npm'
           cache-dependency-path: web/package-lock.json
+
+      - name: Use pinned npm
+        run: |
+          npm install --global "$(node -p "require('./web/package.json').packageManager")"
+          npm --version
 
       - name: Setup Pages
         uses: actions/configure-pages@v4
@@ -38,6 +43,14 @@ jobs:
       - name: Install dependencies
         working-directory: ./web
         run: npm ci
+
+      - name: Check formatting
+        working-directory: ./web
+        run: npm run lint
+
+      - name: Check types
+        working-directory: ./web
+        run: npm run check
 
       - name: Build project
         working-directory: ./web

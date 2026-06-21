@@ -9,11 +9,15 @@ export const MAX_RUN = 257; // 2 literal bytes + extension 255
 export class RleError extends Error {
   constructor(message: string) {
     super(message);
-    this.name = 'RleError';
+    this.name = "RleError";
   }
 }
 
-export function decode(buf: Uint8Array, start: number = 0, end?: number): Uint8Array {
+export function decode(
+  buf: Uint8Array,
+  start: number = 0,
+  end?: number,
+): Uint8Array {
   const out: number[] = [];
   let i = start;
   const stop = end === undefined ? buf.length : end;
@@ -70,13 +74,16 @@ export function encode(data: Uint8Array): Uint8Array {
   return new Uint8Array(out);
 }
 
-export function decodeProject(data: Uint8Array): { header: Uint8Array; image: Uint8Array } {
+export function decodeProject(data: Uint8Array): {
+  header: Uint8Array;
+  image: Uint8Array;
+} {
   if (data.length < HEADER_LEN) {
-    throw new RleError('not a .xy file (too short)');
+    throw new RleError("not a .xy file (too short)");
   }
   for (let i = 0; i < 4; i++) {
     if (data[i] !== MAGIC[i]) {
-      throw new RleError('not a .xy file (bad magic)');
+      throw new RleError("not a .xy file (bad magic)");
     }
   }
   return {
@@ -85,13 +92,16 @@ export function decodeProject(data: Uint8Array): { header: Uint8Array; image: Ui
   };
 }
 
-export function encodeProject(header: Uint8Array, image: Uint8Array): Uint8Array {
+export function encodeProject(
+  header: Uint8Array,
+  image: Uint8Array,
+): Uint8Array {
   if (header.length !== HEADER_LEN) {
-    throw new RleError('header must be exactly 8 bytes');
+    throw new RleError("header must be exactly 8 bytes");
   }
   for (let i = 0; i < 4; i++) {
     if (header[i] !== MAGIC[i]) {
-      throw new RleError('header must have the original 4-byte magic');
+      throw new RleError("header must have the original 4-byte magic");
     }
   }
   const encodedImage = encode(image);

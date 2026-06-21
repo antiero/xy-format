@@ -5,7 +5,7 @@ import {
   type MidiNoteOffEvent,
   type MidiNoteOnEvent,
   type MidiSetTempoEvent,
-} from 'midi-file';
+} from "midi-file";
 import {
   buildArrangementFromBytes,
   ImageProject,
@@ -13,10 +13,13 @@ import {
   TRACK_COUNT,
   type PatternNoteInput,
   type TrackPatternMap,
-} from './image_writer';
-import { buildProjectViewModel, type XYProjectViewModel } from './projectViewModel';
+} from "./image_writer";
+import {
+  buildProjectViewModel,
+  type XYProjectViewModel,
+} from "./projectViewModel";
 
-type Role = 'drum' | 'bass' | 'lead' | 'chord';
+type Role = "drum" | "bass" | "lead" | "chord";
 type LaneKey = `${number}:${number}`;
 
 type MidiNote = {
@@ -72,14 +75,14 @@ export type MidiImportOptions = {
 };
 
 const ROLE_SLOTS: Record<number, Role> = {
-  1: 'drum',
-  2: 'drum',
-  3: 'bass',
-  4: 'lead',
-  5: 'lead',
-  6: 'lead',
-  7: 'chord',
-  8: 'chord',
+  1: "drum",
+  2: "drum",
+  3: "bass",
+  4: "lead",
+  5: "lead",
+  6: "lead",
+  7: "chord",
+  8: "chord",
 };
 
 const SINGLE_ROLE_SLOT: Record<Role, number> = {
@@ -145,15 +148,15 @@ function remapDrumNote(gmNote: number): number {
 }
 
 function isNoteOn(event: MidiEvent): event is MidiNoteOnEvent {
-  return event.type === 'noteOn';
+  return event.type === "noteOn";
 }
 
 function isNoteOff(event: MidiEvent): event is MidiNoteOffEvent {
-  return event.type === 'noteOff';
+  return event.type === "noteOff";
 }
 
 function isSetTempo(event: MidiEvent): event is MidiSetTempoEvent {
-  return event.type === 'setTempo';
+  return event.type === "setTempo";
 }
 
 function laneKey(trackIndex: number, channel: number): LaneKey {
@@ -161,7 +164,7 @@ function laneKey(trackIndex: number, channel: number): LaneKey {
 }
 
 function splitLaneKey(key: LaneKey): [number, number] {
-  const [track, channel] = key.split(':').map((part) => Number(part));
+  const [track, channel] = key.split(":").map((part) => Number(part));
   return [track, channel];
 }
 
@@ -221,14 +224,24 @@ function extractMidiParts(midi: MidiData): Map<LaneKey, MidiNote[]> {
   return laneNotes;
 }
 
-function selectBarWindow(notes: MidiNote[], midiTpb: number, startBar: number, numBars: number): MidiNote[] {
+function selectBarWindow(
+  notes: MidiNote[],
+  midiTpb: number,
+  startBar: number,
+  numBars: number,
+): MidiNote[] {
   const ticksPerBar = midiTpb * 4;
   const lo = startBar * ticksPerBar;
   const hi = (startBar + numBars) * ticksPerBar;
   return notes.filter((note) => lo <= note.absTick && note.absTick < hi);
 }
 
-function partFingerprint(notesWindow: MidiNote[], midiTpb: number, startBar: number, isDrumChannel: boolean): Set<string> {
+function partFingerprint(
+  notesWindow: MidiNote[],
+  midiTpb: number,
+  startBar: number,
+  isDrumChannel: boolean,
+): Set<string> {
   const sig = new Set<string>();
   if (notesWindow.length === 0) return sig;
 
@@ -296,7 +309,8 @@ function computeRoleScores(args: {
   let lead = Math.min(noteCount / 16, 25);
   lead += activeBars * 1.1;
   lead += Math.min(pitchSpan, 36) * 0.7;
-  lead += 52 <= meanPitch && meanPitch <= 90 ? 10 : -Math.abs(meanPitch - 71) * 0.55;
+  lead +=
+    52 <= meanPitch && meanPitch <= 90 ? 10 : -Math.abs(meanPitch - 71) * 0.55;
   lead += polyphonyRatio < 0.35 ? 8 : -(polyphonyRatio - 0.35) * 30;
 
   return { drum, bass, lead, chord };
@@ -337,11 +351,15 @@ function buildPartCandidates(
     const uniquePitches = new Set(pitches).size;
     const pitchMin = Math.min(...pitches);
     const pitchMax = Math.max(...pitches);
-    const meanPitch = pitches.reduce((sum, pitch) => sum + pitch, 0) / noteCount;
+    const meanPitch =
+      pitches.reduce((sum, pitch) => sum + pitch, 0) / noteCount;
     const pitchSpan = pitchMax - pitchMin;
     const bars = new Set<number>();
     for (const note of notesWindow) {
-      const bar = Math.max(0, Math.min(totalBars - 1, Math.floor((note.absTick - lo) / ticksPerBar)));
+      const bar = Math.max(
+        0,
+        Math.min(totalBars - 1, Math.floor((note.absTick - lo) / ticksPerBar)),
+      );
       bars.add(bar);
     }
 
@@ -349,13 +367,17 @@ function buildPartCandidates(
     for (const note of notesWindow) {
       onsetCounts.set(note.absTick, (onsetCounts.get(note.absTick) ?? 0) + 1);
     }
-    const chordOnsets = Array.from(onsetCounts.values()).filter((count) => count > 1).length;
+    const chordOnsets = Array.from(onsetCounts.values()).filter(
+      (count) => count > 1,
+    ).length;
     const polyphonyRatio = chordOnsets / Math.max(1, onsetCounts.size);
     const avgNotesPerOnset = noteCount / Math.max(1, onsetCounts.size);
 
     const [, channel] = splitLaneKey(key);
     const isDrumChannel = channel === 9;
-    const drumNoteHits = pitches.filter((pitch) => 27 <= pitch && pitch <= 87).length;
+    const drumNoteHits = pitches.filter(
+      (pitch) => 27 <= pitch && pitch <= 87,
+    ).length;
     const drumNoteRatio = drumNoteHits / noteCount;
     const roleScores = computeRoleScores({
       isDrumChannel,
@@ -392,19 +414,27 @@ function buildPartCandidates(
       drumNoteRatio,
       utilityScore,
       roleScores,
-      fingerprint: partFingerprint(notesWindow, midiTpb, startBar, isDrumChannel),
+      fingerprint: partFingerprint(
+        notesWindow,
+        midiTpb,
+        startBar,
+        isDrumChannel,
+      ),
     });
   }
 
-  candidates.sort((a, b) => (
-    b.utilityScore - a.utilityScore ||
-    b.noteCount - a.noteCount ||
-    b.activeBars - a.activeBars
-  ));
+  candidates.sort(
+    (a, b) =>
+      b.utilityScore - a.utilityScore ||
+      b.noteCount - a.noteCount ||
+      b.activeBars - a.activeBars,
+  );
   return candidates;
 }
 
-function dedupeCandidates(candidates: PartCandidate[]): [PartCandidate[], Array<[PartCandidate, PartCandidate, number]>] {
+function dedupeCandidates(
+  candidates: PartCandidate[],
+): [PartCandidate[], Array<[PartCandidate, PartCandidate, number]>] {
   const kept: PartCandidate[] = [];
   const dropped: Array<[PartCandidate, PartCandidate, number]> = [];
 
@@ -413,7 +443,10 @@ function dedupeCandidates(candidates: PartCandidate[]): [PartCandidate[], Array<
     let duplicateSimilarity = 0;
     for (const ref of kept) {
       if (candidate.isDrumChannel !== ref.isDrumChannel) continue;
-      const similarity = jaccardSimilarity(candidate.fingerprint, ref.fingerprint);
+      const similarity = jaccardSimilarity(
+        candidate.fingerprint,
+        ref.fingerprint,
+      );
       if (similarity >= 0.92 && candidate.noteCount <= ref.noteCount * 1.25) {
         duplicateOf = ref;
         duplicateSimilarity = similarity;
@@ -430,16 +463,22 @@ function dedupeCandidates(candidates: PartCandidate[]): [PartCandidate[], Array<
   return [kept, dropped];
 }
 
-function roleCandidateOk(candidate: PartCandidate, role: Role, totalBars: number, relaxed = false): boolean {
+function roleCandidateOk(
+  candidate: PartCandidate,
+  role: Role,
+  totalBars: number,
+  relaxed = false,
+): boolean {
   let minNotes = ROLE_MIN_NOTES[role];
   let minBars = ROLE_MIN_ACTIVE_BARS[role];
   if (relaxed) {
     minNotes = Math.max(6, Math.floor(minNotes / 2));
     minBars = Math.max(1, minBars - 1);
   }
-  if (candidate.noteCount < minNotes || candidate.activeBars < minBars) return false;
+  if (candidate.noteCount < minNotes || candidate.activeBars < minBars)
+    return false;
 
-  if (role === 'drum') {
+  if (role === "drum") {
     if (candidate.isDrumChannel) return true;
     if (!relaxed) return false;
     return (
@@ -449,25 +488,37 @@ function roleCandidateOk(candidate: PartCandidate, role: Role, totalBars: number
       candidate.pitchMax - candidate.pitchMin <= 20
     );
   }
-  if (role === 'bass') {
+  if (role === "bass") {
     if (candidate.isDrumChannel) return false;
-    return candidate.meanPitch <= 62 && candidate.polyphonyRatio <= (relaxed ? 0.3 : 0.2);
+    return (
+      candidate.meanPitch <= 62 &&
+      candidate.polyphonyRatio <= (relaxed ? 0.3 : 0.2)
+    );
   }
-  if (role === 'lead') {
+  if (role === "lead") {
     if (candidate.isDrumChannel) return false;
-    return candidate.meanPitch >= (relaxed ? 45 : 50) && candidate.pitchMax >= 55;
+    return (
+      candidate.meanPitch >= (relaxed ? 45 : 50) && candidate.pitchMax >= 55
+    );
   }
   if (candidate.isDrumChannel) return false;
   const minPoly = relaxed ? 0.12 : 0.2;
   const minOnsetStack = relaxed ? 1.25 : 1.35;
-  const minCoverage = Math.max(2, Math.round(totalBars * (relaxed ? 0.12 : 0.18)));
+  const minCoverage = Math.max(
+    2,
+    Math.round(totalBars * (relaxed ? 0.12 : 0.18)),
+  );
   return (
-    (candidate.polyphonyRatio >= minPoly || candidate.avgNotesPerOnset >= minOnsetStack) &&
+    (candidate.polyphonyRatio >= minPoly ||
+      candidate.avgNotesPerOnset >= minOnsetStack) &&
     candidate.activeBars >= minCoverage
   );
 }
 
-function assignPartsToSlots(candidates: PartCandidate[], totalBars: number): Map<number, PartCandidate> {
+function assignPartsToSlots(
+  candidates: PartCandidate[],
+  totalBars: number,
+): Map<number, PartCandidate> {
   const remaining = [...candidates];
   const assignments = new Map<number, PartCandidate>();
 
@@ -477,27 +528,36 @@ function assignPartsToSlots(candidates: PartCandidate[], totalBars: number): Map
       assignments.set(1, candidate);
       return assignments;
     }
-    const roles: Role[] = ['bass', 'lead', 'chord'];
-    const eligible = roles.filter((role) => roleCandidateOk(candidate, role, totalBars, true));
-    const role = (eligible.length ? eligible : roles).reduce((best, roleName) => (
-      candidate.roleScores[roleName] > candidate.roleScores[best] ? roleName : best
-    ));
+    const roles: Role[] = ["bass", "lead", "chord"];
+    const eligible = roles.filter((role) =>
+      roleCandidateOk(candidate, role, totalBars, true),
+    );
+    const role = (eligible.length ? eligible : roles).reduce(
+      (best, roleName) =>
+        candidate.roleScores[roleName] > candidate.roleScores[best]
+          ? roleName
+          : best,
+    );
     assignments.set(SINGLE_ROLE_SLOT[role], candidate);
     return assignments;
   }
 
   function pickForRole(role: Role, relaxed = false): PartCandidate | undefined {
-    const pool = remaining.filter((candidate) => roleCandidateOk(candidate, role, totalBars, relaxed));
+    const pool = remaining.filter((candidate) =>
+      roleCandidateOk(candidate, role, totalBars, relaxed),
+    );
     if (pool.length === 0) return undefined;
-    pool.sort((a, b) => (
-      b.roleScores[role] - a.roleScores[role] ||
-      b.utilityScore - a.utilityScore ||
-      b.noteCount - a.noteCount ||
-      a.key[0] - b.key[0] ||
-      a.key[1] - b.key[1]
-    ));
+    pool.sort(
+      (a, b) =>
+        b.roleScores[role] - a.roleScores[role] ||
+        b.utilityScore - a.utilityScore ||
+        b.noteCount - a.noteCount ||
+        a.key[0] - b.key[0] ||
+        a.key[1] - b.key[1],
+    );
     const best = pool[0];
-    if (best.roleScores[role] < ROLE_MIN_SCORE[role] * (relaxed ? 0.75 : 1)) return undefined;
+    if (best.roleScores[role] < ROLE_MIN_SCORE[role] * (relaxed ? 0.75 : 1))
+      return undefined;
     remaining.splice(remaining.indexOf(best), 1);
     return best;
   }
@@ -515,12 +575,13 @@ function assignPartsToSlots(candidates: PartCandidate[], totalBars: number): Map
 
   for (const slot of [4, 5, 6]) {
     if (assignments.has(slot) || remaining.length === 0) continue;
-    remaining.sort((a, b) => (
-      b.roleScores.lead - a.roleScores.lead ||
-      b.utilityScore - a.utilityScore ||
-      b.noteCount - a.noteCount ||
-      b.activeBars - a.activeBars
-    ));
+    remaining.sort(
+      (a, b) =>
+        b.roleScores.lead - a.roleScores.lead ||
+        b.utilityScore - a.utilityScore ||
+        b.noteCount - a.noteCount ||
+        b.activeBars - a.activeBars,
+    );
     const best = remaining[0];
     if (best.utilityScore < 8) continue;
     remaining.shift();
@@ -530,8 +591,18 @@ function assignPartsToSlots(candidates: PartCandidate[], totalBars: number): Map
   return assignments;
 }
 
-function selectBestParts(laneNotes: Map<LaneKey, MidiNote[]>, midiTpb: number, startBar: number, totalBars: number): SelectionResult {
-  const candidates = buildPartCandidates(laneNotes, midiTpb, startBar, totalBars);
+function selectBestParts(
+  laneNotes: Map<LaneKey, MidiNote[]>,
+  midiTpb: number,
+  startBar: number,
+  totalBars: number,
+): SelectionResult {
+  const candidates = buildPartCandidates(
+    laneNotes,
+    midiTpb,
+    startBar,
+    totalBars,
+  );
   const [rankedParts, droppedDuplicates] = dedupeCandidates(candidates);
   return {
     assignments: assignPartsToSlots(rankedParts, totalBars),
@@ -540,7 +611,12 @@ function selectBestParts(laneNotes: Map<LaneKey, MidiNote[]>, midiTpb: number, s
   };
 }
 
-function midiToXyNotes(midiNotes: MidiNote[], midiTpb: number, startBar: number, isDrum: boolean): PatternNoteInput[] {
+function midiToXyNotes(
+  midiNotes: MidiNote[],
+  midiTpb: number,
+  startBar: number,
+  isDrum: boolean,
+): PatternNoteInput[] {
   const ticksPerBarMidi = midiTpb * 4;
   const barOffset = startBar * ticksPerBarMidi;
   const scale = 1920 / midiTpb;
@@ -556,7 +632,10 @@ function midiToXyNotes(midiNotes: MidiNote[], midiTpb: number, startBar: number,
     if (step < 1 || step > 64) continue;
 
     let gateTicks = Math.round(note.gateTicks * scale);
-    gateTicks = Math.max(STEP_TICKS, Math.round(gateTicks / STEP_TICKS) * STEP_TICKS);
+    gateTicks = Math.max(
+      STEP_TICKS,
+      Math.round(gateTicks / STEP_TICKS) * STEP_TICKS,
+    );
     xyNotes.push({
       step,
       note: isDrum ? remapDrumNote(note.note) : note.note,
@@ -566,10 +645,12 @@ function midiToXyNotes(midiNotes: MidiNote[], midiTpb: number, startBar: number,
     });
   }
 
-  xyNotes.sort((a, b) => (
-    (a.step - 1) * STEP_TICKS + (a.tickOffset ?? 0) -
-    ((b.step - 1) * STEP_TICKS + (b.tickOffset ?? 0))
-  ));
+  xyNotes.sort(
+    (a, b) =>
+      (a.step - 1) * STEP_TICKS +
+      (a.tickOffset ?? 0) -
+      ((b.step - 1) * STEP_TICKS + (b.tickOffset ?? 0)),
+  );
   return xyNotes;
 }
 
@@ -599,9 +680,13 @@ function deriveSecondaryChordWindow(notesWindow: MidiNote[]): MidiNote[] {
 
   const upperVoices: MidiNote[] = [];
   for (const onset of Array.from(byOnset.keys()).sort((a, b) => a - b)) {
-    const group = [...(byOnset.get(onset) ?? [])].sort((a, b) => a.note - b.note);
+    const group = [...(byOnset.get(onset) ?? [])].sort(
+      (a, b) => a.note - b.note,
+    );
     if (group.length >= 2) {
-      upperVoices.push(...group.slice(-Math.max(1, Math.floor(group.length / 2))));
+      upperVoices.push(
+        ...group.slice(-Math.max(1, Math.floor(group.length / 2))),
+      );
     }
   }
   if (upperVoices.length > 0) return upperVoices;
@@ -610,16 +695,28 @@ function deriveSecondaryChordWindow(notesWindow: MidiNote[]): MidiNote[] {
   const median = pitches[Math.floor(pitches.length / 2)];
   const highNotes = notesWindow.filter((note) => note.note >= median);
   if (highNotes.length > 0) return highNotes;
-  return notesWindow.filter((_, index) => index % 2 === 1) || notesWindow.slice(0, 1);
+  return (
+    notesWindow.filter((_, index) => index % 2 === 1) || notesWindow.slice(0, 1)
+  );
 }
 
-function buildTrackPatterns(selection: SelectionResult, midiTpb: number, startBar: number, numPatterns: number): Map<number, Array<PatternNoteInput[] | null>> {
+function buildTrackPatterns(
+  selection: SelectionResult,
+  midiTpb: number,
+  startBar: number,
+  numPatterns: number,
+): Map<number, Array<PatternNoteInput[] | null>> {
   const trackPatterns = new Map<number, Array<PatternNoteInput[] | null>>();
-  const drumPrimary = selection.assignments.get(1) ?? selection.assignments.get(2);
-  const chordPrimary = selection.assignments.get(7) ?? selection.assignments.get(8);
-  const deriveMissingRoles = new Set(
-    Array.from(selection.assignments.values()).map((candidate) => candidate.key.join(':')),
-  ).size > 1;
+  const drumPrimary =
+    selection.assignments.get(1) ?? selection.assignments.get(2);
+  const chordPrimary =
+    selection.assignments.get(7) ?? selection.assignments.get(8);
+  const deriveMissingRoles =
+    new Set(
+      Array.from(selection.assignments.values()).map((candidate) =>
+        candidate.key.join(":"),
+      ),
+    ).size > 1;
 
   for (let slot = 1; slot <= 8; slot++) {
     const role = ROLE_SLOTS[slot];
@@ -630,19 +727,37 @@ function buildTrackPatterns(selection: SelectionResult, midiTpb: number, startBa
       const patternStart = startBar + patternIndex * 4;
       let sourceNotes: MidiNote[] = [];
       if (candidate) {
-        sourceNotes = selectBarWindow(candidate.notesAll, midiTpb, patternStart, 4);
-      } else if (role === 'drum' && drumPrimary && deriveMissingRoles) {
-        const base = selectBarWindow(drumPrimary.notesAll, midiTpb, patternStart, 4);
+        sourceNotes = selectBarWindow(
+          candidate.notesAll,
+          midiTpb,
+          patternStart,
+          4,
+        );
+      } else if (role === "drum" && drumPrimary && deriveMissingRoles) {
+        const base = selectBarWindow(
+          drumPrimary.notesAll,
+          midiTpb,
+          patternStart,
+          4,
+        );
         sourceNotes = deriveSecondaryDrumWindow(base);
-      } else if (role === 'chord' && chordPrimary && deriveMissingRoles) {
-        const base = selectBarWindow(chordPrimary.notesAll, midiTpb, patternStart, 4);
+      } else if (role === "chord" && chordPrimary && deriveMissingRoles) {
+        const base = selectBarWindow(
+          chordPrimary.notesAll,
+          midiTpb,
+          patternStart,
+          4,
+        );
         sourceNotes = deriveSecondaryChordWindow(base);
       }
 
-      const xyNotes = sourceNotes.length > 0
-        ? midiToXyNotes(sourceNotes, midiTpb, patternStart, role === 'drum')
-        : [];
-      patterns.push(xyNotes.length > 0 ? xyNotes.slice(0, MAX_NOTES_PER_PATTERN) : null);
+      const xyNotes =
+        sourceNotes.length > 0
+          ? midiToXyNotes(sourceNotes, midiTpb, patternStart, role === "drum")
+          : [];
+      patterns.push(
+        xyNotes.length > 0 ? xyNotes.slice(0, MAX_NOTES_PER_PATTERN) : null,
+      );
     }
     trackPatterns.set(slot, patterns);
   }
@@ -650,7 +765,11 @@ function buildTrackPatterns(selection: SelectionResult, midiTpb: number, startBa
   return trackPatterns;
 }
 
-function autoDetectPatterns(laneNotes: Map<LaneKey, MidiNote[]>, midiTpb: number, startBar: number): number {
+function autoDetectPatterns(
+  laneNotes: Map<LaneKey, MidiNote[]>,
+  midiTpb: number,
+  startBar: number,
+): number {
   const ticksPerBar = midiTpb * 4;
   let maxTick = 0;
   for (const notes of laneNotes.values()) {
@@ -680,21 +799,29 @@ function firstTempoBpm(midi: MidiData): number {
 }
 
 function outputFileName(inputName: string): string {
-  const stem = inputName.replace(/\.[^.]+$/, '').trim() || 'midi-import';
-  const cleaned = stem.replace(/[/:\\?%*"<>|]/g, '-');
+  const stem = inputName.replace(/\.[^.]+$/, "").trim() || "midi-import";
+  const cleaned = stem.replace(/[/:\\?%*"<>|]/g, "-");
   return `${cleaned}.xy`;
 }
 
-function activePatternMap(patterns: Map<number, Array<PatternNoteInput[] | null>>): TrackPatternMap {
+function activePatternMap(
+  patterns: Map<number, Array<PatternNoteInput[] | null>>,
+): TrackPatternMap {
   const out: TrackPatternMap = {};
   for (const [track, trackPatterns] of patterns) {
-    if (!trackPatterns.some((pattern) => pattern && pattern.length > 0)) continue;
-    out[track] = trackPatterns.map((pattern) => ({ steps: 64, notes: pattern ?? [] }));
+    if (!trackPatterns.some((pattern) => pattern && pattern.length > 0))
+      continue;
+    out[track] = trackPatterns.map((pattern) => ({
+      steps: 64,
+      notes: pattern ?? [],
+    }));
   }
   return out;
 }
 
-function notesPerPatternByTrack(patterns: Map<number, Array<PatternNoteInput[] | null>>): Record<number, number[]> {
+function notesPerPatternByTrack(
+  patterns: Map<number, Array<PatternNoteInput[] | null>>,
+): Record<number, number[]> {
   const out: Record<number, number[]> = {};
   for (const [track, trackPatterns] of patterns) {
     const counts = trackPatterns.map((pattern) => pattern?.length ?? 0);
@@ -714,45 +841,69 @@ export function buildMidiProjectFromBytes(
   const midi = parseMidi(midiBytes);
   const ticksPerBeat = midi.header.ticksPerBeat ?? midi.header.timeDivision;
   if (!ticksPerBeat) {
-    throw new Error('SMPTE-timed MIDI files are not supported yet.');
+    throw new Error("SMPTE-timed MIDI files are not supported yet.");
   }
 
   const startBar = 0;
   const laneNotes = extractMidiParts(midi);
   const numPatterns = autoDetectPatterns(laneNotes, ticksPerBeat, startBar);
   const totalBars = numPatterns * 4;
-  const selection = selectBestParts(laneNotes, ticksPerBeat, startBar, totalBars);
+  const selection = selectBestParts(
+    laneNotes,
+    ticksPerBeat,
+    startBar,
+    totalBars,
+  );
   if (selection.assignments.size === 0) {
-    throw new Error('No usable MIDI note lanes were found.');
+    throw new Error("No usable MIDI note lanes were found.");
   }
 
-  const trackPatterns = buildTrackPatterns(selection, ticksPerBeat, startBar, numPatterns);
+  const trackPatterns = buildTrackPatterns(
+    selection,
+    ticksPerBeat,
+    startBar,
+    numPatterns,
+  );
   const arrangementMap = activePatternMap(trackPatterns);
   if (Object.keys(arrangementMap).length === 0) {
-    throw new Error('No notes remained after MIDI segmentation.');
+    throw new Error("No notes remained after MIDI segmentation.");
   }
 
-  const arrangementBytes = buildArrangementFromBytes(baselineBytes, arrangementMap);
+  const arrangementBytes = buildArrangementFromBytes(
+    baselineBytes,
+    arrangementMap,
+  );
   const imageProject = ImageProject.fromBytes(arrangementBytes);
   const bpm = options.bpmOverride ?? firstTempoBpm(midi);
   imageProject.setTempo(bpm);
 
-  const activeTracks = Object.keys(arrangementMap).map((track) => Number(track)).sort((a, b) => a - b);
+  const activeTracks = Object.keys(arrangementMap)
+    .map((track) => Number(track))
+    .sort((a, b) => a - b);
   for (let sceneIndex = 0; sceneIndex < numPatterns; sceneIndex++) {
     const row = Array(TRACK_COUNT).fill(0);
     for (const track of activeTracks) {
-      row[track - 1] = Math.min(sceneIndex, imageProject.getPatternCount(track) - 1);
+      row[track - 1] = Math.min(
+        sceneIndex,
+        imageProject.getPatternCount(track) - 1,
+      );
     }
     imageProject.setSceneRow(sceneIndex, row, Array(TRACK_COUNT).fill(false));
   }
-  imageProject.setSongChain(0, Array.from({ length: numPatterns }, (_, index) => index), true);
+  imageProject.setSongChain(
+    0,
+    Array.from({ length: numPatterns }, (_, index) => index),
+    true,
+  );
 
   const summary: MidiImportSummary = {
     bpm,
     ticksPerBeat,
     patterns: numPatterns,
     totalBars,
-    importedNotes: Object.values(notesPerPatternByTrack(trackPatterns)).flat().reduce((sum, count) => sum + count, 0),
+    importedNotes: Object.values(notesPerPatternByTrack(trackPatterns))
+      .flat()
+      .reduce((sum, count) => sum + count, 0),
     activeTracks,
     notesPerPatternByTrack: notesPerPatternByTrack(trackPatterns),
   };
@@ -761,7 +912,11 @@ export function buildMidiProjectFromBytes(
     project: buildProjectViewModel(
       imageProject,
       outputFileName(fileName),
-      { activeTrackIndex: Math.max(0, (activeTracks[0] ?? 1) - 1), activePatternIndex: 0, activeSceneIndex: 0 },
+      {
+        activeTrackIndex: Math.max(0, (activeTracks[0] ?? 1) - 1),
+        activePatternIndex: 0,
+        activeSceneIndex: 0,
+      },
       true,
     ),
     summary,
@@ -769,19 +924,29 @@ export function buildMidiProjectFromBytes(
 }
 
 async function defaultBaselineBytes(): Promise<Uint8Array> {
-  baselineBytesPromise ??= fetch(`${import.meta.env.BASE_URL}baselines/blank.xy`).then(async (response) => {
+  baselineBytesPromise ??= fetch(
+    `${import.meta.env.BASE_URL}baselines/blank.xy`,
+  ).then(async (response) => {
     if (!response.ok) {
-      throw new Error('The built-in blank project could not be loaded.');
+      throw new Error("The built-in blank project could not be loaded.");
     }
     return new Uint8Array(await response.arrayBuffer());
   });
   return baselineBytesPromise;
 }
 
-export async function loadMidiFileAsNewProject(file: File, options: MidiImportOptions = {}): Promise<MidiImportResult> {
+export async function loadMidiFileAsNewProject(
+  file: File,
+  options: MidiImportOptions = {},
+): Promise<MidiImportResult> {
   const [midiBuffer, baseline] = await Promise.all([
     file.arrayBuffer(),
     defaultBaselineBytes(),
   ]);
-  return buildMidiProjectFromBytes(new Uint8Array(midiBuffer), file.name, baseline, options);
+  return buildMidiProjectFromBytes(
+    new Uint8Array(midiBuffer),
+    file.name,
+    baseline,
+    options,
+  );
 }

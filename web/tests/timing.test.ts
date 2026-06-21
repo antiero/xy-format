@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from "vitest";
 import {
   decodePatternSteps,
   decodeTrackScale,
@@ -6,51 +6,114 @@ import {
   normalizeTickToPattern,
   patternEffectiveLength16ths,
   sceneLength16ths,
-} from '../src/lib/xy/timing';
+} from "../src/lib/xy/timing";
 import {
   collectLanePlaybackEvents,
   collectPlaybackEvents,
   collectScenePlaybackLanes,
   crossesPlaybackPosition,
   laneLoopLength16ths,
-} from '../src/lib/xy/playback';
-import type { XYPatternViewModel, XYSceneViewModel, XYTrackViewModel } from '../src/lib/xy/projectViewModel';
+} from "../src/lib/xy/playback";
+import type {
+  XYPatternViewModel,
+  XYSceneViewModel,
+  XYTrackViewModel,
+} from "../src/lib/xy/projectViewModel";
 
-describe('timing model', () => {
-  it('derives bars and final-bar length from total steps', () => {
-    expect(decodePatternSteps(16)).toMatchObject({ bars: 1, finalBarSteps: 16, totalSteps: 16, valid: true });
-    expect(decodePatternSteps(24)).toMatchObject({ bars: 2, finalBarSteps: 8, totalSteps: 24, valid: true });
-    expect(decodePatternSteps(64)).toMatchObject({ bars: 4, finalBarSteps: 16, totalSteps: 64, valid: true });
+describe("timing model", () => {
+  it("derives bars and final-bar length from total steps", () => {
+    expect(decodePatternSteps(16)).toMatchObject({
+      bars: 1,
+      finalBarSteps: 16,
+      totalSteps: 16,
+      valid: true,
+    });
+    expect(decodePatternSteps(24)).toMatchObject({
+      bars: 2,
+      finalBarSteps: 8,
+      totalSteps: 24,
+      valid: true,
+    });
+    expect(decodePatternSteps(64)).toMatchObject({
+      bars: 4,
+      finalBarSteps: 16,
+      totalSteps: 64,
+      valid: true,
+    });
   });
 
-  it('decodes confirmed track-scale bytes and leaves unknown values read-only', () => {
-    expect(decodeTrackScale(0x01)).toMatchObject({ scale: '1/2', factor16ths: 0.5, supportedForWrite: true });
-    expect(decodeTrackScale(0x03)).toMatchObject({ scale: '1', factor16ths: 1, supportedForWrite: true });
-    expect(decodeTrackScale(0x05)).toMatchObject({ scale: '2', factor16ths: 2, supportedForWrite: true });
-    expect(decodeTrackScale(0x07)).toMatchObject({ scale: '3', factor16ths: 3, supportedForWrite: false });
-    expect(decodeTrackScale(0x0e)).toMatchObject({ scale: '16', factor16ths: 16, supportedForWrite: true });
-    expect(decodeTrackScale(0x09)).toMatchObject({ scale: 'unknown', factor16ths: null, supportedForWrite: false });
+  it("decodes confirmed track-scale bytes and leaves unknown values read-only", () => {
+    expect(decodeTrackScale(0x01)).toMatchObject({
+      scale: "1/2",
+      factor16ths: 0.5,
+      supportedForWrite: true,
+    });
+    expect(decodeTrackScale(0x03)).toMatchObject({
+      scale: "1",
+      factor16ths: 1,
+      supportedForWrite: true,
+    });
+    expect(decodeTrackScale(0x05)).toMatchObject({
+      scale: "2",
+      factor16ths: 2,
+      supportedForWrite: true,
+    });
+    expect(decodeTrackScale(0x07)).toMatchObject({
+      scale: "3",
+      factor16ths: 3,
+      supportedForWrite: false,
+    });
+    expect(decodeTrackScale(0x0e)).toMatchObject({
+      scale: "16",
+      factor16ths: 16,
+      supportedForWrite: true,
+    });
+    expect(decodeTrackScale(0x09)).toMatchObject({
+      scale: "unknown",
+      factor16ths: null,
+      supportedForWrite: false,
+    });
   });
 
-  it('converts note ticks into scale-aware display units', () => {
-    expect(noteToDisplayPosition({ tick: 960, gateTicks: 480 }, { trackScale: '1' })).toEqual({
+  it("converts note ticks into scale-aware display units", () => {
+    expect(
+      noteToDisplayPosition({ tick: 960, gateTicks: 480 }, { trackScale: "1" }),
+    ).toEqual({
       start16ths: 2,
       duration16ths: 1,
     });
-    expect(noteToDisplayPosition({ tick: 960, gateTicks: 480 }, { trackScale: '2' })).toEqual({
+    expect(
+      noteToDisplayPosition({ tick: 960, gateTicks: 480 }, { trackScale: "2" }),
+    ).toEqual({
       start16ths: 4,
       duration16ths: 2,
     });
     expect(normalizeTickToPattern(0xfffffff6, 16)).toBe(7670);
-    expect(noteToDisplayPosition({ tick: 0xfffffff6, gateTicks: 480 }, { trackScale: '1', totalSteps: 16 })).toEqual({
+    expect(
+      noteToDisplayPosition(
+        { tick: 0xfffffff6, gateTicks: 480 },
+        { trackScale: "1", totalSteps: 16 },
+      ),
+    ).toEqual({
       start16ths: 15.979166666666666,
       duration16ths: 1,
     });
   });
 
-  it('computes scene length as the longest selected scaled pattern', () => {
-    const p1 = { totalSteps: 64, trackScale: '1', effectiveLength16ths: 64 } as XYPatternViewModel;
-    const p2 = { totalSteps: 24, trackScale: '4', effectiveLength16ths: patternEffectiveLength16ths({ totalSteps: 24, trackScale: '4' } as XYPatternViewModel) } as XYPatternViewModel;
+  it("computes scene length as the longest selected scaled pattern", () => {
+    const p1 = {
+      totalSteps: 64,
+      trackScale: "1",
+      effectiveLength16ths: 64,
+    } as XYPatternViewModel;
+    const p2 = {
+      totalSteps: 24,
+      trackScale: "4",
+      effectiveLength16ths: patternEffectiveLength16ths({
+        totalSteps: 24,
+        trackScale: "4",
+      } as XYPatternViewModel),
+    } as XYPatternViewModel;
     const tracks = [
       { patterns: [p1] },
       { patterns: [p2] },
@@ -59,7 +122,7 @@ describe('timing model', () => {
     expect(sceneLength16ths(scene, tracks)).toBe(96);
   });
 
-  it('collects scale-aware playback events and detects loop crossings', () => {
+  it("collects scale-aware playback events and detects loop crossings", () => {
     const project = {
       activeSceneIndex: 0,
       tracks: [
@@ -68,9 +131,17 @@ describe('timing model', () => {
             {
               index: 0,
               totalSteps: 16,
-              trackScale: '3',
+              trackScale: "3",
               effectiveLength16ths: 48,
-              notes: [{ id: 'n1', tick: 960, gateTicks: 480, note: 60, velocity: 100 }],
+              notes: [
+                {
+                  id: "n1",
+                  tick: 960,
+                  gateTicks: 480,
+                  note: 60,
+                  velocity: 100,
+                },
+              ],
             },
           ],
         },
@@ -78,7 +149,7 @@ describe('timing model', () => {
       scenes: [{ length16ths: 48, patternByTrack: [0], mutedTracks: [false] }],
     } as never;
 
-    expect(collectPlaybackEvents(project, 'track', 0, 0)[0]).toMatchObject({
+    expect(collectPlaybackEvents(project, "track", 0, 0)[0]).toMatchObject({
       start16ths: 6,
       duration16ths: 3,
       note: 60,
@@ -87,37 +158,45 @@ describe('timing model', () => {
     expect(crossesPlaybackPosition(20, 10, 12, false)).toBe(false);
   });
 
-  it('builds DAW lanes only from scene tracks with note data', () => {
+  it("builds DAW lanes only from scene tracks with note data", () => {
     const project = {
       activeSceneIndex: 0,
       tracks: [
         {
           index: 0,
-          label: 'T1',
-          colorRole: 'red',
-          kind: 'instrument',
+          label: "T1",
+          colorRole: "red",
+          kind: "instrument",
           patterns: [
             {
               index: 0,
               totalSteps: 16,
-              trackScale: '1',
-              trackScaleLabel: '1',
+              trackScale: "1",
+              trackScaleLabel: "1",
               effectiveLength16ths: 16,
-              notes: [{ id: 'kick', tick: 0, gateTicks: 480, note: 53, velocity: 100 }],
+              notes: [
+                {
+                  id: "kick",
+                  tick: 0,
+                  gateTicks: 480,
+                  note: 53,
+                  velocity: 100,
+                },
+              ],
             },
           ],
         },
         {
           index: 1,
-          label: 'T2',
-          colorRole: 'white',
-          kind: 'instrument',
+          label: "T2",
+          colorRole: "white",
+          kind: "instrument",
           patterns: [
             {
               index: 0,
               totalSteps: 16,
-              trackScale: '1',
-              trackScaleLabel: '1',
+              trackScale: "1",
+              trackScaleLabel: "1",
               effectiveLength16ths: 16,
               notes: [],
             },
@@ -125,29 +204,51 @@ describe('timing model', () => {
         },
         {
           index: 2,
-          label: 'T3',
-          colorRole: 'white',
-          kind: 'instrument',
+          label: "T3",
+          colorRole: "white",
+          kind: "instrument",
           patterns: [
             {
               index: 0,
               totalSteps: 16,
-              trackScale: '2',
-              trackScaleLabel: '2',
+              trackScale: "2",
+              trackScaleLabel: "2",
               effectiveLength16ths: 32,
-              notes: [{ id: 'bass', tick: 480, gateTicks: 480, note: 43, velocity: 90 }],
+              notes: [
+                {
+                  id: "bass",
+                  tick: 480,
+                  gateTicks: 480,
+                  note: 43,
+                  velocity: 90,
+                },
+              ],
             },
           ],
         },
       ],
-      scenes: [{ length16ths: 32, patternByTrack: [0, 0, 0], mutedTracks: [false, false, true] }],
+      scenes: [
+        {
+          length16ths: 32,
+          patternByTrack: [0, 0, 0],
+          mutedTracks: [false, false, true],
+        },
+      ],
     } as never;
 
     const lanes = collectScenePlaybackLanes(project);
-    expect(lanes.map((lane) => lane.trackLabel)).toEqual(['T1', 'T3']);
+    expect(lanes.map((lane) => lane.trackLabel)).toEqual(["T1", "T3"]);
     expect(laneLoopLength16ths(lanes)).toBe(32);
-    expect(collectLanePlaybackEvents(lanes).map((event) => event.note)).toEqual([53]);
-    expect(collectLanePlaybackEvents(lanes, new Set([0])).map((event) => event.note)).toEqual([]);
-    expect(collectLanePlaybackEvents(lanes, new Set(), new Set([2])).map((event) => event.note)).toEqual([]);
+    expect(collectLanePlaybackEvents(lanes).map((event) => event.note)).toEqual(
+      [53],
+    );
+    expect(
+      collectLanePlaybackEvents(lanes, new Set([0])).map((event) => event.note),
+    ).toEqual([]);
+    expect(
+      collectLanePlaybackEvents(lanes, new Set(), new Set([2])).map(
+        (event) => event.note,
+      ),
+    ).toEqual([]);
   });
 });

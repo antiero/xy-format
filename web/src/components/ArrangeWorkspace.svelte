@@ -1,9 +1,16 @@
 <script lang="ts">
-  import { get } from 'svelte/store';
-  import { activeModeStore, dispatchProjectEdit, sceneClipboardStore } from '../stores/project';
-  import { display16thsAsBars } from '../lib/xy/timing';
-  import { SONG_MAX_CHAIN, type SongChain } from '../lib/xy/image_writer';
-  import type { XYProjectViewModel, XYSceneViewModel } from '../lib/xy/projectViewModel';
+  import { get } from "svelte/store";
+  import {
+    activeModeStore,
+    dispatchProjectEdit,
+    sceneClipboardStore,
+  } from "../stores/project";
+  import { display16thsAsBars } from "../lib/xy/timing";
+  import { SONG_MAX_CHAIN, type SongChain } from "../lib/xy/image_writer";
+  import type {
+    XYProjectViewModel,
+    XYSceneViewModel,
+  } from "../lib/xy/projectViewModel";
 
   export let project: XYProjectViewModel;
 
@@ -12,21 +19,24 @@
   $: scene = project.scenes[project.activeSceneIndex];
   $: song = project.songs[0] as SongChain;
   $: presentScenes = project.scenes.filter((candidate) => candidate.present);
-  $: selectedSongStep = Math.max(0, Math.min(Math.max(0, song.sceneChain.length - 1), selectedSongStep));
+  $: selectedSongStep = Math.max(
+    0,
+    Math.min(Math.max(0, song.sceneChain.length - 1), selectedSongStep),
+  );
   $: selectedSongScene = song.sceneChain[selectedSongStep] ?? scene.index;
 
   function selectScene(sceneIndex: number) {
-    dispatchProjectEdit({ type: 'set-active-scene', sceneIndex });
+    dispatchProjectEdit({ type: "set-active-scene", sceneIndex });
   }
 
   function openPattern(trackIndex: number) {
-    dispatchProjectEdit({ type: 'set-active-track', trackIndex });
-    activeModeStore.set('pattern');
+    dispatchProjectEdit({ type: "set-active-track", trackIndex });
+    activeModeStore.set("pattern");
   }
 
   function setScenePattern(trackIndex: number, patternIndex: number) {
     dispatchProjectEdit({
-      type: 'set-scene-pattern',
+      type: "set-scene-pattern",
       sceneIndex: scene.index,
       trackIndex,
       patternIndex,
@@ -35,7 +45,7 @@
 
   function setSceneMute(trackIndex: number, muted: boolean) {
     dispatchProjectEdit({
-      type: 'set-scene-mute',
+      type: "set-scene-mute",
       sceneIndex: scene.index,
       trackIndex,
       muted,
@@ -54,7 +64,7 @@
     if (!clipboard) return;
     clipboard.patternByTrack.forEach((patternIndex, trackIndex) => {
       dispatchProjectEdit({
-        type: 'set-scene-pattern',
+        type: "set-scene-pattern",
         sceneIndex: scene.index,
         trackIndex,
         patternIndex,
@@ -62,7 +72,7 @@
     });
     clipboard.mutedTracks.forEach((muted, trackIndex) => {
       dispatchProjectEdit({
-        type: 'set-scene-mute',
+        type: "set-scene-mute",
         sceneIndex: scene.index,
         trackIndex,
         muted,
@@ -73,7 +83,7 @@
   function duplicateScene() {
     const target = Math.min(98, scene.index + 1);
     dispatchProjectEdit({
-      type: 'duplicate-scene',
+      type: "duplicate-scene",
       sourceSceneIndex: scene.index,
       targetSceneIndex: target,
     });
@@ -81,12 +91,12 @@
   }
 
   function resetScene() {
-    dispatchProjectEdit({ type: 'reset-scene', sceneIndex: scene.index });
+    dispatchProjectEdit({ type: "reset-scene", sceneIndex: scene.index });
   }
 
   function updateSong(sceneChain: number[], loop = song.loop) {
     dispatchProjectEdit({
-      type: 'update-song-chain',
+      type: "update-song-chain",
       songIndex: 0,
       sceneChain,
       loop,
@@ -130,7 +140,7 @@
       <h2>Scene {scene.index + 1}</h2>
     </div>
     <div class="status-strip">
-      <span>{scene.present ? 'present' : 'empty'}</span>
+      <span>{scene.present ? "present" : "empty"}</span>
       <span>{display16thsAsBars(scene.length16ths)}</span>
       <span>{song.sceneChain.length}/{SONG_MAX_CHAIN} song</span>
     </div>
@@ -176,7 +186,11 @@
             title={`scene ${candidate.index + 1}`}
           >
             <span>{candidate.index + 1}</span>
-            <i>{candidate.present ? display16thsAsBars(candidate.length16ths) : ''}</i>
+            <i
+              >{candidate.present
+                ? display16thsAsBars(candidate.length16ths)
+                : ""}</i
+            >
           </button>
         {/each}
       </div>
@@ -192,24 +206,40 @@
         {#each project.tracks as track}
           {@const patternIndex = scene.patternByTrack[track.index]}
           {@const pattern = track.patterns[patternIndex]}
-          <div class="arrange-track-row" class:muted={scene.mutedTracks[track.index]}>
-            <button type="button" class="arrange-track-id" on:click={() => openPattern(track.index)}>
-              <span class="track-led" class:red={track.colorRole === 'red'}></span>
+          <div
+            class="arrange-track-row"
+            class:muted={scene.mutedTracks[track.index]}
+          >
+            <button
+              type="button"
+              class="arrange-track-id"
+              on:click={() => openPattern(track.index)}
+            >
+              <span class="track-led" class:red={track.colorRole === "red"}
+              ></span>
               <strong>{track.label}</strong>
             </button>
-            <select value={patternIndex} on:change={(event) => setScenePattern(track.index, Number((event.target as HTMLSelectElement).value))}>
+            <select
+              value={patternIndex}
+              on:change={(event) =>
+                setScenePattern(
+                  track.index,
+                  Number((event.target as HTMLSelectElement).value),
+                )}
+            >
               {#each track.patterns as candidate}
                 <option value={candidate.index}>P{candidate.index + 1}</option>
               {/each}
             </select>
-            <span>{pattern ? `${pattern.notes.length} notes` : 'missing'}</span>
-            <span>{pattern ? pattern.trackScaleLabel : '-'}</span>
+            <span>{pattern ? `${pattern.notes.length} notes` : "missing"}</span>
+            <span>{pattern ? pattern.trackScaleLabel : "-"}</span>
             <button
               type="button"
               class:active={scene.mutedTracks[track.index]}
-              on:click={() => setSceneMute(track.index, !scene.mutedTracks[track.index])}
+              on:click={() =>
+                setSceneMute(track.index, !scene.mutedTracks[track.index])}
             >
-              {scene.mutedTracks[track.index] ? 'muted' : 'on'}
+              {scene.mutedTracks[track.index] ? "muted" : "on"}
             </button>
           </div>
         {/each}
@@ -219,13 +249,29 @@
     <aside class="song-flow-panel">
       <div class="section-title">
         <span>song 1</span>
-        <span>{song.supported ? (song.loop ? 'loop on' : 'loop off') : 'read-only'}</span>
+        <span
+          >{song.supported
+            ? song.loop
+              ? "loop on"
+              : "loop off"
+            : "read-only"}</span
+        >
       </div>
 
       {#if song.supported}
         <div class="song-controls">
-          <button type="button" on:click={addActiveSceneToSong} disabled={song.sceneChain.length >= SONG_MAX_CHAIN}>add scene {scene.index + 1}</button>
-          <button type="button" class:active={song.loop} on:click={() => updateSong(song.sceneChain, !song.loop)}>{song.loop ? 'loop on' : 'loop off'}</button>
+          <button
+            type="button"
+            on:click={addActiveSceneToSong}
+            disabled={song.sceneChain.length >= SONG_MAX_CHAIN}
+            >add scene {scene.index + 1}</button
+          >
+          <button
+            type="button"
+            class:active={song.loop}
+            on:click={() => updateSong(song.sceneChain, !song.loop)}
+            >{song.loop ? "loop on" : "loop off"}</button
+          >
         </div>
 
         <div class="song-ribbon">
@@ -254,20 +300,42 @@
               <span>step {selectedSongStep + 1}</span>
               <span>scene {selectedSongScene + 1}</span>
             </div>
-            <select value={selectedSongScene} on:change={(event) => setSongStepScene(Number((event.target as HTMLSelectElement).value))}>
+            <select
+              value={selectedSongScene}
+              on:change={(event) =>
+                setSongStepScene(
+                  Number((event.target as HTMLSelectElement).value),
+                )}
+            >
               {#each project.scenes as candidate}
-                <option value={candidate.index}>scene {candidate.index + 1}</option>
+                <option value={candidate.index}
+                  >scene {candidate.index + 1}</option
+                >
               {/each}
             </select>
             <div class="action-row">
-              <button type="button" on:click={() => moveSongStep(selectedSongStep, -1)} disabled={selectedSongStep === 0}>up</button>
-              <button type="button" on:click={() => moveSongStep(selectedSongStep, 1)} disabled={selectedSongStep === song.sceneChain.length - 1}>down</button>
-              <button type="button" on:click={() => removeSongStep(selectedSongStep)}>remove</button>
+              <button
+                type="button"
+                on:click={() => moveSongStep(selectedSongStep, -1)}
+                disabled={selectedSongStep === 0}>up</button
+              >
+              <button
+                type="button"
+                on:click={() => moveSongStep(selectedSongStep, 1)}
+                disabled={selectedSongStep === song.sceneChain.length - 1}
+                >down</button
+              >
+              <button
+                type="button"
+                on:click={() => removeSongStep(selectedSongStep)}>remove</button
+              >
             </div>
           </div>
         {/if}
       {:else}
-        <p class="empty-line">Song footer shape is not supported for web editing.</p>
+        <p class="empty-line">
+          Song footer shape is not supported for web editing.
+        </p>
       {/if}
     </aside>
   </div>

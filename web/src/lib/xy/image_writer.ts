@@ -1,6 +1,6 @@
-import { decodeProject, encodeProject } from './rle';
+import { decodeProject, encodeProject } from "./rle";
 
-export const TRACK_BASE0 = 0x0D79;
+export const TRACK_BASE0 = 0x0d79;
 export const TRACK_STRIDE = 17876;
 export const TRACK_COUNT = 16;
 
@@ -11,7 +11,7 @@ export const OFF_QUANTIZATION = 0x07;
 export const OFF_TRACK_GROOVE = 0x08;
 export const OFF_PRISTINE = 0x11;
 export const OFF_PLOCK_SHAPE = 0x3056;
-export const OFF_NOTE_COUNT = 0x456F;
+export const OFF_NOTE_COUNT = 0x456f;
 export const NOTE_SIZE = 12;
 export const STEP_TICKS = 480;
 
@@ -95,15 +95,25 @@ function concatBytes(parts: Uint8Array[]): Uint8Array {
   return out;
 }
 
-function replaceRangeBytes(source: Uint8Array, start: number, end: number, replacement: Uint8Array): Uint8Array {
-  const out = new Uint8Array(source.length - (end - start) + replacement.length);
+function replaceRangeBytes(
+  source: Uint8Array,
+  start: number,
+  end: number,
+  replacement: Uint8Array,
+): Uint8Array {
+  const out = new Uint8Array(
+    source.length - (end - start) + replacement.length,
+  );
   out.set(source.subarray(0, start), 0);
   out.set(replacement, start);
   out.set(source.subarray(end), start + replacement.length);
   return out;
 }
 
-function patternPayload(pattern: ArrangementPatternInput): { notes: PatternNoteInput[]; steps?: number } {
+function patternPayload(pattern: ArrangementPatternInput): {
+  notes: PatternNoteInput[];
+  steps?: number;
+} {
   if (Array.isArray(pattern)) {
     return { notes: pattern };
   }
@@ -114,15 +124,18 @@ function patternPayload(pattern: ArrangementPatternInput): { notes: PatternNoteI
   return { notes: pattern.notes ?? [], steps };
 }
 
-function patternStruct(baseStruct: Uint8Array, pattern: ArrangementPatternInput): Uint8Array {
+function patternStruct(
+  baseStruct: Uint8Array,
+  pattern: ArrangementPatternInput,
+): Uint8Array {
   const { notes, steps } = patternPayload(pattern);
   const st = new Uint8Array(baseStruct);
 
   if (steps !== undefined) {
     if (steps < 1 || steps > 64) {
-      throw new Error('pattern length must be 1..64 steps');
+      throw new Error("pattern length must be 1..64 steps");
     }
-    st[OFF_PATTERN_STEPS] = steps & 0xFF;
+    st[OFF_PATTERN_STEPS] = steps & 0xff;
     st[OFF_PRISTINE] = 0;
     st[OFF_PRISTINE + 1] = 0;
   }
@@ -132,11 +145,14 @@ function patternStruct(baseStruct: Uint8Array, pattern: ArrangementPatternInput)
   }
 
   if (notes.length > 120) {
-    throw new Error('pattern note limit exceeded');
+    throw new Error("pattern note limit exceeded");
   }
 
   const maxStep = Math.max(...notes.map((note) => note.step));
-  const inferredSteps = Math.min(64, Math.max(16, Math.ceil(maxStep / 16) * 16));
+  const inferredSteps = Math.min(
+    64,
+    Math.max(16, Math.ceil(maxStep / 16) * 16),
+  );
   st[OFF_PATTERN_STEPS] = steps ?? inferredSteps;
   st[OFF_PRISTINE] = 0;
   st[OFF_PRISTINE + 1] = 0;
@@ -150,8 +166,10 @@ function patternStruct(baseStruct: Uint8Array, pattern: ArrangementPatternInput)
     const offset = index * NOTE_SIZE;
     recordView.setUint32(offset, Math.max(0, Math.round(tick)), true);
     recordView.setUint32(offset + 4, Math.max(1, Math.round(gate)), true);
-    records[offset + 8] = Math.max(0, Math.min(127, Math.round(input.note))) & 0x7F;
-    records[offset + 9] = Math.max(0, Math.min(127, Math.round(input.velocity ?? 100))) & 0x7F;
+    records[offset + 8] =
+      Math.max(0, Math.min(127, Math.round(input.note))) & 0x7f;
+    records[offset + 9] =
+      Math.max(0, Math.min(127, Math.round(input.velocity ?? 100))) & 0x7f;
     records[offset + 10] = 0;
     records[offset + 11] = 0;
   });
@@ -273,7 +291,7 @@ export function buildArrangementFromBytes(
   const { header, image: base } = decodeProject(baselineBytes);
   const starts = leaderStartsFromImage(base);
   if (starts.length !== TRACK_COUNT) {
-    throw new Error('could not locate baseline track structs');
+    throw new Error("could not locate baseline track structs");
   }
 
   const parts: Uint8Array[] = [base.slice(0, starts[0])];
@@ -281,7 +299,10 @@ export function buildArrangementFromBytes(
   for (let track = 1; track <= TRACK_COUNT; track++) {
     const start = starts[track - 1];
     const baseStruct = base.subarray(start, start + TRACK_STRIDE);
-    const tail = track === TRACK_COUNT ? base.subarray(start + TRACK_STRIDE) : new Uint8Array();
+    const tail =
+      track === TRACK_COUNT
+        ? base.subarray(start + TRACK_STRIDE)
+        : new Uint8Array();
     const patterns = trackPatterns[track];
 
     if (!patterns || patterns.length === 0) {
@@ -290,10 +311,12 @@ export function buildArrangementFromBytes(
     }
 
     if (patterns.length > 9) {
-      throw new Error('OP-XY tracks support at most 9 patterns');
+      throw new Error("OP-XY tracks support at most 9 patterns");
     }
 
-    const structs = patterns.map((pattern) => patternStruct(baseStruct, pattern));
+    const structs = patterns.map((pattern) =>
+      patternStruct(baseStruct, pattern),
+    );
     const leader = new Uint8Array(structs[0]);
     leader[0] = patterns.length;
     const clones = structs.slice(1).map((st) => st.subarray(1));
@@ -326,7 +349,7 @@ export class ImageProject {
     if (starts.length > 0) {
       this.starts = starts;
     } else {
-        this.starts = [];
+      this.starts = [];
     }
 
     const pStarts = patternStartsFromImage(this.image);
@@ -342,16 +365,16 @@ export class ImageProject {
   }
 
   public trackPatternStart(track: number, patternIndex: number): number {
-      const patternsForTrack = this.patternStarts[track - 1];
-      if (!patternsForTrack || patternIndex >= patternsForTrack.length) {
-          throw new Error(`Pattern ${patternIndex} not found on track ${track}`);
-      }
-      return patternsForTrack[patternIndex];
+    const patternsForTrack = this.patternStarts[track - 1];
+    if (!patternsForTrack || patternIndex >= patternsForTrack.length) {
+      throw new Error(`Pattern ${patternIndex} not found on track ${track}`);
+    }
+    return patternsForTrack[patternIndex];
   }
 
   public getPatternCount(track: number): number {
-      const patternsForTrack = this.patternStarts[track - 1];
-      return patternsForTrack ? patternsForTrack.length : 0;
+    const patternsForTrack = this.patternStarts[track - 1];
+    return patternsForTrack ? patternsForTrack.length : 0;
   }
 
   public markEdited(track: number): void {
@@ -375,16 +398,20 @@ export class ImageProject {
   }
 
   public getPatternSteps(track: number, patternIndex: number = 0): number {
-      const s = this.trackPatternStart(track, patternIndex);
-      return this.image[s + OFF_PATTERN_STEPS];
+    const s = this.trackPatternStart(track, patternIndex);
+    return this.image[s + OFF_PATTERN_STEPS];
   }
 
-  public setPatternSteps(track: number, steps: number, patternIndex: number = 0): void {
+  public setPatternSteps(
+    track: number,
+    steps: number,
+    patternIndex: number = 0,
+  ): void {
     if (steps < 1 || steps > 64) {
-      throw new Error('pattern length must be 1..64 steps');
+      throw new Error("pattern length must be 1..64 steps");
     }
     const s = this.trackPatternStart(track, patternIndex);
-    this.image[s + OFF_PATTERN_STEPS] = steps & 0xFF;
+    this.image[s + OFF_PATTERN_STEPS] = steps & 0xff;
     this.markPatternEdited(track, patternIndex);
   }
 
@@ -393,16 +420,23 @@ export class ImageProject {
     return this.image[s + OFF_SCALE];
   }
 
-  public setTrackScaleRaw(track: number, raw: number, patternIndex: number = 0): void {
-    if (raw < 0 || raw > 0xFF) {
-      throw new Error('track scale raw value must be 0..255');
+  public setTrackScaleRaw(
+    track: number,
+    raw: number,
+    patternIndex: number = 0,
+  ): void {
+    if (raw < 0 || raw > 0xff) {
+      throw new Error("track scale raw value must be 0..255");
     }
     const s = this.trackPatternStart(track, patternIndex);
-    this.image[s + OFF_SCALE] = raw & 0xFF;
+    this.image[s + OFF_SCALE] = raw & 0xff;
     this.markPatternEdited(track, patternIndex);
   }
 
-  public getPatternMetadata(track: number, patternIndex: number = 0): PatternMetadata {
+  public getPatternMetadata(
+    track: number,
+    patternIndex: number = 0,
+  ): PatternMetadata {
     return {
       patternIndex,
       steps: this.getPatternSteps(track, patternIndex),
@@ -412,16 +446,32 @@ export class ImageProject {
   }
 
   public noteCount(track: number, patternIndex: number = 0): number {
-    return this.image[this.trackPatternStart(track, patternIndex) + OFF_NOTE_COUNT];
+    return this.image[
+      this.trackPatternStart(track, patternIndex) + OFF_NOTE_COUNT
+    ];
   }
 
   public addNote(
     track: number,
-    { step, tick, note, velocity = 100, gate = 240, patternIndex = 0 }: { step?: number; tick?: number; note: number; velocity?: number; gate?: number; patternIndex?: number }
+    {
+      step,
+      tick,
+      note,
+      velocity = 100,
+      gate = 240,
+      patternIndex = 0,
+    }: {
+      step?: number;
+      tick?: number;
+      note: number;
+      velocity?: number;
+      gate?: number;
+      patternIndex?: number;
+    },
   ): void {
     if (tick === undefined) {
       if (step === undefined) {
-        throw new Error('need step or tick');
+        throw new Error("need step or tick");
       }
       tick = (step - 1) * STEP_TICKS;
     }
@@ -430,12 +480,19 @@ export class ImageProject {
     const cpos = s + OFF_NOTE_COUNT;
     const count = this.image[cpos];
     if (count >= 120) {
-      throw new Error('pattern note limit reached');
+      throw new Error("pattern note limit reached");
     }
 
     const tickBytes = u32ToBytes(tick);
     const gateBytes = u32ToBytes(gate);
-    const rec = new Uint8Array([...tickBytes, ...gateBytes, note & 0x7F, velocity & 0x7F, 0, 0]);
+    const rec = new Uint8Array([
+      ...tickBytes,
+      ...gateBytes,
+      note & 0x7f,
+      velocity & 0x7f,
+      0,
+      0,
+    ]);
 
     const insertAt = cpos + 1 + count * NOTE_SIZE;
 
@@ -452,12 +509,18 @@ export class ImageProject {
     this.rescan();
   }
 
-  private noteOffset(track: number, patternIndex: number, noteIndex: number): number {
+  private noteOffset(
+    track: number,
+    patternIndex: number,
+    noteIndex: number,
+  ): number {
     const s = this.trackPatternStart(track, patternIndex);
     const cpos = s + OFF_NOTE_COUNT;
     const count = this.image[cpos];
     if (noteIndex < 0 || noteIndex >= count) {
-      throw new Error(`note ${noteIndex} not found on track ${track} pattern ${patternIndex}`);
+      throw new Error(
+        `note ${noteIndex} not found on track ${track} pattern ${patternIndex}`,
+      );
     }
     return cpos + 1 + noteIndex * NOTE_SIZE;
   }
@@ -471,23 +534,23 @@ export class ImageProject {
     const view = new DataView(this.image.buffer);
 
     for (let i = 0; i < count; i++) {
-        const offset = cpos + 1 + i * NOTE_SIZE;
-        const tick = view.getUint32(offset, true);
-        const gate = view.getUint32(offset + 4, true);
-        const note = this.image[offset + 8];
-        const velocity = this.image[offset + 9];
-        const flags0 = this.image[offset + 10];
-        const flags1 = this.image[offset + 11];
-        notes.push({
-          id: `t${track - 1}:p${patternIndex}:n${i}:x${tick}:m${note}`,
-          index: i,
-          tick,
-          gate,
-          note,
-          velocity,
-          flags0,
-          flags1,
-        });
+      const offset = cpos + 1 + i * NOTE_SIZE;
+      const tick = view.getUint32(offset, true);
+      const gate = view.getUint32(offset + 4, true);
+      const note = this.image[offset + 8];
+      const velocity = this.image[offset + 9];
+      const flags0 = this.image[offset + 10];
+      const flags1 = this.image[offset + 11];
+      notes.push({
+        id: `t${track - 1}:p${patternIndex}:n${i}:x${tick}:m${note}`,
+        index: i,
+        tick,
+        gate,
+        note,
+        velocity,
+        flags0,
+        flags1,
+      });
     }
 
     return notes;
@@ -497,7 +560,7 @@ export class ImageProject {
     track: number,
     patternIndex: number,
     noteIndex: number,
-    patch: Partial<Pick<RawNoteRecord, 'tick' | 'gate' | 'note' | 'velocity'>>
+    patch: Partial<Pick<RawNoteRecord, "tick" | "gate" | "note" | "velocity">>,
   ): void {
     const offset = this.noteOffset(track, patternIndex, noteIndex);
     const view = new DataView(this.image.buffer);
@@ -508,20 +571,28 @@ export class ImageProject {
       view.setUint32(offset + 4, Math.max(1, Math.round(patch.gate)), true);
     }
     if (patch.note !== undefined) {
-      this.image[offset + 8] = Math.max(0, Math.min(127, Math.round(patch.note))) & 0x7F;
+      this.image[offset + 8] =
+        Math.max(0, Math.min(127, Math.round(patch.note))) & 0x7f;
     }
     if (patch.velocity !== undefined) {
-      this.image[offset + 9] = Math.max(0, Math.min(127, Math.round(patch.velocity))) & 0x7F;
+      this.image[offset + 9] =
+        Math.max(0, Math.min(127, Math.round(patch.velocity))) & 0x7f;
     }
     this.markPatternEdited(track, patternIndex);
   }
 
-  public deleteNote(track: number, patternIndex: number, noteIndex: number): void {
+  public deleteNote(
+    track: number,
+    patternIndex: number,
+    noteIndex: number,
+  ): void {
     const s = this.trackPatternStart(track, patternIndex);
     const cpos = s + OFF_NOTE_COUNT;
     const count = this.image[cpos];
     if (noteIndex < 0 || noteIndex >= count) {
-      throw new Error(`note ${noteIndex} not found on track ${track} pattern ${patternIndex}`);
+      throw new Error(
+        `note ${noteIndex} not found on track ${track} pattern ${patternIndex}`,
+      );
     }
 
     const removeAt = cpos + 1 + noteIndex * NOTE_SIZE;
@@ -540,10 +611,14 @@ export class ImageProject {
     return this.image[slot + trackIndex - 1]; // Tracks are 1-indexed for the API but 0-indexed in array here
   }
 
-  public setScenePattern(sceneIndex: number, trackIndex: number, patternIndex: number): void {
-      const slot = SCENE_SLOT0 + sceneIndex * SCENE_SLOT_SIZE;
-      this.image[slot + trackIndex - 1] = patternIndex;
-      this.image[slot + 32] = 1; // flag
+  public setScenePattern(
+    sceneIndex: number,
+    trackIndex: number,
+    patternIndex: number,
+  ): void {
+    const slot = SCENE_SLOT0 + sceneIndex * SCENE_SLOT_SIZE;
+    this.image[slot + trackIndex - 1] = patternIndex;
+    this.image[slot + 32] = 1; // flag
   }
 
   public getSceneMute(sceneIndex: number, trackIndex: number): boolean {
@@ -551,7 +626,11 @@ export class ImageProject {
     return this.image[slot + 16 + trackIndex - 1] !== 0;
   }
 
-  public setSceneMute(sceneIndex: number, trackIndex: number, muted: boolean): void {
+  public setSceneMute(
+    sceneIndex: number,
+    trackIndex: number,
+    muted: boolean,
+  ): void {
     const slot = SCENE_SLOT0 + sceneIndex * SCENE_SLOT_SIZE;
     this.image[slot + 16 + trackIndex - 1] = muted ? SCENE_MUTE_VALUE : 0;
     this.image[slot + 32] = 1;
@@ -567,15 +646,27 @@ export class ImageProject {
     this.image[slot + 32] = present ? 1 : 0;
   }
 
-  public getSceneRow(sceneIndex: number): { patterns: number[]; mutes: boolean[]; present: boolean } {
+  public getSceneRow(sceneIndex: number): {
+    patterns: number[];
+    mutes: boolean[];
+    present: boolean;
+  } {
     return {
-      patterns: Array.from({ length: TRACK_COUNT }, (_, i) => this.getScenePattern(sceneIndex, i + 1)),
-      mutes: Array.from({ length: TRACK_COUNT }, (_, i) => this.getSceneMute(sceneIndex, i + 1)),
+      patterns: Array.from({ length: TRACK_COUNT }, (_, i) =>
+        this.getScenePattern(sceneIndex, i + 1),
+      ),
+      mutes: Array.from({ length: TRACK_COUNT }, (_, i) =>
+        this.getSceneMute(sceneIndex, i + 1),
+      ),
       present: this.getScenePresent(sceneIndex),
     };
   }
 
-  public setSceneRow(sceneIndex: number, patterns: number[], mutes: boolean[]): void {
+  public setSceneRow(
+    sceneIndex: number,
+    patterns: number[],
+    mutes: boolean[],
+  ): void {
     const slot = SCENE_SLOT0 + sceneIndex * SCENE_SLOT_SIZE;
     for (let i = 0; i < TRACK_COUNT; i++) {
       this.image[slot + i] = Math.max(0, Math.min(8, patterns[i] ?? 0));
@@ -584,15 +675,25 @@ export class ImageProject {
     this.image[slot + 32] = 1;
   }
 
-  public duplicateScene(sourceSceneIndex: number, targetSceneIndex: number): void {
+  public duplicateScene(
+    sourceSceneIndex: number,
+    targetSceneIndex: number,
+  ): void {
     const source = SCENE_SLOT0 + sourceSceneIndex * SCENE_SLOT_SIZE;
     const target = SCENE_SLOT0 + targetSceneIndex * SCENE_SLOT_SIZE;
-    this.image.set(this.image.subarray(source, source + SCENE_SLOT_SIZE), target);
+    this.image.set(
+      this.image.subarray(source, source + SCENE_SLOT_SIZE),
+      target,
+    );
     this.image[target + 32] = 1;
   }
 
   public resetScene(sceneIndex: number): void {
-    this.setSceneRow(sceneIndex, Array(TRACK_COUNT).fill(0), Array(TRACK_COUNT).fill(false));
+    this.setSceneRow(
+      sceneIndex,
+      Array(TRACK_COUNT).fill(0),
+      Array(TRACK_COUNT).fill(false),
+    );
   }
 
   private footerStart(): number {
@@ -600,7 +701,10 @@ export class ImageProject {
     if (end !== null && end >= 0 && end < this.image.length) {
       return end;
     }
-    return Math.max(0, this.image.length - SONG_FOOTER_SLOTS * SONG_DEFAULT_SLOT_SIZE);
+    return Math.max(
+      0,
+      this.image.length - SONG_FOOTER_SLOTS * SONG_DEFAULT_SLOT_SIZE,
+    );
   }
 
   private songSlotLengthAt(offset: number): number {
@@ -613,14 +717,26 @@ export class ImageProject {
 
   public getSongChain(songIndex: number = 0): SongChain {
     if (songIndex !== 0) {
-      return { index: songIndex, sceneChain: [], loop: false, supported: false };
+      return {
+        index: songIndex,
+        sceneChain: [],
+        loop: false,
+        supported: false,
+      };
     }
     const start = this.footerStart();
     const count = this.image[start];
     if (count > SONG_MAX_CHAIN || start + 1 + count + 2 > this.image.length) {
-      return { index: songIndex, sceneChain: [], loop: false, supported: false };
+      return {
+        index: songIndex,
+        sceneChain: [],
+        loop: false,
+        supported: false,
+      };
     }
-    const sceneChain = Array.from(this.image.subarray(start + 1, start + 1 + count));
+    const sceneChain = Array.from(
+      this.image.subarray(start + 1, start + 1 + count),
+    );
     const loopA = this.image[start + 1 + count];
     const loopB = this.image[start + 1 + count + 1];
     return {
@@ -631,16 +747,20 @@ export class ImageProject {
     };
   }
 
-  public setSongChain(songIndex: number, sceneChain: number[], loop: boolean = true): void {
+  public setSongChain(
+    songIndex: number,
+    sceneChain: number[],
+    loop: boolean = true,
+  ): void {
     if (songIndex !== 0) {
-      throw new Error('only Song 1 write support is enabled in the web app');
+      throw new Error("only Song 1 write support is enabled in the web app");
     }
     if (sceneChain.length > SONG_MAX_CHAIN) {
       throw new Error(`song chain cannot exceed ${SONG_MAX_CHAIN} scenes`);
     }
     for (const scene of sceneChain) {
       if (scene < 0 || scene >= SCENE_COUNT) {
-        throw new Error('song scene references must be 0..98');
+        throw new Error("song scene references must be 0..98");
       }
     }
 
@@ -652,7 +772,9 @@ export class ImageProject {
     slot[1 + sceneChain.length] = loop ? 0 : 1;
     slot[1 + sceneChain.length + 1] = loop ? 1 : 0;
 
-    const newImage = new Uint8Array(this.image.length - oldLength + slot.length);
+    const newImage = new Uint8Array(
+      this.image.length - oldLength + slot.length,
+    );
     newImage.set(this.image.subarray(0, start), 0);
     newImage.set(slot, start);
     newImage.set(this.image.subarray(start + oldLength), start + slot.length);
