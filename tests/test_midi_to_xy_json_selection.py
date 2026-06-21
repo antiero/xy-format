@@ -139,6 +139,27 @@ def _single_drum_single_chord_midi() -> mido.MidiFile:
     return mid
 
 
+def _single_polyphonic_lane_midi() -> mido.MidiFile:
+    """8-bar one-lane MIDI export with stacked chord onsets."""
+    tpb = 480
+    bar = tpb * 4
+
+    mid = mido.MidiFile(ticks_per_beat=tpb)
+    tempo_track = mido.MidiTrack()
+    tempo_track.append(mido.MetaMessage("set_tempo", tempo=mido.bpm2tempo(98), time=0))
+    mid.tracks.append(tempo_track)
+
+    chord: list[tuple[int, int, int, int]] = []
+    voicings = [(60, 64, 67), (57, 60, 64), (62, 65, 69), (55, 59, 62)]
+    for b in range(8):
+        for beat in (0, 2):
+            onset = b * bar + beat * tpb
+            for pitch in voicings[b % len(voicings)]:
+                chord.append((onset, pitch, tpb * 2, 86))
+    mid.tracks.append(_build_track(chord, channel=7))
+    return mid
+
+
 def test_role_mapping_prefers_drums_bass_chords() -> None:
     tool = _load_midi_tool_module()
     mid = _synthetic_mix_midi()
@@ -165,6 +186,17 @@ def test_role_mapping_prefers_drums_bass_chords() -> None:
 
     # Duplicate lane was detected and dropped at least once.
     assert len(sel.dropped_duplicates) >= 1
+
+
+def test_single_polyphonic_lane_uses_chord_slot() -> None:
+    tool = _load_midi_tool_module()
+    mid = _single_polyphonic_lane_midi()
+
+    sel = tool.select_best_parts(mid, start_bar=0, total_bars=8)
+
+    assert 7 in sel.assignments
+    assert sel.assignments[7].key[1] == 7
+    assert sel.assignments[7].polyphony_ratio > 0.5
 
 
 def test_secondary_drum_and_chord_slots_are_derived_when_missing() -> None:

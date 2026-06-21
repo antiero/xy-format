@@ -65,8 +65,9 @@ decoded-image codec, inspection, and authoring paths.
 - `xy/rle.py` — decode/encode the project image.
 - `xy/image_writer.py` — image-based editing and arrangement assembly.
 - `tools/spec_to_xy_image.py` — JSON/spec to image-authored `.xy`.
-- `tools/midi_to_xy.py` — MIDI selection front end for JSON specs or direct
-  image-authored `.xy` output.
+- `tools/midi_to_xy.py` — MIDI selection front end for JSON specs, or
+  `--new-project` direct image-authored `.xy` output when no source project
+  exists.
 - `tools/inspect_xy.py` — human-readable project inspection report.
 - `tools/corpus_lab.py` — corpus/device outcome records.
 - `tools/analysis/decoded_diff.py` — decoded-space field diffs.

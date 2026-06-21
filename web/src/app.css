@@ -1165,6 +1165,13 @@ button.primary {
 
 .launch-actions {
   margin-top: 8px;
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.tempo-input {
+  width: 82px;
 }
 
 .load-error {

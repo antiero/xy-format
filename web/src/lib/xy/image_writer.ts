@@ -25,6 +25,26 @@ export const SONG_FOOTER_SLOTS = 14;
 export const SONG_DEFAULT_SLOT_SIZE = 4;
 export const SONG_MAX_CHAIN = 96;
 
+export type PatternNoteInput = {
+  step: number;
+  note: number;
+  velocity?: number;
+  tickOffset?: number;
+  tick_offset?: number;
+  gateTicks?: number;
+  gate_ticks?: number;
+};
+
+export type ArrangementPatternInput =
+  | PatternNoteInput[]
+  | {
+      notes?: PatternNoteInput[];
+      steps?: number;
+      bars?: number;
+    };
+
+export type TrackPatternMap = Record<number, ArrangementPatternInput[]>;
+
 export type RawNoteRecord = {
   id: string;
   index: number;
@@ -62,6 +82,82 @@ function u16ToBytes(value: number): Uint8Array {
   const view = new DataView(buf.buffer);
   view.setUint16(0, value, true); // little-endian
   return buf;
+}
+
+function concatBytes(parts: Uint8Array[]): Uint8Array {
+  const total = parts.reduce((sum, part) => sum + part.length, 0);
+  const out = new Uint8Array(total);
+  let offset = 0;
+  for (const part of parts) {
+    out.set(part, offset);
+    offset += part.length;
+  }
+  return out;
+}
+
+function replaceRangeBytes(source: Uint8Array, start: number, end: number, replacement: Uint8Array): Uint8Array {
+  const out = new Uint8Array(source.length - (end - start) + replacement.length);
+  out.set(source.subarray(0, start), 0);
+  out.set(replacement, start);
+  out.set(source.subarray(end), start + replacement.length);
+  return out;
+}
+
+function patternPayload(pattern: ArrangementPatternInput): { notes: PatternNoteInput[]; steps?: number } {
+  if (Array.isArray(pattern)) {
+    return { notes: pattern };
+  }
+  let steps = pattern.steps;
+  if (steps === undefined && pattern.bars !== undefined) {
+    steps = pattern.bars * 16;
+  }
+  return { notes: pattern.notes ?? [], steps };
+}
+
+function patternStruct(baseStruct: Uint8Array, pattern: ArrangementPatternInput): Uint8Array {
+  const { notes, steps } = patternPayload(pattern);
+  const st = new Uint8Array(baseStruct);
+
+  if (steps !== undefined) {
+    if (steps < 1 || steps > 64) {
+      throw new Error('pattern length must be 1..64 steps');
+    }
+    st[OFF_PATTERN_STEPS] = steps & 0xFF;
+    st[OFF_PRISTINE] = 0;
+    st[OFF_PRISTINE + 1] = 0;
+  }
+
+  if (notes.length === 0) {
+    return st;
+  }
+
+  if (notes.length > 120) {
+    throw new Error('pattern note limit exceeded');
+  }
+
+  const maxStep = Math.max(...notes.map((note) => note.step));
+  const inferredSteps = Math.min(64, Math.max(16, Math.ceil(maxStep / 16) * 16));
+  st[OFF_PATTERN_STEPS] = steps ?? inferredSteps;
+  st[OFF_PRISTINE] = 0;
+  st[OFF_PRISTINE + 1] = 0;
+
+  const records = new Uint8Array(notes.length * NOTE_SIZE);
+  const recordView = new DataView(records.buffer);
+  notes.forEach((input, index) => {
+    const tickOffset = input.tickOffset ?? input.tick_offset ?? 0;
+    const gate = input.gateTicks ?? input.gate_ticks ?? 240;
+    const tick = (input.step - 1) * STEP_TICKS + tickOffset;
+    const offset = index * NOTE_SIZE;
+    recordView.setUint32(offset, Math.max(0, Math.round(tick)), true);
+    recordView.setUint32(offset + 4, Math.max(1, Math.round(gate)), true);
+    records[offset + 8] = Math.max(0, Math.min(127, Math.round(input.note))) & 0x7F;
+    records[offset + 9] = Math.max(0, Math.min(127, Math.round(input.velocity ?? 100))) & 0x7F;
+    records[offset + 10] = 0;
+    records[offset + 11] = 0;
+  });
+
+  st[OFF_NOTE_COUNT] = notes.length;
+  return replaceRangeBytes(st, OFF_NOTE_COUNT + 1, OFF_NOTE_COUNT + 1, records);
 }
 
 export function leaderStartsFromImage(image: Uint8Array): number[] {
@@ -168,6 +264,43 @@ export function trackDataEndFromImage(image: Uint8Array): number | null {
     }
   }
   return pos;
+}
+
+export function buildArrangementFromBytes(
+  baselineBytes: Uint8Array,
+  trackPatterns: TrackPatternMap,
+): Uint8Array {
+  const { header, image: base } = decodeProject(baselineBytes);
+  const starts = leaderStartsFromImage(base);
+  if (starts.length !== TRACK_COUNT) {
+    throw new Error('could not locate baseline track structs');
+  }
+
+  const parts: Uint8Array[] = [base.slice(0, starts[0])];
+
+  for (let track = 1; track <= TRACK_COUNT; track++) {
+    const start = starts[track - 1];
+    const baseStruct = base.subarray(start, start + TRACK_STRIDE);
+    const tail = track === TRACK_COUNT ? base.subarray(start + TRACK_STRIDE) : new Uint8Array();
+    const patterns = trackPatterns[track];
+
+    if (!patterns || patterns.length === 0) {
+      parts.push(concatBytes([baseStruct, tail]));
+      continue;
+    }
+
+    if (patterns.length > 9) {
+      throw new Error('OP-XY tracks support at most 9 patterns');
+    }
+
+    const structs = patterns.map((pattern) => patternStruct(baseStruct, pattern));
+    const leader = new Uint8Array(structs[0]);
+    leader[0] = patterns.length;
+    const clones = structs.slice(1).map((st) => st.subarray(1));
+    parts.push(concatBytes([leader, ...clones, tail]));
+  }
+
+  return encodeProject(header, concatBytes(parts));
 }
 
 // Basic implementation of the ImageProject functionality

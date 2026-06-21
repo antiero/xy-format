@@ -11,6 +11,8 @@ JSON spec (default):
 
 Direct XY build:
     python tools/midi_to_xy.py input.mid --format xy -o output/song.xy --patterns 9
+    python tools/midi_to_xy.py input.mid --new-project -o output/song.xy
+    python tools/midi_to_xy.py input.mid --new-project --bpm 98 -o output/song.xy
 
 Analysis only:
     python tools/midi_to_xy.py input.mid --info
@@ -544,6 +546,22 @@ def assign_parts_to_slots(
     remaining = list(candidates)
     assignments: Dict[int, PartCandidate] = {}
 
+    # A one-lane MIDI file is common for exported piano/chord material. In
+    # that case, place it by its strongest musical role instead of letting the
+    # fixed slot pass consume it as the first eligible lead.
+    if len(remaining) == 1:
+        cand = remaining[0]
+        if cand.is_drum_channel:
+            return {1: cand}
+        roles = ["bass", "lead", "chord"]
+        eligible = [
+            role
+            for role in roles
+            if _role_candidate_ok(cand, role, total_bars, relaxed=True)
+        ] or roles
+        role = max(eligible, key=lambda r: cand.role_scores[r])
+        return {{"bass": 3, "lead": 4, "chord": 7}[role]: cand}
+
     def pick_for_role(role: str, *, relaxed: bool = False) -> Optional[PartCandidate]:
         pool = [c for c in remaining if _role_candidate_ok(c, role, total_bars, relaxed=relaxed)]
         if not pool:
@@ -882,6 +900,7 @@ def build_track_patterns(
 
     drum_primary = selection.assignments.get(1) or selection.assignments.get(2)
     chord_primary = selection.assignments.get(7) or selection.assignments.get(8)
+    derive_missing_roles = len({cand.key for cand in selection.assignments.values()}) > 1
 
     for slot in range(1, 9):
         role = ROLE_SLOTS[slot]
@@ -893,12 +912,12 @@ def build_track_patterns(
             source_notes: List[MidiNote] = []
             if cand is not None:
                 source_notes = select_bar_window(cand.notes_all, midi_tpb, pat_start, 4)
-            elif role == "drum" and drum_primary is not None:
+            elif role == "drum" and drum_primary is not None and derive_missing_roles:
                 base = select_bar_window(drum_primary.notes_all, midi_tpb, pat_start, 4)
                 source_notes = _derive_secondary_drum_window(base)
                 if not source_notes:
                     source_notes = base
-            elif role == "chord" and chord_primary is not None:
+            elif role == "chord" and chord_primary is not None and derive_missing_roles:
                 base = select_bar_window(chord_primary.notes_all, midi_tpb, pat_start, 4)
                 source_notes = _derive_secondary_chord_window(base)
                 if not source_notes:
@@ -1111,6 +1130,14 @@ def main() -> None:
         help="Output format (default: json)",
     )
     parser.add_argument(
+        "--new-project",
+        action="store_true",
+        help=(
+            "Create a new .xy project directly from the MIDI file. "
+            "Alias for --format xy using the built-in blank baseline."
+        ),
+    )
+    parser.add_argument(
         "--xy-output",
         default=None,
         help=(
@@ -1141,11 +1168,20 @@ def main() -> None:
         help="Number of 4-bar patterns (1-9, default: auto-detect)",
     )
     parser.add_argument(
+        "--bpm",
+        type=float,
+        default=None,
+        help="Override the output project tempo for direct .xy/new-project output",
+    )
+    parser.add_argument(
         "--info",
         action="store_true",
         help="Show analysis and selection summary only",
     )
     args = parser.parse_args()
+
+    if args.new_project:
+        args.format = "xy"
 
     if args.bars and args.start_bar is None:
         start_bar = int(args.bars.split("-")[0])
@@ -1173,18 +1209,22 @@ def main() -> None:
     tpb = mid.ticks_per_beat
     total_bars = num_patterns * 4
 
-    bpm = 120.0
+    midi_bpm = 120.0
     for track in mid.tracks:
         for msg in track:
             if msg.type == "set_tempo":
-                bpm = mido.tempo2bpm(msg.tempo)
+                midi_bpm = mido.tempo2bpm(msg.tempo)
                 break
         else:
             continue
         break
+    bpm = args.bpm if args.bpm is not None else midi_bpm
 
     print(f"MIDI: {Path(args.input).name}")
-    print(f"Tempo: {bpm:.1f} BPM, ticks/beat: {tpb}")
+    if args.bpm is not None:
+        print(f"Tempo: {bpm:.1f} BPM override (MIDI metadata: {midi_bpm:.1f}), ticks/beat: {tpb}")
+    else:
+        print(f"Tempo: {bpm:.1f} BPM, ticks/beat: {tpb}")
     if num_patterns > 1:
         print(f"Multi-pattern: {num_patterns} patterns x 4 bars = {total_bars} bars")
         print(f"Window: bars {start_bar}-{start_bar + total_bars - 1}")

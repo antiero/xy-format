@@ -25,7 +25,7 @@ User-facing:
 - Corpus index/query: `docs/tools/corpus_lab.md` (`tools/corpus_lab.py`)
 - Spatial variance analyzer: `docs/tools/analyze_spatial_variance.md` (`tools/analyze_spatial_variance.py`)
 - Header reader: `docs/tools/read_xy_header.md` (`tools/read_xy_header.py`)
-- MIDI → .xy conversion: `tools/midi_to_xy.py`
+- MIDI → .xy conversion: `docs/tools/midi_to_xy.md` (`tools/midi_to_xy.py`)
 - P-lock extraction: `tools/extract_plocks.py`
 - Corpus-wide analyses: `tools/analyze_corpus.py`
 - Multi-pattern device capture: `tools/capture_9pat.py`
