@@ -7,8 +7,6 @@ from dataclasses import dataclass
 from .image_writer import ImageProject
 from .rle import decode_project
 
-TRACK_BASE0 = 0x0D79
-TRACK_STRIDE = 0x45D4
 TRACK_PATTERN_STEPS_OFFSET = 0x01
 TRACK_DEFAULT_STEP_LENGTH_OFFSET = 0x02
 TRACK_QUANTIZATION_OFFSET = 0x07
@@ -132,10 +130,7 @@ def read_track_bar_menu(project: ImageProject, track: int) -> TrackBarMenu:
     if not 1 <= track <= 16:
         raise ValueError("track must be 1..16")
     image = project.image
-    # These BAR fields sit inside the byte range historically used as the track
-    # signature, so signature scanning can miss edited tracks. BAR probes use
-    # the fixed baseline-shape decoded image; use the canonical base/stride.
-    base = TRACK_BASE0 + (track - 1) * TRACK_STRIDE
+    base = project.track_start(track)
     return TrackBarMenu(
         track=track,
         pattern_steps=image[base + TRACK_PATTERN_STEPS_OFFSET],

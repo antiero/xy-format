@@ -26,6 +26,10 @@ MIX_VOL_BYTE_MAX = 0x7F
 MIX_VOL_U32_MAX = 0x7FFFFFFF
 
 
+def _scene_slot0(project: ImageProject) -> int:
+    return project.scene_slot0
+
+
 @dataclass(frozen=True)
 class TrackMixVolume:
     track: int
@@ -103,6 +107,7 @@ def inspect_scene_volumes_bytes(data: bytes) -> SceneVolumeInspection:
 
 def inspect_scene_volumes(project: ImageProject) -> SceneVolumeInspection:
     img = project.image
+    scene_slot0 = _scene_slot0(project)
     storage_starts = pattern_starts_from_image(img)
     if len(storage_starts) < 16:
         storage_starts = [project.track_start(track) for track in range(1, 17)]
@@ -131,7 +136,7 @@ def inspect_scene_volumes(project: ImageProject) -> SceneVolumeInspection:
         master_vol_u32=master_u32,
         track_volumes=tuple(tracks),
         scene_flags=tuple(
-            img[SCENE_SLOT0 + slot * SCENE_SLOT_SIZE + SCENE_FLAG_OFFSET]
+            img[scene_slot0 + slot * SCENE_SLOT_SIZE + SCENE_FLAG_OFFSET]
             for slot in range(9)
         ),
     )
@@ -173,13 +178,13 @@ def scene_mute_storage_slot(scene: int) -> int:
 
 def read_scene_slot_pattern_sel(project: ImageProject, scene_slot: int) -> tuple[int, ...]:
     """Pattern index (0-based) per track for a scene slot (0 = live / scene 1 on single-scene)."""
-    slot = SCENE_SLOT0 + scene_slot * SCENE_SLOT_SIZE
+    slot = _scene_slot0(project) + scene_slot * SCENE_SLOT_SIZE
     return tuple(project.image[slot + t] for t in range(16))
 
 
 def read_scene_slot_mute_bytes(project: ImageProject, scene_slot: int) -> tuple[int, ...]:
     """Raw mute bytes for 16 tracks in a scene slot (0 = unmuted, 2 = muted)."""
-    slot = SCENE_SLOT0 + scene_slot * SCENE_SLOT_SIZE
+    slot = _scene_slot0(project) + scene_slot * SCENE_SLOT_SIZE
     base = slot + SCENE_MUTE_OFFSET
     return tuple(project.image[base + t] for t in range(16))
 
@@ -190,7 +195,7 @@ def read_scene_slot_flag(project: ImageProject, scene_slot: int) -> int:
     Device fixtures and ``build_arrangement`` use value 1 when a scene row is
     populated/present; empty trailing rows read as 0.
     """
-    slot = SCENE_SLOT0 + scene_slot * SCENE_SLOT_SIZE
+    slot = _scene_slot0(project) + scene_slot * SCENE_SLOT_SIZE
     return project.image[slot + SCENE_FLAG_OFFSET]
 
 

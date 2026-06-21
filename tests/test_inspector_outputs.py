@@ -137,7 +137,7 @@ EXPECTATIONS: dict[str, dict] = {
     "unnamed_19": {"contains": [r"Pattern Length @0x007E:\s+4 bars \(0x40\)"]},
     "unnamed_20": {"contains": [r"Track 1\s+Block @0x0080\s+Engine ID: 0x00\s+Scale: Track Scale 2 \(0x05\)"]},
     "unnamed_21": {"contains": [r"Track 1\s+Block @0x0080\s+Engine ID: 0x00\s+Scale: Track Scale 16 \(0x0E\)"]},
-    "unnamed_22": {"contains": [r"Track 1\s+Block @0x0080\s+Engine ID: 0x00\s+Scale: Track Scale 1 \(0x01\)"]},
+    "unnamed_22": {"contains": [r"Track 1\s+Block @0x0080\s+Engine ID: 0x00\s+Scale: Track Scale 1/2 \(0x01\)"]},
     "unnamed_39": {
         "contains": [r"Live trig @0x", r"EventType 0x21"],
         "expected_tail_notes": [],

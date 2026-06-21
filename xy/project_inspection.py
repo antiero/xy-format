@@ -5,7 +5,7 @@ from collections import Counter
 from dataclasses import dataclass
 from typing import Literal
 
-from .image_writer import TRACK_STRIDE, pattern_starts_from_image
+from .image_writer import TRACK_STRIDE, pattern_starts_by_track_from_image
 from .rle import decode_project
 
 
@@ -88,27 +88,23 @@ def inspect_project_bytes(data: bytes) -> ProjectInspection:
 
 
 def inspect_project_image(image: bytes) -> ProjectInspection:
-    starts = pattern_starts_from_image(image)
+    starts_by_track = pattern_starts_by_track_from_image(image)
     tracks: list[TrackInspection] = []
-    cursor = 0
 
-    for track_number in range(1, 17):
-        if cursor >= len(starts):
+    for track_number, track_starts in enumerate(starts_by_track[:16], start=1):
+        if not track_starts:
             tracks.append(TrackInspection(track=track_number, patterns=()))
             continue
 
-        leader_start = starts[cursor]
-        pattern_count = image[leader_start] if leader_start < len(image) else 0
-        if not 1 <= pattern_count <= 9:
-            pattern_count = 1
-
-        track_starts = starts[cursor : cursor + pattern_count]
+        pattern_count = len(track_starts)
         patterns = tuple(
             _inspect_pattern(image, start, pattern_index, pattern_count)
             for pattern_index, start in enumerate(track_starts, start=1)
         )
         tracks.append(TrackInspection(track=track_number, patterns=patterns))
-        cursor += pattern_count
+
+    for track_number in range(len(starts_by_track) + 1, 17):
+        tracks.append(TrackInspection(track=track_number, patterns=()))
 
     return ProjectInspection(tracks=tuple(tracks))
 

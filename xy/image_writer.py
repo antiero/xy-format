@@ -21,6 +21,9 @@ SIG_RE = re.compile(rb"\x00\x00\x00[\x00-\x0f]\xff\x00\xfc\x00", re.S)
 TRACK_BASE0 = 0x0D79
 TRACK_STRIDE = 17876
 TRACK_COUNT = 16
+SCENE_SLOT0 = 0x95
+TRACK_HEADER_MAGIC = b"\xFF\x00\xFC\x00"
+TRACK_TO_SCENE_SLOT_DELTA = TRACK_BASE0 - SCENE_SLOT0
 
 # track-struct relative offsets (docs/format/decoded_image_map.md)
 OFF_PATTERN_STEPS = 0x01
@@ -36,15 +39,50 @@ NOTE_SIZE = 12
 STEP_TICKS = 480
 
 
+def _has_plausible_pattern_header(
+    image: bytes | bytearray, start: int, *, leader_only: bool
+) -> bool:
+    if start < 0 or start + OFF_NOTE_COUNT >= len(image):
+        return False
+    count_or_clone = image[start]
+    if leader_only:
+        if not 1 <= count_or_clone <= 9:
+            return False
+    elif count_or_clone > 9:
+        return False
+    steps = image[start + OFF_PATTERN_STEPS]
+    if not 1 <= steps <= 64:
+        return False
+    magic = image[start + OFF_QUANTIZATION : start + OFF_QUANTIZATION + 4]
+    if bytes(magic) != TRACK_HEADER_MAGIC:
+        return False
+    return image[start + OFF_NOTE_COUNT] <= 120
+
+
+def _scan_pattern_headers(image: bytes | bytearray, *, leader_only: bool) -> list[int]:
+    limit = len(image) - OFF_NOTE_COUNT
+    if limit <= 0:
+        return []
+    return [
+        start
+        for start in range(limit)
+        if _has_plausible_pattern_header(image, start, leader_only=leader_only)
+    ]
+
+
 def pattern_starts_from_image(image: bytes | bytearray) -> list[int]:
     """Return decoded-image starts for every physical pattern struct.
 
     Track discovery used to key off bytes inside the Bar region. Those bytes
     are legitimate user state, so authored Bar edits can erase the signature.
-    The decoded image has a stable leader layout: T1 starts at 0x0D79, each
-    pattern struct has a fixed base size, and the note vector extends its
-    containing pattern by 12 bytes per note.
+    The decoded image normally has a stable leader layout, but captures can
+    shift the first track earlier/later with corresponding global rows. Prefer
+    validated pattern headers, then fall back to the canonical base/stride.
     """
+
+    by_track = pattern_starts_by_track_from_image(image)
+    if by_track:
+        return [start for starts in by_track for start in starts]
 
     starts: list[int] = []
     pos = TRACK_BASE0
@@ -73,8 +111,58 @@ def pattern_starts_from_image(image: bytes | bytearray) -> list[int]:
     return starts
 
 
+def pattern_starts_by_track_from_image(image: bytes | bytearray) -> list[list[int]]:
+    """Return decoded-image physical pattern starts grouped by logical track."""
+
+    leaders = leader_starts_from_image(image)
+    if len(leaders) == TRACK_COUNT:
+        physical_starts = _scan_pattern_headers(image, leader_only=False)
+        track_patterns: list[list[int]] = []
+        for index, leader in enumerate(leaders):
+            next_leader = (
+                leaders[index + 1] if index + 1 < len(leaders) else len(image)
+            )
+            starts = [
+                start for start in physical_starts if leader <= start < next_leader
+            ]
+            track_patterns.append(starts or [leader])
+        return track_patterns
+
+    track_patterns: list[list[int]] = []
+    pos = TRACK_BASE0
+    for _ in range(TRACK_COUNT):
+        pattern_starts: list[int] = []
+        if pos < 0 or pos + TRACK_STRIDE > len(image):
+            return track_patterns
+        pattern_count = image[pos]
+        if not 1 <= pattern_count <= 9:
+            pattern_count = 1
+        pattern_starts.append(pos)
+        if pos + OFF_NOTE_COUNT >= len(image):
+            return track_patterns
+        note_count = image[pos + OFF_NOTE_COUNT]
+        if note_count > 120:
+            return track_patterns
+        pos += TRACK_STRIDE + note_count * NOTE_SIZE
+        for _pattern in range(1, pattern_count):
+            clone_start = pos - 1
+            if clone_start + OFF_NOTE_COUNT >= len(image):
+                return track_patterns
+            pattern_starts.append(clone_start)
+            note_count = image[clone_start + OFF_NOTE_COUNT]
+            if note_count > 120:
+                return track_patterns
+            pos = clone_start + TRACK_STRIDE + note_count * NOTE_SIZE
+        track_patterns.append(pattern_starts)
+    return track_patterns
+
+
 def leader_starts_from_image(image: bytes | bytearray) -> list[int]:
     """Return the 16 decoded-image logical track leader starts."""
+
+    scanned = _scan_pattern_headers(image, leader_only=True)
+    if len(scanned) == TRACK_COUNT:
+        return scanned
 
     leaders: list[int] = []
     pos = TRACK_BASE0
@@ -107,6 +195,8 @@ class ImageProject:
     header: bytes
     image: bytearray
     _starts: list[int] = field(default_factory=list)
+    _pattern_starts: list[list[int]] = field(default_factory=list)
+    _scene_slot0: int = SCENE_SLOT0
 
     @classmethod
     def from_file(cls, path: str) -> "ImageProject":
@@ -126,8 +216,16 @@ class ImageProject:
         starts = leader_starts_from_image(self.image)
         if starts:
             self._starts = starts
-            return
-        self._starts = [m.start() - 3 for m in SIG_RE.finditer(self.image)]
+            self._scene_slot0 = max(0, starts[0] - TRACK_TO_SCENE_SLOT_DELTA)
+        else:
+            self._starts = [m.start() - 3 for m in SIG_RE.finditer(self.image)]
+            self._scene_slot0 = SCENE_SLOT0
+        self._pattern_starts = pattern_starts_by_track_from_image(self.image)
+
+    @property
+    def scene_slot0(self) -> int:
+        """Decoded-image offset of scene slot 0 for this project layout."""
+        return self._scene_slot0
 
     def track_start(self, track: int) -> int:
         """1-based track number -> struct base offset (header byte 0)."""
@@ -139,23 +237,19 @@ class ImageProject:
             raise ValueError("track must be 1..16")
         if not 1 <= pattern <= 9:
             raise ValueError("pattern must be 1..9")
-        starts = pattern_starts_from_image(self.image)
-        if not starts:
+        starts_by_track = self._pattern_starts or pattern_starts_by_track_from_image(
+            self.image
+        )
+        if not starts_by_track:
             raise ValueError("could not locate pattern structs")
-        index = 0
-        for current_track in range(1, TRACK_COUNT + 1):
-            if index >= len(starts):
-                raise ValueError("pattern struct table ended early")
-            leader = starts[index]
-            count = self.image[leader]
-            if not 1 <= count <= 9:
-                count = 1
-            if current_track == track:
-                if pattern > count:
-                    raise ValueError(f"track {track} only has {count} pattern(s)")
-                return starts[index + pattern - 1]
-            index += count
-        raise ValueError("track must be 1..16")
+        if track > len(starts_by_track):
+            raise ValueError("track must be 1..16")
+        patterns = starts_by_track[track - 1]
+        if not patterns:
+            raise ValueError(f"track {track} has no decoded pattern structs")
+        if pattern > len(patterns):
+            raise ValueError(f"track {track} only has {len(patterns)} pattern(s)")
+        return patterns[pattern - 1]
 
     # --- field edits -----------------------------------------------------
     def mark_edited(self, track: int) -> None:
@@ -522,8 +616,8 @@ class ImageProject:
     TRK_AUX_LFO = 0x38B7
     TRK_STEPCOMP = 0x3057   # 16 B per step
     TRK_PLOCK = 0x2A0       # 84 B per step row, u16 cells
-    # encoded track-scale byte (0x01=½× .. 0x0E=16×); pass raw for others.
-    SCALE_BYTES = {0.5: 0x01, 1: 0x03, 2: 0x05, 16: 0x0E}
+    # encoded track-scale byte; pass raw for unknown/experimental values.
+    SCALE_BYTES = {0.5: 0x01, 1: 0x03, 2: 0x05, 4: 0x07, 8: 0x0B, 16: 0x0E}
     EXTERNAL_AUDIO_SOURCES = {
         "mic": 0x00000000,
         "headset": 0x1FFFFFFE,
@@ -576,7 +670,7 @@ class ImageProject:
     }
 
     def set_track_scale(self, track: int, scale) -> None:
-        """scale: 0.5/1/2/16 (known) or a raw encoded byte."""
+        """scale: 0.5/1/2/4/8/16 (known) or a raw encoded byte."""
         b = self.SCALE_BYTES.get(scale, scale)
         self.image[self.track_start(track) + self.TRK_SCALE] = b & 0xFF
         self.mark_edited(track)
@@ -1407,7 +1501,6 @@ class ImageProject:
 #       default 01 00 00 00
 # Validated byte-exact against j05/j06 (tests/test_image_writer.py).
 
-SCENE_SLOT0 = 0x95
 SCENE_SLOT_SIZE = 33
 GLOBAL_ACTIVE_SCENE = 0x6
 GLOBAL_SCENE_COUNT = GLOBAL_ACTIVE_SCENE  # legacy alias; this byte is active scene, not count
@@ -1480,23 +1573,24 @@ def build_arrangement(
     starts = leader_starts_from_image(base)
     if not starts:
         starts = [m.start() - 3 for m in SIG_RE.finditer(base)]
+    scene_slot0 = max(0, starts[0] - TRACK_TO_SCENE_SLOT_DELTA)
     g = bytearray(base[: starts[0]])
 
     # live selection (slot 0): device sits on the last created pattern
     sel_written = False
     for t, pats in track_patterns.items():
         if len(pats) > 1:
-            g[SCENE_SLOT0 + t - 1] = len(pats) - 1
+            g[scene_slot0 + t - 1] = len(pats) - 1
             sel_written = True
     if sel_written:
-        g[SCENE_SLOT0 + 32] = 1  # flags
+        g[scene_slot0 + 32] = 1  # flags
 
     if scenes:
         # Legacy behavior: generated arrangements leave the active scene on the
         # last supplied scene, matching the byte-exact j05/j06 fixtures.
         g[GLOBAL_ACTIVE_SCENE] = len(scenes) - 1
         for k, row in enumerate(scenes, start=1):
-            slot = SCENE_SLOT0 + k * SCENE_SLOT_SIZE
+            slot = scene_slot0 + k * SCENE_SLOT_SIZE
             mutes = scene_mutes[k - 1] if scene_mutes and k - 1 < len(scene_mutes) else []
             if any(row.values()) or mutes:
                 for t, pat in row.items():

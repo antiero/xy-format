@@ -458,10 +458,11 @@ def read_track_scale(data: bytes, block_offset: int) -> int:
 
 
 TRACK_SCALE_LABELS = {
-    0x00: "Track Scale 1/2",
-    0x01: "Track Scale 1",
-    0x03: "Track Scale 8",
+    0x01: "Track Scale 1/2",
+    0x03: "Track Scale 1",
     0x05: "Track Scale 2",
+    0x07: "Track Scale 4",
+    0x0B: "Track Scale 8",
     0x0E: "Track Scale 16",
 }
 
