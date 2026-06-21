@@ -68,14 +68,10 @@
 
   $: activeMessage = dragging
     ? ({ text: "DROP XY MIDI", tone: "neutral" } satisfies DisplayMessage)
-    : hoverMessage ?? message;
+    : (hoverMessage ?? message);
 </script>
 
-<div
-  class="opxy-hardware"
-  class:dragging
-  aria-label="OP-XY project launcher"
->
+<div class="opxy-hardware" class:dragging aria-label="OP-XY project launcher">
   <img
     class="opxy-hardware-art"
     src={opxySvg}
@@ -190,5 +186,4 @@
     border: 1px solid rgba(247, 247, 242, 0.22);
     pointer-events: none;
   }
-
 </style>
