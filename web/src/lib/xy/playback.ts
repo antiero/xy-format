@@ -98,7 +98,6 @@ export function collectScenePlaybackLanes(
   sceneIndex = project.activeSceneIndex,
 ): PlaybackLane[] {
   const scene = project.scenes[sceneIndex];
-  console.log("sceneIndex=", sceneIndex, " scene=", scene);
   if (!scene) return [];
   const loopLength16ths = Math.max(16, scene.length16ths || 16);
 

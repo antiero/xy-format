@@ -67,7 +67,6 @@
   function syncScene(position16ths: number) {
     const stepIndex = songStepIndexAtPosition(songSteps, position16ths);
     const step = songSteps[stepIndex];
-    // console.log("sceneIndex: ", step.sceneIndex);
     if (!step || stepIndex === activePlaybackStep) return;
     activePlaybackStep = stepIndex;
     selectedSongStep = stepIndex;
@@ -185,11 +184,11 @@
     announceDisplayMessage("REWIND", "neutral");
   }
 
-  function sceneRingProgress(start16ths: number, length16ths: number): number {
-    if (!$isPlayingStore) return 0;
+  function sceneRingProgress(start16ths: number, length16ths: number, isPlaying: boolean, currentTick: number): number {
+    if (!isPlaying) return 0;
     return Math.max(
       0,
-      Math.min(1, ($currentTickStore - start16ths) / length16ths),
+      Math.min(1, (currentTick - start16ths) / length16ths),
     );
   }
 
@@ -247,7 +246,7 @@
                 >
                   <span
                     class="song-scene-circle"
-                    style={`--scene-progress: ${sceneRingProgress(slot.step.start16ths, slot.step.length16ths)}turn;`}
+                    style={`--scene-progress: ${sceneRingProgress(slot.step.start16ths, slot.step.length16ths, $isPlayingStore, $currentTickStore)}turn;`}
                   >
                     <span>{slot.step.sceneIndex + 1}</span>
                   </span>
