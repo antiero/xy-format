@@ -184,12 +184,14 @@
     announceDisplayMessage("REWIND", "neutral");
   }
 
-  function sceneRingProgress(start16ths: number, length16ths: number, isPlaying: boolean, currentTick: number): number {
+  function sceneRingProgress(
+    start16ths: number,
+    length16ths: number,
+    isPlaying: boolean,
+    currentTick: number,
+  ): number {
     if (!isPlaying) return 0;
-    return Math.max(
-      0,
-      Math.min(1, (currentTick - start16ths) / length16ths),
-    );
+    return Math.max(0, Math.min(1, (currentTick - start16ths) / length16ths));
   }
 
   onDestroy(() => {
