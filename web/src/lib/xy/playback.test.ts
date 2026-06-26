@@ -2,8 +2,11 @@ import { describe, expect, it } from "vitest";
 import { STEP_TICKS } from "./image_writer";
 import {
   collectLanePlaybackEvents,
+  collectSongPlaybackEvents,
+  collectSongPlaybackSteps,
   collectScenePlaybackLanes,
   repeatPlaybackEvents,
+  songStepIndexAtPosition,
   type PlaybackEvent,
 } from "./playback";
 import type {
@@ -134,5 +137,47 @@ describe("playback scene repetition", () => {
     expect(sceneStarts[1]).toBe(0);
     expect(sceneStarts[2]).toBeCloseTo(5.6666667);
     expect(sceneStarts.slice(3)).toEqual([16, 32, 48]);
+  });
+});
+
+describe("Song Mode playback", () => {
+  it("offsets every scene's audible track events into one song timeline", () => {
+    const project = {
+      tracks: [
+        track(0, pattern([note("t0:n0", 0)], 16, "1", "step")),
+        track(1, pattern([note("t1:n0", 0, 67)], 16, "1", "step")),
+      ],
+      scenes: [
+        {
+          index: 0,
+          present: true,
+          patternByTrack: [0, 0],
+          mutedTracks: [],
+          length16ths: 16,
+        },
+        {
+          index: 1,
+          present: true,
+          patternByTrack: [0, 0],
+          mutedTracks: [],
+          length16ths: 32,
+        },
+      ],
+      activeSceneIndex: 0,
+    } as XYProjectViewModel;
+
+    const steps = collectSongPlaybackSteps(project, [0, 1]);
+    expect(steps).toEqual([
+      { index: 0, sceneIndex: 0, start16ths: 0, length16ths: 16 },
+      { index: 1, sceneIndex: 1, start16ths: 16, length16ths: 32 },
+    ]);
+    expect(
+      collectSongPlaybackEvents(project, steps).map(
+        (event) => event.start16ths,
+      ),
+    ).toEqual([0, 0, 16, 16, 32, 32]);
+    expect(songStepIndexAtPosition(steps, 0)).toBe(0);
+    expect(songStepIndexAtPosition(steps, 16)).toBe(1);
+    expect(songStepIndexAtPosition(steps, 47.9)).toBe(1);
   });
 });

@@ -32,6 +32,14 @@ export type PlaybackLane = {
   events: PlaybackEvent[];
 };
 
+/** A scene positioned within a linear Song Mode playback timeline. */
+export type SongPlaybackStep = {
+  index: number;
+  sceneIndex: number;
+  start16ths: number;
+  length16ths: number;
+};
+
 function noteEvent(
   trackIndex: number,
   pattern: XYPatternViewModel,
@@ -90,6 +98,7 @@ export function collectScenePlaybackLanes(
   sceneIndex = project.activeSceneIndex,
 ): PlaybackLane[] {
   const scene = project.scenes[sceneIndex];
+  console.log("sceneIndex=", sceneIndex, " scene=", scene);
   if (!scene) return [];
   const loopLength16ths = Math.max(16, scene.length16ths || 16);
 
@@ -192,6 +201,60 @@ export function collectPlaybackEvents(
         : [];
     })
     .sort((a, b) => a.start16ths - b.start16ths);
+}
+
+/**
+ * Lay the Song Mode scene chain out as one continuous transport. A scene is
+ * always at least one bar long, matching the firmware's default scene span.
+ */
+export function collectSongPlaybackSteps(
+  project: XYProjectViewModel,
+  sceneChain: readonly number[],
+): SongPlaybackStep[] {
+  let start16ths = 0;
+
+  return sceneChain.map((sceneIndex, index) => {
+    const length16ths = Math.max(
+      16,
+      project.scenes[sceneIndex]?.length16ths ?? 16,
+    );
+    const step = { index, sceneIndex, start16ths, length16ths };
+    start16ths += length16ths;
+    return step;
+  });
+}
+
+/**
+ * Collect every audible track event for every scene in Song Mode. Events are
+ * offset into one timeline so playback does not restart or omit tracks at a
+ * scene boundary.
+ */
+export function collectSongPlaybackEvents(
+  project: XYProjectViewModel,
+  steps: readonly SongPlaybackStep[],
+): PlaybackEvent[] {
+  return steps
+    .flatMap((step) =>
+      collectPlaybackEvents(project, "scene", 0, 0, step.sceneIndex).map(
+        (event) => ({
+          ...event,
+          id: `song:${step.index}:${event.id}`,
+          start16ths: event.start16ths + step.start16ths,
+        }),
+      ),
+    )
+    .sort((a, b) => a.start16ths - b.start16ths);
+}
+
+export function songStepIndexAtPosition(
+  steps: readonly SongPlaybackStep[],
+  position16ths: number,
+): number {
+  if (steps.length === 0) return 0;
+  const index = steps.findIndex(
+    (step) => position16ths < step.start16ths + step.length16ths,
+  );
+  return index === -1 ? steps.length - 1 : index;
 }
 
 export function crossesPlaybackPosition(

@@ -1,22 +1,12 @@
 <script lang="ts">
-  import { onDestroy, onMount } from "svelte";
   import OpXyHardwareLauncher from "./components/OpXyHardwareLauncher.svelte";
-  import OpXyDisplay from "./components/OpXyDisplay.svelte";
-  import ProjectWorkspace from "./components/ProjectWorkspace.svelte";
-  import DawWorkspace from "./components/DawWorkspace.svelte";
-  import PatternWorkspace from "./components/PatternWorkspace.svelte";
-  import ArrangeWorkspace from "./components/ArrangeWorkspace.svelte";
-  import InspectWorkspace from "./components/InspectWorkspace.svelte";
+  import SongModeWorkspace from "./components/SongModeWorkspace.svelte";
   import {
-    activeModeStore,
     announceDisplayMessage,
     currentTickStore,
     displayMessageStore,
     isPlayingStore,
     projectStore,
-    redoProjectEdit,
-    undoProjectEdit,
-    type WorkspaceMode,
   } from "./stores/project";
   import { editedFileName, exportXYProject } from "./lib/xy/projectExporter";
   import { loadXYFile } from "./lib/xy/projectLoader";
@@ -24,68 +14,19 @@
     loadMidiFileAsNewProject,
     type MidiImportSummary,
   } from "./lib/xy/midiImporter";
-  import { projectSummary } from "./lib/xy/projectViewModel";
   import { validationCounts } from "./lib/xy/validation";
 
   let xyFileInput: HTMLInputElement;
   let midiFileInput: HTMLInputElement;
   let loadError = "";
   let importSummary: MidiImportSummary | null = null;
-  let midiBpmOverride = "";
   let dragging = false;
-  let validationKey = "";
-
-  const modes: { id: WorkspaceMode; label: string }[] = [
-    { id: "project", label: "Project" },
-    { id: "daw", label: "DAW" },
-    { id: "pattern", label: "Pattern" },
-    { id: "arrange", label: "Arrange" },
-    { id: "inspect", label: "Inspect" },
-  ];
+  let projectCreated = false;
+  let importFileName = "";
 
   $: counts = $projectStore
     ? validationCounts($projectStore.validation)
     : { errors: 0, warnings: 0, info: 0 };
-  $: displayProgress = ((($currentTickStore % 64) + 64) % 64) / 64;
-  $: activeDisplayLabel = $projectStore
-    ? `${$projectStore.tracks[$projectStore.activeTrackIndex]?.label ?? "T1"} P${$projectStore.activePatternIndex + 1} S${$projectStore.activeSceneIndex + 1}`
-    : "OP-XY LAB";
-  $: {
-    if ($projectStore) {
-      const nextValidationKey = `${counts.errors}:${counts.warnings}`;
-      if (
-        validationKey &&
-        nextValidationKey !== validationKey &&
-        (counts.errors > 0 || counts.warnings > 0)
-      ) {
-        announceDisplayMessage(
-          counts.errors > 0
-            ? `${counts.errors} VALIDATION ERROR${counts.errors === 1 ? "" : "S"}`
-            : `${counts.warnings} VALIDATION WARNING${counts.warnings === 1 ? "" : "S"}`,
-          counts.errors > 0 ? "error" : "warn",
-        );
-      }
-      validationKey = nextValidationKey;
-    } else {
-      validationKey = "";
-    }
-  }
-
-  function midiImportLabel(summary: MidiImportSummary): string {
-    const tracks = summary.activeTracks.map((track) => `T${track}`).join("/");
-    return `MIDI ${summary.scenes}s ${summary.totalBars}b ${summary.importedNotes}n ${tracks}`;
-  }
-
-  function parsedBpmOverride(): number | undefined {
-    const bpm = Number(midiBpmOverride);
-    if (!Number.isFinite(bpm) || bpm <= 0) return undefined;
-    return bpm;
-  }
-
-  function selectMode(mode: WorkspaceMode) {
-    activeModeStore.set(mode);
-    announceDisplayMessage(`${mode.toUpperCase()} MODE`);
-  }
 
   async function openXYFile(file: File) {
     loadError = "";
@@ -93,7 +34,9 @@
     try {
       const project = await loadXYFile(file);
       projectStore.set(project);
-      activeModeStore.set("daw");
+      projectCreated = true;
+      importFileName = file.name;
+      currentTickStore.set(0);
       announceDisplayMessage(`LOADED ${file.name}`, "ok");
     } catch (error) {
       console.error(error);
@@ -110,12 +53,13 @@
     importSummary = null;
     announceDisplayMessage(`IMPORT ${file.name}`, "neutral");
     try {
-      const result = await loadMidiFileAsNewProject(file, {
-        bpmOverride: parsedBpmOverride(),
-      });
+      const result = await loadMidiFileAsNewProject(file);
       projectStore.set(result.project);
       importSummary = result.summary;
-      activeModeStore.set("daw");
+      importFileName = file.name;
+      projectCreated = false;
+      currentTickStore.set(0);
+      isPlayingStore.set(false);
       announceDisplayMessage(
         `MIDI ${result.summary.importedNotes} NOTES`,
         "ok",
@@ -160,17 +104,19 @@
     if (file) await openFile(file);
   }
 
-  async function handleDownload() {
+  async function createXYProject() {
     const project = $projectStore;
     if (!project) return;
     if (
       counts.errors > 0 &&
-      !window.confirm(`Export with ${counts.errors} validation error(s)?`)
+      !window.confirm(
+        `Create this project with ${counts.errors} validation error(s)?`,
+      )
     ) {
-      announceDisplayMessage("EXPORT CANCELLED", "warn");
+      announceDisplayMessage("PROJECT CANCELLED", "warn");
       return;
     }
-    announceDisplayMessage("EXPORTING", "neutral");
+    announceDisplayMessage("CREATING PROJECT", "neutral");
     const blob = await exportXYProject(project);
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
@@ -180,61 +126,10 @@
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
-    announceDisplayMessage("EXPORT READY", "ok");
+    projectCreated = true;
+    currentTickStore.set(0);
+    announceDisplayMessage("PROJECT READY", "ok");
   }
-
-  function isEditableTarget(target: EventTarget | null): boolean {
-    if (!(target instanceof HTMLElement)) return false;
-    return Boolean(
-      target.closest("input, textarea, select, [contenteditable]"),
-    );
-  }
-
-  function handleKeydown(event: KeyboardEvent) {
-    const project = $projectStore;
-    if (!project) return;
-    const key = event.key.toLowerCase();
-    if ((event.metaKey || event.ctrlKey) && key === "s") {
-      event.preventDefault();
-      void handleDownload();
-      return;
-    }
-
-    if (!isEditableTarget(event.target)) {
-      if ((event.metaKey || event.ctrlKey) && key === "z") {
-        event.preventDefault();
-        if (event.shiftKey) {
-          redoProjectEdit();
-        } else {
-          undoProjectEdit();
-        }
-        return;
-      }
-      if ((event.metaKey || event.ctrlKey) && key === "y") {
-        event.preventDefault();
-        redoProjectEdit();
-        return;
-      }
-    }
-
-    if (isEditableTarget(event.target)) return;
-
-    if (key === "p" && !event.metaKey && !event.ctrlKey) {
-      selectMode("pattern");
-    } else if (key === "d" && !event.metaKey && !event.ctrlKey) {
-      selectMode("daw");
-    } else if (key === "a" && !event.metaKey && !event.ctrlKey) {
-      selectMode("arrange");
-    }
-  }
-
-  onMount(() => {
-    window.addEventListener("keydown", handleKeydown);
-  });
-
-  onDestroy(() => {
-    window.removeEventListener("keydown", handleKeydown);
-  });
 </script>
 
 <main
@@ -263,98 +158,67 @@
   />
 
   {#if $projectStore}
-    <header class="topbar">
-      <div class="brand-lockup">
-        <span class="brand-led"></span>
-        <div>
-          <h1>XY Project Lab</h1>
-          <p>unofficial OP-XY project-file utility</p>
-        </div>
-      </div>
-
-      <div class="toolbar-actions">
-        <button type="button" on:click={() => xyFileInput.click()}
-          >open .xy</button
-        >
-        <input
-          class="tempo-input"
-          type="number"
-          min="10"
-          max="300"
-          step="0.1"
-          placeholder="BPM"
-          aria-label="MIDI BPM override"
-          bind:value={midiBpmOverride}
-        />
-        <button type="button" on:click={() => midiFileInput.click()}
-          >import MIDI</button
-        >
-        <button
-          type="button"
-          disabled={!$projectStore}
-          class="primary"
-          on:click={handleDownload}>export</button
-        >
-      </div>
+    <header class="workflow-topbar">
+      <a class="workflow-brand" href="/" aria-label="XY Project Lab home">
+        xy project lab
+      </a>
+      <button type="button" on:click={() => midiFileInput.click()}
+        >import MIDI</button
+      >
     </header>
 
-    <section class="instrument-panel" aria-label="OP-XY project controls">
-      <div class="instrument-display">
-        <OpXyDisplay
-          mode={$activeModeStore}
-          fileName={$projectStore.fileName}
-          modified={$projectStore.modified}
-          tempo={$projectStore.tempoBpm}
-          {counts}
-          isPlaying={$isPlayingStore}
-          progress={displayProgress}
-          message={$displayMessageStore}
-          activeLabel={activeDisplayLabel}
-        />
-      </div>
+    {#if projectCreated}
+      <SongModeWorkspace project={$projectStore} />
+    {:else}
+      <section class="project-ready" aria-label="MIDI project ready to create">
+        <p class="workflow-kicker">MIDI imported</p>
+        <h1>{importFileName || "untitled MIDI"}</h1>
+        <p class="project-ready-copy">
+          Scenes are arranged in sequence and ready to write as an OP–XY
+          project.
+        </p>
 
-      <nav class="modebar instrument-modebar" aria-label="Workspace mode">
-        {#each modes as mode}
-          <button
-            type="button"
-            class="mode-pad"
-            class:active={$activeModeStore === mode.id}
-            on:click={() => selectMode(mode.id)}
-          >
-            {mode.label}
-          </button>
-        {/each}
-      </nav>
+        <dl class="import-details">
+          <div>
+            <dt>scenes</dt>
+            <dd>
+              {importSummary?.scenes ??
+                $projectStore.songs[0]?.sceneChain.length ??
+                0}
+            </dd>
+          </div>
+          <div>
+            <dt>tracks</dt>
+            <dd>{importSummary?.activeTracks.length ?? 0}</dd>
+          </div>
+          <div>
+            <dt>tempo</dt>
+            <dd>{$projectStore.tempoBpm.toFixed(1)} bpm</dd>
+          </div>
+          <div>
+            <dt>notes</dt>
+            <dd>{importSummary?.importedNotes ?? 0}</dd>
+          </div>
+        </dl>
 
-      <div class="project-status instrument-status">
-        <span>{$projectStore.fileName}</span>
-        <span>{$projectStore.modified ? "modified" : "clean"}</span>
-        {#if importSummary}
-          <span>{midiImportLabel(importSummary)}</span>
+        {#if counts.errors > 0 || counts.warnings > 0}
+          <p class="project-validation" class:error={counts.errors > 0}>
+            {counts.errors > 0
+              ? `${counts.errors} validation error${counts.errors === 1 ? "" : "s"}`
+              : `${counts.warnings} validation warning${counts.warnings === 1 ? "" : "s"}`}
+          </p>
         {/if}
-        <span
-          class:error={counts.errors > 0}
-          class:warn={counts.errors === 0 && counts.warnings > 0}
-        >
-          {counts.errors}e · {counts.warnings}w
-        </span>
-        <span>{projectSummary($projectStore)}</span>
-      </div>
-    </section>
 
-    <div class="workspace-frame">
-      {#if $activeModeStore === "project"}
-        <ProjectWorkspace project={$projectStore} />
-      {:else if $activeModeStore === "daw"}
-        <DawWorkspace project={$projectStore} />
-      {:else if $activeModeStore === "pattern"}
-        <PatternWorkspace project={$projectStore} />
-      {:else if $activeModeStore === "arrange"}
-        <ArrangeWorkspace project={$projectStore} />
-      {:else}
-        <InspectWorkspace project={$projectStore} />
-      {/if}
-    </div>
+        <div class="project-ready-actions">
+          <button type="button" on:click={() => midiFileInput.click()}
+            >replace MIDI</button
+          >
+          <button type="button" class="primary" on:click={createXYProject}
+            >create .xy project</button
+          >
+        </div>
+      </section>
+    {/if}
   {:else}
     <section class="launch-surface" aria-label="OP-XY project launcher">
       <div class="launch-brand" aria-label="XY Project Lab">
@@ -363,12 +227,20 @@
       </div>
 
       <OpXyHardwareLauncher
-        tempo={Number(midiBpmOverride) || 120}
+        tempo={120}
         message={$displayMessageStore}
         {dragging}
         onOpenXY={() => xyFileInput.click()}
         onImportMidi={() => midiFileInput.click()}
       />
+
+      <div class="launch-actions">
+        <button
+          type="button"
+          class="primary"
+          on:click={() => midiFileInput.click()}>import MIDI</button
+        >
+      </div>
 
       {#if loadError}
         <p class="load-error launch-error">{loadError}</p>
@@ -381,3 +253,130 @@
     </section>
   {/if}
 </main>
+
+<style>
+  .workflow-topbar {
+    display: flex;
+    min-height: 58px;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 10px clamp(16px, 3vw, 32px);
+    border-bottom: 1px solid var(--xy-line);
+    background: rgba(5, 5, 5, 0.92);
+  }
+
+  .workflow-brand {
+    color: var(--xy-text);
+    font-size: 12px;
+    font-weight: 760;
+    text-decoration: none;
+    text-transform: uppercase;
+  }
+
+  .project-ready {
+    width: min(720px, 100%);
+    margin: auto;
+    padding: clamp(36px, 10vh, 112px) clamp(20px, 5vw, 48px);
+  }
+
+  .workflow-kicker {
+    margin: 0 0 10px;
+    color: var(--xy-text-muted);
+    font-size: 11px;
+    text-transform: uppercase;
+  }
+
+  .project-ready h1 {
+    margin: 0;
+    overflow-wrap: anywhere;
+    font-size: clamp(32px, 7vw, 68px);
+    font-weight: 500;
+    letter-spacing: -0.06em;
+    line-height: 0.95;
+  }
+
+  .project-ready-copy {
+    max-width: 500px;
+    margin: 22px 0 36px;
+    color: var(--xy-text-muted);
+    font-size: 16px;
+    line-height: 1.5;
+  }
+
+  .import-details {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    margin: 0 0 28px;
+    border-top: 1px solid var(--xy-line);
+    border-bottom: 1px solid var(--xy-line);
+  }
+
+  .import-details div {
+    min-width: 0;
+    padding: 14px 10px 14px 0;
+  }
+
+  .import-details div + div {
+    padding-left: 12px;
+    border-left: 1px solid var(--xy-line);
+  }
+
+  .import-details dt {
+    color: var(--xy-text-dim);
+    font-size: 10px;
+    text-transform: uppercase;
+  }
+
+  .import-details dd {
+    margin: 5px 0 0;
+    font-size: 17px;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .project-validation {
+    margin: 0 0 20px;
+    color: var(--xy-yellow-warn);
+    font-size: 12px;
+    text-transform: uppercase;
+  }
+
+  .project-validation.error {
+    color: var(--xy-red-led);
+  }
+
+  .project-ready-actions,
+  .launch-actions {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+
+  .launch-actions {
+    position: absolute;
+    z-index: 3;
+    left: 6vw;
+    bottom: 84px;
+  }
+
+  @media (max-width: 620px) {
+    .import-details {
+      grid-template-columns: repeat(2, 1fr);
+    }
+
+    .import-details div:nth-child(3) {
+      border-left: 0;
+      border-top: 1px solid var(--xy-line);
+    }
+
+    .import-details div:nth-child(4) {
+      border-top: 1px solid var(--xy-line);
+    }
+
+    .launch-actions {
+      right: 6vw;
+      bottom: 70px;
+    }
+  }
+</style>
