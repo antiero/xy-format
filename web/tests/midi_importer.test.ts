@@ -80,8 +80,85 @@ function singlePolyphonicLaneMidi(): Uint8Array {
   return new Uint8Array(writeMidi(data));
 }
 
+function longDistinctDrumMidi(): Uint8Array {
+  const tpb = 480;
+  const bar = tpb * 4;
+  const noteEvents: Array<{
+    tick: number;
+    event: Omit<MidiEvent, "deltaTime">;
+  }> = [];
+
+  // Ten distinct 4-bar windows. This exceeds one track's nine-pattern
+  // limit, so the importer must place the final window in a muted bank on a
+  // spare instrument track while retaining all ten Song scenes.
+  for (let pattern = 0; pattern < 10; pattern++) {
+    const base = pattern * 4 * bar;
+    for (let barIndex = 0; barIndex < 4; barIndex++) {
+      const onset = base + barIndex * bar;
+      noteEvents.push(
+        {
+          tick: onset,
+          event: {
+            type: "noteOn",
+            channel: 9,
+            noteNumber: 36,
+            velocity: 100,
+          },
+        },
+        {
+          tick: onset + 120,
+          event: {
+            type: "noteOff",
+            channel: 9,
+            noteNumber: 36,
+            velocity: 0,
+          },
+        },
+        {
+          tick: onset + (pattern + 1) * 120,
+          event: {
+            type: "noteOn",
+            channel: 9,
+            noteNumber: 38,
+            velocity: 96,
+          },
+        },
+        {
+          tick: onset + (pattern + 1) * 120 + 120,
+          event: {
+            type: "noteOff",
+            channel: 9,
+            noteNumber: 38,
+            velocity: 0,
+          },
+        },
+      );
+    }
+  }
+
+  const data: MidiData = {
+    header: { format: 1, numTracks: 2, ticksPerBeat: tpb },
+    tracks: [
+      [
+        {
+          deltaTime: 0,
+          type: "setTempo",
+          meta: true,
+          microsecondsPerBeat: Math.round(60_000_000 / 120),
+        },
+        { deltaTime: 0, type: "endOfTrack", meta: true },
+      ],
+      [
+        ...makeTrackFromAbsolute(noteEvents),
+        { deltaTime: 0, type: "endOfTrack", meta: true },
+      ],
+    ],
+  };
+  return new Uint8Array(writeMidi(data));
+}
+
 describe("MIDI new-project importer", () => {
-  it("segments a single polyphonic lane into chord-track patterns without duplicating a second chord slot", () => {
+  it("reuses a repeated chord pattern across Song scenes without duplicating a second chord slot", () => {
     const baseline = new Uint8Array(readFileSync(BASELINE));
     const result = buildMidiProjectFromBytes(
       singlePolyphonicLaneMidi(),
@@ -103,8 +180,43 @@ describe("MIDI new-project importer", () => {
     expect(result.project.fileName).toBe("single-chord.xy");
     expect(result.project.modified).toBe(true);
     expect(result.project.tempoBpm).toBeCloseTo(101.5, 1);
-    expect(result.project.tracks[6].patterns).toHaveLength(2);
+    expect(result.project.tracks[6].patterns).toHaveLength(1);
     expect(result.project.tracks[6].patterns[0].notes).toHaveLength(24);
     expect(result.project.songs[0].sceneChain).toEqual([0, 1]);
+  });
+
+  it("keeps all long-MIDI scenes by banking a tenth unique pattern on a spare track", () => {
+    const baseline = new Uint8Array(readFileSync(BASELINE));
+    const result = buildMidiProjectFromBytes(
+      longDistinctDrumMidi(),
+      "long-drums.mid",
+      baseline,
+    );
+
+    expect(result.summary).toMatchObject({
+      patterns: 10,
+      totalBars: 40,
+      importedNotes: 80,
+      activeTracks: [1, 2],
+    });
+    expect(result.summary.notesPerPatternByTrack[1]).toHaveLength(10);
+    expect(result.project.tracks[0].patterns).toHaveLength(9);
+    expect(result.project.tracks[1].patterns).toHaveLength(1);
+    expect(result.project.songs[0].sceneChain).toEqual(
+      Array.from({ length: 10 }, (_, index) => index),
+    );
+
+    for (let sceneIndex = 0; sceneIndex < 9; sceneIndex++) {
+      expect(result.project.scenes[sceneIndex]).toMatchObject({
+        present: true,
+        patternByTrack: expect.arrayContaining([sceneIndex, 0]),
+        mutedTracks: expect.arrayContaining([false, true]),
+      });
+    }
+    expect(result.project.scenes[9]).toMatchObject({
+      present: true,
+      patternByTrack: expect.arrayContaining([0, 0]),
+      mutedTracks: expect.arrayContaining([true, false]),
+    });
   });
 });

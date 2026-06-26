@@ -73,7 +73,7 @@
 
   function midiImportLabel(summary: MidiImportSummary): string {
     const tracks = summary.activeTracks.map((track) => `T${track}`).join("/");
-    return `MIDI ${summary.patterns}p ${summary.totalBars}b ${summary.importedNotes}n ${tracks}`;
+    return `MIDI ${summary.scenes}s ${summary.totalBars}b ${summary.importedNotes}n ${tracks}`;
   }
 
   function parsedBpmOverride(): number | undefined {

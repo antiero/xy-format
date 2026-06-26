@@ -1556,6 +1556,8 @@ def build_arrangement(
     scene_mutes: list[list[int]] | None = None,
     song_chain: list[int] | None = None,
     song_loop: bool = True,
+    template_tracks: dict[int, int] | None = None,
+    force_scene_presence: bool = False,
 ) -> bytes:
     """Assemble a project image from scratch.
 
@@ -1568,6 +1570,11 @@ def build_arrangement(
     scene_mutes: optional per-scene list of 1-based muted tracks (device
         mute value is 2; nonzero = muted, confirmed device-side).
     song_chain: optional list of 0-based scene ids for Song 1.
+    template_tracks: optional output-track -> baseline-track map. This lets
+        an arrangement use a spare instrument track as another bank of the
+        same sound while retaining the source track's preset state.
+    force_scene_presence: mark every supplied scene present, including an
+        all-P1/unmuted row whose bytes are otherwise identical to a blank row.
     """
     header, base = decode_project(open(base_path, "rb").read())
     starts = leader_starts_from_image(base)
@@ -1586,16 +1593,22 @@ def build_arrangement(
         g[scene_slot0 + 32] = 1  # flags
 
     if scenes:
+        if len(scenes) > 99:
+            raise ValueError("OP-XY supports at most 99 scenes")
         # Legacy behavior: generated arrangements leave the active scene on the
         # last supplied scene, matching the byte-exact j05/j06 fixtures.
         g[GLOBAL_ACTIVE_SCENE] = len(scenes) - 1
         for k, row in enumerate(scenes, start=1):
             slot = scene_slot0 + k * SCENE_SLOT_SIZE
             mutes = scene_mutes[k - 1] if scene_mutes and k - 1 < len(scene_mutes) else []
-            if any(row.values()) or mutes:
+            if force_scene_presence or any(row.values()) or mutes:
                 for t, pat in row.items():
+                    if not 1 <= t <= 16 or not 0 <= pat <= 8:
+                        raise ValueError("scene selection must be track 1..16, pattern 0..8")
                     g[slot + t - 1] = pat
                 for t in mutes:
+                    if not 1 <= t <= 16:
+                        raise ValueError("scene mute track must be 1..16")
                     g[slot + 16 + t - 1] = 2  # device mute value
                 g[slot + 32] = 1
 
@@ -1603,11 +1616,17 @@ def build_arrangement(
     for t in range(1, 17):
         s = starts[t - 1]
         tail = base[s + STRIDE :] if t == 16 else b""
-        base_struct = base[s : s + STRIDE]
+        template_track = (template_tracks or {}).get(t, t)
+        if not 1 <= template_track <= 16:
+            raise ValueError(f"template track for T{t} must be 1..16")
+        template_start = starts[template_track - 1]
+        base_struct = base[template_start : template_start + STRIDE]
         pats = track_patterns.get(t)
         if not pats:
             parts.append(base_struct + tail)
             continue
+        if len(pats) > 9:
+            raise ValueError("OP-XY tracks support at most 9 patterns")
         structs = [_pattern_struct(base_struct, p) for p in pats]
         leader = bytearray(structs[0])
         leader[0] = len(pats)
@@ -1615,6 +1634,10 @@ def build_arrangement(
     image = bytearray(b"".join(parts))
 
     if song_chain:
+        if len(song_chain) > 96:
+            raise ValueError("OP-XY Song 1 supports at most 96 scenes")
+        if any(not 0 <= scene <= 98 for scene in song_chain):
+            raise ValueError("song scene ids must be 0..98")
         footer_start = len(image) - FOOTER_SLOTS * 4
         slot = bytes([len(song_chain)]) + bytes(song_chain) + bytes(
             [0 if song_loop else 1, 0]

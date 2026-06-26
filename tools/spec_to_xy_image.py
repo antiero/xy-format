@@ -24,7 +24,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from xy.image_writer import build_arrangement  # noqa: E402
+from xy.image_writer import ImageProject, build_arrangement  # noqa: E402
 
 DEFAULT_BASELINE = "src/one-off-changes-from-default/unnamed 1.xy"
 
@@ -43,10 +43,11 @@ def main() -> int:
     args = ap.parse_args()
 
     spec = json.load(open(args.spec))
+    min_velocity = int(spec.get("min_velocity", args.min_velocity))
     tracks: dict[int, list[list[dict]]] = {}
     for t in spec["tracks"]:
         pats = [
-            [n for n in (p or []) if n.get("velocity", 100) >= args.min_velocity]
+            [n for n in (p or []) if n.get("velocity", 100) >= min_velocity]
             for p in t["patterns"]
         ]
         if any(pats) or args.keep_empty_tracks:
@@ -56,24 +57,54 @@ def main() -> int:
 
     n_pat = max(len(p) for p in tracks.values())
     scenes = None
+    scene_mutes = None
     song_chain = None
     if not args.no_scenes:
-        scenes = [
-            {t: min(k, len(pats) - 1) for t, pats in tracks.items()}
-            for k in range(n_pat)
-        ]
+        raw_scenes = spec.get("scenes")
+        if raw_scenes is None:
+            scenes = [
+                {t: min(k, len(pats) - 1) for t, pats in tracks.items()}
+                for k in range(n_pat)
+            ]
+            scene_mutes = None
+        else:
+            scenes = [
+                {int(track): int(pattern) for track, pattern in row.items()}
+                for row in raw_scenes
+            ]
+            scene_mutes = [
+                [int(track) for track in muted_tracks]
+                for muted_tracks in spec.get("scene_mutes", [])
+            ]
         if not args.no_song:
-            song_chain = list(range(n_pat))
+            song_chain = [
+                int(scene) for scene in spec.get("song_chain", list(range(len(scenes))))
+            ]
+
+    template_tracks = {
+        int(track): int(source)
+        for track, source in spec.get("track_template_sources", {}).items()
+    }
 
     out = build_arrangement(
-        args.baseline, tracks, scenes=scenes, song_chain=song_chain
+        args.baseline,
+        tracks,
+        scenes=scenes,
+        scene_mutes=scene_mutes,
+        song_chain=song_chain,
+        template_tracks=template_tracks,
+        force_scene_presence=bool(spec.get("force_scene_presence", False)),
     )
+    if "tempo_bpm" in spec:
+        project = ImageProject.from_bytes(out)
+        project.set_tempo(float(spec["tempo_bpm"]))
+        out = project.to_bytes()
     open(args.output, "wb").write(out)
     total = sum(len(p) for ps in tracks.values() for p in ps)
     print(
         f"wrote {args.output}: {len(out):,} bytes — "
         f"{len(tracks)} track(s), {n_pat} patterns, {total} notes"
-        f"{', %d scenes + song chain' % n_pat if song_chain else ''}"
+        f"{', %d scenes + song chain' % len(scenes) if song_chain else ''}"
     )
     return 0
 

@@ -7,10 +7,10 @@ Examples
 --------
 JSON spec (default):
     python tools/midi_to_xy.py input.mid
-    python tools/midi_to_xy.py input.mid -o specs/midi-to-xy/song.json --patterns 9
+    python tools/midi_to_xy.py input.mid -o specs/midi-to-xy/song.json --patterns 61
 
 Direct XY build:
-    python tools/midi_to_xy.py input.mid --format xy -o output/song.xy --patterns 9
+    python tools/midi_to_xy.py input.mid --format xy -o output/song.xy --patterns 61
     python tools/midi_to_xy.py input.mid --new-project -o output/song.xy
     python tools/midi_to_xy.py input.mid --new-project --bpm 98 -o output/song.xy
 
@@ -104,6 +104,9 @@ ROLE_MIN_ACTIVE_BARS = {
 
 # Maximum notes per OP-XY pattern (device hard cap)
 MAX_NOTES_PER_PATTERN = 120
+MAX_PATTERNS_PER_TRACK = 9
+MAX_INSTRUMENT_TRACKS = 8
+MAX_SONG_SCENES = 96
 
 
 @dataclass
@@ -144,6 +147,17 @@ class SelectionResult:
     assignments: Dict[int, PartCandidate]  # OP-XY track -> source part
     ranked_parts: List[PartCandidate]
     dropped_duplicates: List[Tuple[PartCandidate, PartCandidate, float]]
+
+
+@dataclass
+class BankedArrangement:
+    """Device-valid pattern banks plus their scene/song routing."""
+
+    track_patterns: Dict[int, List[List[Note]]]
+    template_tracks: Dict[int, int]
+    scenes: List[Dict[int, int]]
+    scene_mutes: List[List[int]]
+    active_tracks: List[int]
 
 
 def remap_drum_note(gm_note: int) -> int:
@@ -893,6 +907,7 @@ def build_track_patterns(
     midi_tpb: int,
     start_bar: int,
     num_patterns: int,
+    include_derived_parts: bool = True,
 ) -> Dict[int, List[Optional[List[Note]]]]:
     """Build per-slot note lists per 4-bar pattern."""
 
@@ -912,12 +927,22 @@ def build_track_patterns(
             source_notes: List[MidiNote] = []
             if cand is not None:
                 source_notes = select_bar_window(cand.notes_all, midi_tpb, pat_start, 4)
-            elif role == "drum" and drum_primary is not None and derive_missing_roles:
+            elif (
+                include_derived_parts
+                and role == "drum"
+                and drum_primary is not None
+                and derive_missing_roles
+            ):
                 base = select_bar_window(drum_primary.notes_all, midi_tpb, pat_start, 4)
                 source_notes = _derive_secondary_drum_window(base)
                 if not source_notes:
                     source_notes = base
-            elif role == "chord" and chord_primary is not None and derive_missing_roles:
+            elif (
+                include_derived_parts
+                and role == "chord"
+                and chord_primary is not None
+                and derive_missing_roles
+            ):
                 base = select_bar_window(chord_primary.notes_all, midi_tpb, pat_start, 4)
                 source_notes = _derive_secondary_chord_window(base)
                 if not source_notes:
@@ -949,6 +974,124 @@ def build_track_patterns(
     return track_patterns
 
 
+def _pattern_signature(notes: List[Note]) -> tuple[tuple[int, int, int, int, int], ...]:
+    """Return the exact authored representation used for pattern reuse."""
+
+    return tuple(
+        (
+            note["step"],
+            note["note"],
+            note.get("velocity", 100),
+            note.get("tick_offset", 0),
+            note.get("gate_ticks", 240),
+        )
+        for note in notes
+    )
+
+
+def bank_track_patterns(
+    patterns_by_source_track: Dict[int, List[Optional[List[Note]]]],
+    scene_count: int,
+) -> BankedArrangement:
+    """Fit a complete timeline into OP-XY's nine-pattern track limit.
+
+    Identical four-bar windows share a pattern. A source lane with more than
+    nine distinct windows is split over spare instrument tracks, and every
+    scene mutes the banks not selected for that lane. This preserves the
+    source timeline without serializing an invalid pattern count.
+    """
+
+    source_banks: list[dict] = []
+    for source_track, windows in sorted(patterns_by_source_track.items()):
+        unique_patterns: List[List[Note]] = []
+        index_by_signature: dict[tuple[tuple[int, int, int, int, int], ...], int] = {}
+        window_indices: List[Optional[int]] = []
+        for window in windows:
+            if not window:
+                window_indices.append(None)
+                continue
+            signature = _pattern_signature(window)
+            pattern_index = index_by_signature.get(signature)
+            if pattern_index is None:
+                pattern_index = len(unique_patterns)
+                index_by_signature[signature] = pattern_index
+                unique_patterns.append(window)
+            window_indices.append(pattern_index)
+        if unique_patterns:
+            source_banks.append(
+                {
+                    "source_track": source_track,
+                    "unique_patterns": unique_patterns,
+                    "window_indices": window_indices,
+                    "hosts": [],
+                }
+            )
+
+    if not source_banks:
+        raise ValueError("no notes remained after MIDI segmentation")
+
+    required_tracks = sum(
+        math.ceil(len(source["unique_patterns"]) / MAX_PATTERNS_PER_TRACK)
+        for source in source_banks
+    )
+    if required_tracks > MAX_INSTRUMENT_TRACKS:
+        raise ValueError(
+            f"MIDI needs {required_tracks} instrument pattern banks after reusing "
+            f"identical 4-bar sections; OP-XY has {MAX_INSTRUMENT_TRACKS} "
+            f"instrument tracks with {MAX_PATTERNS_PER_TRACK} patterns each. "
+            "Simplify source lanes or import a shorter range."
+        )
+
+    reserved_tracks = {source["source_track"] for source in source_banks}
+    free_tracks = [
+        track
+        for track in range(1, MAX_INSTRUMENT_TRACKS + 1)
+        if track not in reserved_tracks
+    ]
+    track_patterns: Dict[int, List[List[Note]]] = {}
+    template_tracks: Dict[int, int] = {}
+
+    for source in source_banks:
+        source_track = source["source_track"]
+        bank_count = math.ceil(
+            len(source["unique_patterns"]) / MAX_PATTERNS_PER_TRACK
+        )
+        hosts = [source_track]
+        while len(hosts) < bank_count:
+            if not free_tracks:
+                raise ValueError("could not allocate an instrument pattern bank")
+            hosts.append(free_tracks.pop(0))
+        source["hosts"] = hosts
+
+        for bank_index, host in enumerate(hosts):
+            begin = bank_index * MAX_PATTERNS_PER_TRACK
+            track_patterns[host] = source["unique_patterns"][
+                begin : begin + MAX_PATTERNS_PER_TRACK
+            ]
+            template_tracks[host] = source_track
+
+    scenes: List[Dict[int, int]] = [{} for _ in range(scene_count)]
+    scene_mutes: List[set[int]] = [set() for _ in range(scene_count)]
+    for source in source_banks:
+        for scene_index in range(scene_count):
+            scene_mutes[scene_index].update(source["hosts"])
+            unique_index = source["window_indices"][scene_index]
+            if unique_index is None:
+                continue
+            bank_index = unique_index // MAX_PATTERNS_PER_TRACK
+            host = source["hosts"][bank_index]
+            scenes[scene_index][host] = unique_index % MAX_PATTERNS_PER_TRACK
+            scene_mutes[scene_index].discard(host)
+
+    return BankedArrangement(
+        track_patterns=track_patterns,
+        template_tracks=template_tracks,
+        scenes=scenes,
+        scene_mutes=[sorted(mutes) for mutes in scene_mutes],
+        active_tracks=sorted(track_patterns),
+    )
+
+
 def _count_active_patterns(patterns: List[Optional[List[Note]]]) -> int:
     return sum(1 for p in patterns if p)
 
@@ -959,6 +1102,8 @@ def build_json_payload(
     template_path: str,
     xy_output_path: str,
     num_patterns: int,
+    banked_arrangement: BankedArrangement | None = None,
+    bpm: float | None = None,
 ) -> dict:
     """Build a schema-valid JSON payload for tools/spec_to_xy_image.py."""
 
@@ -968,6 +1113,26 @@ def build_json_payload(
         "output": xy_output_path,
         "tracks": [],
     }
+    if bpm is not None:
+        payload["tempo_bpm"] = bpm
+
+    if banked_arrangement is not None:
+        for track, patterns in sorted(banked_arrangement.track_patterns.items()):
+            payload["tracks"].append(
+                {
+                    "track": track,
+                    "patterns": [_notes_to_json(notes) for notes in patterns],
+                }
+            )
+        payload["scenes"] = banked_arrangement.scenes
+        payload["scene_mutes"] = banked_arrangement.scene_mutes
+        payload["song_chain"] = list(range(num_patterns))
+        payload["track_template_sources"] = banked_arrangement.template_tracks
+        payload["force_scene_presence"] = True
+        # MIDI conversion can add velocity-1 step-one anchors for safe
+        # pattern timing. Keep them in the JSON route just like direct export.
+        payload["min_velocity"] = 1
+        return payload
 
     if num_patterns == 1:
         # Compiler one-pattern form: include only tracks with actual notes.
@@ -1016,42 +1181,32 @@ def convert_to_xy(
     bpm: float,
     num_patterns: int,
     track_patterns: Dict[int, List[Optional[List[Note]]]],
+    banked_arrangement: BankedArrangement | None = None,
 ) -> None:
     """Emit .xy directly via decoded-image arrangement assembly."""
 
     print(f"Loading baseline: {baseline_path}")
+    banked_arrangement = banked_arrangement or bank_track_patterns(
+        track_patterns, num_patterns
+    )
     image_patterns: dict[int, list[list[dict] | dict]] = {}
     total_notes = 0
-    for slot in range(1, 9):
-        patterns = track_patterns.get(slot, [None] * num_patterns)
-        normalized: list[list[dict] | dict] = []
-        for notes in patterns:
-            concrete = _notes_to_json(notes) if notes else []
-            total_notes += len(concrete)
-            normalized.append(concrete)
-        if any(normalized):
-            image_patterns[slot] = normalized
+    for patterns in track_patterns.values():
+        total_notes += sum(len(notes) for notes in patterns if notes)
+    for slot, patterns in banked_arrangement.track_patterns.items():
+        image_patterns[slot] = [_notes_to_json(notes) for notes in patterns]
 
     if not image_patterns:
         raise ValueError("no notes after conversion")
 
-    scenes = None
-    song_chain = None
-    if num_patterns > 1:
-        scenes = [
-            {
-                track: min(pattern_idx, len(patterns) - 1)
-                for track, patterns in image_patterns.items()
-            }
-            for pattern_idx in range(num_patterns)
-        ]
-        song_chain = list(range(num_patterns))
-
     data = build_arrangement(
         baseline_path,
         image_patterns,
-        scenes=scenes,
-        song_chain=song_chain,
+        scenes=banked_arrangement.scenes,
+        scene_mutes=banked_arrangement.scene_mutes,
+        song_chain=list(range(num_patterns)),
+        template_tracks=banked_arrangement.template_tracks,
+        force_scene_presence=True,
     )
     project = ImageProject.from_bytes(data)
     project.set_tempo(bpm)
@@ -1059,7 +1214,10 @@ def convert_to_xy(
     out = Path(output_path)
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_bytes(data)
-    print(f"Converted: {total_notes} notes across {len(image_patterns)} tracks")
+    print(
+        f"Converted: {total_notes} timeline notes across "
+        f"{len(image_patterns)} instrument pattern banks"
+    )
     print(f"Wrote {len(data)} bytes -> {out}")
 
 
@@ -1074,12 +1232,11 @@ def _auto_detect_patterns(midi_path: str, start_bar: int) -> int:
     max_tick = 0
     for notes in lane_notes.values():
         for n in notes:
-            max_tick = max(max_tick, n.abs_tick)
+            max_tick = max(max_tick, n.abs_tick + n.gate_ticks)
 
-    total_bars = max_tick // ticks_per_bar + 1
+    total_bars = max(1, math.ceil(max_tick / ticks_per_bar))
     remaining_bars = max(1, total_bars - start_bar)
-    patterns = min(9, math.ceil(remaining_bars / 4))
-    return max(1, patterns)
+    return max(1, math.ceil(remaining_bars / 4))
 
 
 def _pick_default_output(input_path: str, fmt: str) -> str:
@@ -1165,7 +1322,7 @@ def main() -> None:
         "--patterns",
         type=int,
         default=None,
-        help="Number of 4-bar patterns (1-9, default: auto-detect)",
+        help="Number of 4-bar Song scenes (1-96, default: full MIDI length)",
     )
     parser.add_argument(
         "--bpm",
@@ -1191,12 +1348,18 @@ def main() -> None:
         start_bar = 0
 
     if args.patterns is not None:
-        num_patterns = max(1, min(9, args.patterns))
+        num_patterns = max(1, args.patterns)
     elif args.bars:
         num_patterns = 1
     else:
         num_patterns = _auto_detect_patterns(args.input, start_bar)
-        print(f"Auto-detected {num_patterns} pattern(s) from song length")
+        print(f"Auto-detected {num_patterns} four-bar scene(s) from song length")
+
+    if num_patterns > MAX_SONG_SCENES:
+        raise ValueError(
+            f"MIDI needs {num_patterns} four-bar scenes, but one OP-XY Song "
+            f"supports at most {MAX_SONG_SCENES}. Split the MIDI into shorter projects."
+        )
 
     if args.info:
         mid = mido.MidiFile(args.input)
@@ -1242,6 +1405,27 @@ def main() -> None:
     print()
 
     track_patterns = build_track_patterns(selection, tpb, start_bar, num_patterns)
+    try:
+        banked_arrangement = bank_track_patterns(track_patterns, num_patterns)
+    except ValueError as primary_error:
+        # Derived drum/chord layers are optional conveniences. If they would
+        # consume an instrument bank needed by the source MIDI, preserve the
+        # complete source timeline instead.
+        source_only_patterns = build_track_patterns(
+            selection,
+            tpb,
+            start_bar,
+            num_patterns,
+            include_derived_parts=False,
+        )
+        try:
+            banked_arrangement = bank_track_patterns(
+                source_only_patterns, num_patterns
+            )
+            track_patterns = source_only_patterns
+            print("Omitted derived secondary parts to preserve the full MIDI timeline")
+        except ValueError:
+            raise primary_error
 
     # Keep output summaries concise but clear.
     for slot in range(1, 9):
@@ -1260,6 +1444,8 @@ def main() -> None:
             template_path=template_path,
             xy_output_path=xy_output,
             num_patterns=num_patterns,
+            banked_arrangement=banked_arrangement,
+            bpm=bpm,
         )
         write_json_spec(payload, output_path)
         print(f"JSON tracks emitted: {len(payload['tracks'])}")
@@ -1272,6 +1458,7 @@ def main() -> None:
         bpm=bpm,
         num_patterns=num_patterns,
         track_patterns=track_patterns,
+        banked_arrangement=banked_arrangement,
     )
 
 

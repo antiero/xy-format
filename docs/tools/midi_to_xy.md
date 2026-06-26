@@ -12,13 +12,21 @@ python3 tools/midi_to_xy.py song.mid --new-project --bpm 98 -o output/from-midi/
 ```
 
 The tool starts from the known-good blank baseline, splits the MIDI into
-4-bar OP-XY patterns, assigns useful source lanes to OP-XY tracks by role,
-creates scene/song state, sets the MIDI tempo, and writes a decoded-image
-authored `.xy`.
+4-bar windows, assigns useful source lanes to OP-XY tracks by role, creates
+scene/song state, sets the MIDI tempo, and writes a decoded-image authored
+`.xy`.
+
+OP-XY has a hard limit of nine patterns per instrument track. The importer
+therefore stores each distinct 4-bar window once, reuses it from later Song
+scenes, and uses a spare instrument track as a muted pattern bank when a
+source lane needs more than nine distinct windows. This preserves the full
+timeline for songs up to 96 four-bar scenes (384 bars). It stops with a clear
+error rather than silently truncating longer projects or arrangements that
+cannot fit into eight instrument pattern banks.
 
 Useful options:
 
-- `--patterns N`: force the number of 4-bar patterns, up to 9.
+- `--patterns N`: force the number of 4-bar Song scenes, up to 96.
 - `--start-bar N`: start from a later bar.
 - `--bpm N`: override the output project tempo when MIDI metadata is wrong.
 - `--info`: print lane scoring and pattern density without writing a file.

@@ -236,3 +236,29 @@ def test_json_payload_is_schema_valid_for_compiler() -> None:
     assert "descriptor_strategy" not in payload
     assert len(payload["tracks"]) == 8
     assert all(len(track["patterns"]) == 2 for track in payload["tracks"])
+
+
+def test_long_timeline_banks_tenth_unique_pattern_and_keeps_all_scenes() -> None:
+    tool = _load_midi_tool_module()
+    windows = [
+        [
+            {
+                "step": 1,
+                "note": 48,
+                "velocity": 100,
+                "tick_offset": 0,
+                "gate_ticks": 480 + index,
+            }
+        ]
+        for index in range(10)
+    ]
+
+    banked = tool.bank_track_patterns({1: windows}, scene_count=10)
+
+    assert banked.active_tracks == [1, 2]
+    assert [len(banked.track_patterns[track]) for track in banked.active_tracks] == [9, 1]
+    assert banked.template_tracks == {1: 1, 2: 1}
+    assert banked.scenes[:9] == [{1: index} for index in range(9)]
+    assert banked.scenes[9] == {2: 0}
+    assert all(2 in muted for muted in banked.scene_mutes[:9])
+    assert banked.scene_mutes[9] == [1]

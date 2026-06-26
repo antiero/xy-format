@@ -9,10 +9,13 @@ import {
 import {
   buildArrangementFromBytes,
   ImageProject,
+  SCENE_COUNT,
+  SONG_MAX_CHAIN,
   STEP_TICKS,
   TRACK_COUNT,
   type PatternNoteInput,
   type TrackPatternMap,
+  type TrackTemplateMap,
 } from "./image_writer";
 import {
   buildProjectViewModel,
@@ -58,7 +61,9 @@ type SelectionResult = {
 export type MidiImportSummary = {
   bpm: number;
   ticksPerBeat: number;
+  /** Legacy name for the number of four-bar timeline windows. */
   patterns: number;
+  scenes: number;
   totalBars: number;
   importedNotes: number;
   activeTracks: number[];
@@ -114,6 +119,8 @@ const ROLE_MIN_ACTIVE_BARS: Record<Role, number> = {
 };
 
 const MAX_NOTES_PER_PATTERN = 120;
+const MAX_PATTERNS_PER_TRACK = 9;
+const INSTRUMENT_TRACK_COUNT = 8;
 
 const GM_TO_OPXY_DRUM: Record<number, number> = {
   35: 48,
@@ -705,6 +712,7 @@ function buildTrackPatterns(
   midiTpb: number,
   startBar: number,
   numPatterns: number,
+  includeDerivedParts = true,
 ): Map<number, Array<PatternNoteInput[] | null>> {
   const trackPatterns = new Map<number, Array<PatternNoteInput[] | null>>();
   const drumPrimary =
@@ -733,7 +741,12 @@ function buildTrackPatterns(
           patternStart,
           4,
         );
-      } else if (role === "drum" && drumPrimary && deriveMissingRoles) {
+      } else if (
+        includeDerivedParts &&
+        role === "drum" &&
+        drumPrimary &&
+        deriveMissingRoles
+      ) {
         const base = selectBarWindow(
           drumPrimary.notesAll,
           midiTpb,
@@ -741,7 +754,12 @@ function buildTrackPatterns(
           4,
         );
         sourceNotes = deriveSecondaryDrumWindow(base);
-      } else if (role === "chord" && chordPrimary && deriveMissingRoles) {
+      } else if (
+        includeDerivedParts &&
+        role === "chord" &&
+        chordPrimary &&
+        deriveMissingRoles
+      ) {
         const base = selectBarWindow(
           chordPrimary.notesAll,
           midiTpb,
@@ -779,7 +797,7 @@ function autoDetectPatterns(
   }
   const totalBars = Math.max(1, Math.ceil(maxTick / ticksPerBar));
   const remainingBars = Math.max(1, totalBars - startBar);
-  return Math.max(1, Math.min(9, Math.ceil(remainingBars / 4)));
+  return Math.max(1, Math.ceil(remainingBars / 4));
 }
 
 function firstTempoBpm(midi: MidiData): number {
@@ -804,19 +822,163 @@ function outputFileName(inputName: string): string {
   return `${cleaned}.xy`;
 }
 
-function activePatternMap(
+type BankedArrangement = {
+  trackPatterns: TrackPatternMap;
+  trackTemplates: TrackTemplateMap;
+  sceneRows: number[][];
+  sceneMutes: boolean[][];
+  activeTracks: number[];
+};
+
+type SourcePatternBank = {
+  sourceTrack: number;
+  uniquePatterns: PatternNoteInput[][];
+  windowPatternIndexes: Array<number | null>;
+  hosts: number[];
+};
+
+function patternSignature(pattern: PatternNoteInput[]): string {
+  return pattern
+    .map((note) => {
+      const tickOffset = note.tickOffset ?? note.tick_offset ?? 0;
+      const gateTicks = note.gateTicks ?? note.gate_ticks ?? 240;
+      return [
+        note.step,
+        note.note,
+        note.velocity ?? 100,
+        tickOffset,
+        gateTicks,
+      ].join(":");
+    })
+    .join("|");
+}
+
+/**
+ * Convert a timeline of 4-bar windows into device-valid pattern banks.
+ *
+ * OP-XY exposes only nine patterns on each instrument track, but Song mode
+ * can chain 96 scenes. Repeated windows are stored once and selected again
+ * by later scenes. A source lane with more than nine distinct windows is
+ * spread over spare instrument tracks; the scene mutes every non-selected
+ * bank so only one copy of that lane plays at a time.
+ */
+function bankTrackPatterns(
   patterns: Map<number, Array<PatternNoteInput[] | null>>,
-): TrackPatternMap {
-  const out: TrackPatternMap = {};
-  for (const [track, trackPatterns] of patterns) {
-    if (!trackPatterns.some((pattern) => pattern && pattern.length > 0))
-      continue;
-    out[track] = trackPatterns.map((pattern) => ({
-      steps: 64,
-      notes: pattern ?? [],
-    }));
+  sceneCount: number,
+): BankedArrangement {
+  const sources: SourcePatternBank[] = [];
+
+  for (const [sourceTrack, windows] of Array.from(patterns.entries()).sort(
+    ([a], [b]) => a - b,
+  )) {
+    const uniqueBySignature = new Map<string, number>();
+    const uniquePatterns: PatternNoteInput[][] = [];
+    const windowPatternIndexes: Array<number | null> = [];
+
+    for (const window of windows) {
+      if (!window || window.length === 0) {
+        windowPatternIndexes.push(null);
+        continue;
+      }
+      const key = patternSignature(window);
+      let patternIndex = uniqueBySignature.get(key);
+      if (patternIndex === undefined) {
+        patternIndex = uniquePatterns.length;
+        uniqueBySignature.set(key, patternIndex);
+        uniquePatterns.push(window);
+      }
+      windowPatternIndexes.push(patternIndex);
+    }
+
+    if (uniquePatterns.length > 0) {
+      sources.push({
+        sourceTrack,
+        uniquePatterns,
+        windowPatternIndexes,
+        hosts: [],
+      });
+    }
   }
-  return out;
+
+  if (sources.length === 0) {
+    throw new Error("No notes remained after MIDI segmentation.");
+  }
+
+  const requiredTracks = sources.reduce(
+    (total, source) =>
+      total + Math.ceil(source.uniquePatterns.length / MAX_PATTERNS_PER_TRACK),
+    0,
+  );
+  if (requiredTracks > INSTRUMENT_TRACK_COUNT) {
+    throw new Error(
+      `This MIDI needs ${requiredTracks} instrument pattern banks after reusing identical 4-bar sections; OP-XY has ${INSTRUMENT_TRACK_COUNT} instrument tracks with ${MAX_PATTERNS_PER_TRACK} patterns each. Simplify source lanes or import a shorter range.`,
+    );
+  }
+
+  const reservedTracks = new Set(sources.map((source) => source.sourceTrack));
+  const freeTracks = Array.from(
+    { length: INSTRUMENT_TRACK_COUNT },
+    (_, index) => index + 1,
+  ).filter((track) => !reservedTracks.has(track));
+  const out: TrackPatternMap = {};
+  const trackTemplates: TrackTemplateMap = {};
+
+  for (const source of sources) {
+    const bankCount = Math.ceil(
+      source.uniquePatterns.length / MAX_PATTERNS_PER_TRACK,
+    );
+    source.hosts = [source.sourceTrack];
+    while (source.hosts.length < bankCount) {
+      const host = freeTracks.shift();
+      if (host === undefined) {
+        throw new Error("Could not allocate an instrument pattern bank.");
+      }
+      source.hosts.push(host);
+    }
+
+    source.hosts.forEach((host, bankIndex) => {
+      const begin = bankIndex * MAX_PATTERNS_PER_TRACK;
+      const bank = source.uniquePatterns.slice(
+        begin,
+        begin + MAX_PATTERNS_PER_TRACK,
+      );
+      out[host] = bank.map((notes) => ({ steps: 64, notes }));
+      trackTemplates[host] = source.sourceTrack;
+    });
+  }
+
+  const sceneRows = Array.from({ length: sceneCount }, () =>
+    Array(TRACK_COUNT).fill(0),
+  );
+  const sceneMutes = Array.from({ length: sceneCount }, () =>
+    Array(TRACK_COUNT).fill(false),
+  );
+  for (const source of sources) {
+    for (let sceneIndex = 0; sceneIndex < sceneCount; sceneIndex++) {
+      for (const host of source.hosts) {
+        sceneMutes[sceneIndex][host - 1] = true;
+      }
+      const uniquePatternIndex = source.windowPatternIndexes[sceneIndex];
+      if (uniquePatternIndex === null || uniquePatternIndex === undefined) {
+        continue;
+      }
+      const bankIndex = Math.floor(uniquePatternIndex / MAX_PATTERNS_PER_TRACK);
+      const host = source.hosts[bankIndex];
+      sceneRows[sceneIndex][host - 1] =
+        uniquePatternIndex % MAX_PATTERNS_PER_TRACK;
+      sceneMutes[sceneIndex][host - 1] = false;
+    }
+  }
+
+  return {
+    trackPatterns: out,
+    trackTemplates,
+    sceneRows,
+    sceneMutes,
+    activeTracks: Object.keys(out)
+      .map((track) => Number(track))
+      .sort((a, b) => a - b),
+  };
 }
 
 function notesPerPatternByTrack(
@@ -847,6 +1009,11 @@ export function buildMidiProjectFromBytes(
   const startBar = 0;
   const laneNotes = extractMidiParts(midi);
   const numPatterns = autoDetectPatterns(laneNotes, ticksPerBeat, startBar);
+  if (numPatterns > SONG_MAX_CHAIN || numPatterns > SCENE_COUNT) {
+    throw new Error(
+      `This MIDI needs ${numPatterns} four-bar scenes, but one OP-XY Song supports at most ${SONG_MAX_CHAIN}. Split the MIDI into shorter projects.`,
+    );
+  }
   const totalBars = numPatterns * 4;
   const selection = selectBestParts(
     laneNotes,
@@ -858,37 +1025,50 @@ export function buildMidiProjectFromBytes(
     throw new Error("No usable MIDI note lanes were found.");
   }
 
-  const trackPatterns = buildTrackPatterns(
+  let trackPatterns = buildTrackPatterns(
     selection,
     ticksPerBeat,
     startBar,
     numPatterns,
   );
-  const arrangementMap = activePatternMap(trackPatterns);
-  if (Object.keys(arrangementMap).length === 0) {
-    throw new Error("No notes remained after MIDI segmentation.");
+  let banked: BankedArrangement;
+  try {
+    banked = bankTrackPatterns(trackPatterns, numPatterns);
+  } catch (error) {
+    // Secondary drum/chord parts are generated conveniences, not source MIDI.
+    // Prefer the complete source timeline when those extras would consume the
+    // final instrument bank needed by a long arrangement.
+    const sourceOnlyPatterns = buildTrackPatterns(
+      selection,
+      ticksPerBeat,
+      startBar,
+      numPatterns,
+      false,
+    );
+    try {
+      banked = bankTrackPatterns(sourceOnlyPatterns, numPatterns);
+      trackPatterns = sourceOnlyPatterns;
+    } catch {
+      throw error;
+    }
   }
 
   const arrangementBytes = buildArrangementFromBytes(
     baselineBytes,
-    arrangementMap,
+    banked.trackPatterns,
+    banked.trackTemplates,
   );
   const imageProject = ImageProject.fromBytes(arrangementBytes);
   const bpm = options.bpmOverride ?? firstTempoBpm(midi);
   imageProject.setTempo(bpm);
 
-  const activeTracks = Object.keys(arrangementMap)
-    .map((track) => Number(track))
-    .sort((a, b) => a - b);
+  const activeTracks = banked.activeTracks;
   for (let sceneIndex = 0; sceneIndex < numPatterns; sceneIndex++) {
-    const row = Array(TRACK_COUNT).fill(0);
-    for (const track of activeTracks) {
-      row[track - 1] = Math.min(
-        sceneIndex,
-        imageProject.getPatternCount(track) - 1,
-      );
-    }
-    imageProject.setSceneRow(sceneIndex, row, Array(TRACK_COUNT).fill(false));
+    imageProject.setSceneRow(
+      sceneIndex,
+      banked.sceneRows[sceneIndex],
+      banked.sceneMutes[sceneIndex],
+    );
   }
   imageProject.setSongChain(
     0,
@@ -900,6 +1080,7 @@ export function buildMidiProjectFromBytes(
     bpm,
     ticksPerBeat,
     patterns: numPatterns,
+    scenes: numPatterns,
     totalBars,
     importedNotes: Object.values(notesPerPatternByTrack(trackPatterns))
       .flat()

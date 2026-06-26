@@ -47,6 +47,7 @@ export type ArrangementPatternInput =
     };
 
 export type TrackPatternMap = Record<number, ArrangementPatternInput[]>;
+export type TrackTemplateMap = Record<number, number>;
 
 export type RawNoteRecord = {
   id: string;
@@ -343,6 +344,7 @@ export function trackDataEndFromImage(image: Uint8Array): number | null {
 export function buildArrangementFromBytes(
   baselineBytes: Uint8Array,
   trackPatterns: TrackPatternMap,
+  trackTemplates: TrackTemplateMap = {},
 ): Uint8Array {
   const { header, image: base } = decodeProject(baselineBytes);
   const starts = leaderStartsFromImage(base);
@@ -354,7 +356,15 @@ export function buildArrangementFromBytes(
 
   for (let track = 1; track <= TRACK_COUNT; track++) {
     const start = starts[track - 1];
-    const baseStruct = base.subarray(start, start + TRACK_STRIDE);
+    const templateTrack = trackTemplates[track] ?? track;
+    if (templateTrack < 1 || templateTrack > TRACK_COUNT) {
+      throw new Error(`invalid template track ${templateTrack} for T${track}`);
+    }
+    const templateStart = starts[templateTrack - 1];
+    const baseStruct = base.subarray(
+      templateStart,
+      templateStart + TRACK_STRIDE,
+    );
     const tail =
       track === TRACK_COUNT
         ? base.subarray(start + TRACK_STRIDE)
