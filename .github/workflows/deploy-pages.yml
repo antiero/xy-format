@@ -54,7 +54,7 @@ jobs:
 
       - name: Build project
         working-directory: ./web
-        run: npm run build -- --base=/${{ github.event.repository.name }}/
+        run: npm run build
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
