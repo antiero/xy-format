@@ -41,6 +41,8 @@
   let importFileName = "";
   let projectFileName = "";
   let readyExport: ReadyProjectExport | null = null;
+  let importedMidiFile: File | null = null;
+  let midiSelectionUpdating = false;
 
   $: counts = $projectStore
     ? validationCounts($projectStore.validation)
@@ -50,6 +52,8 @@
     loadError = "";
     importSummary = null;
     readyExport = null;
+    importedMidiFile = null;
+    midiSelectionUpdating = false;
     try {
       const project = await loadXYFile(file);
       projectStore.set(project);
@@ -72,11 +76,14 @@
     loadError = "";
     importSummary = null;
     readyExport = null;
+    importedMidiFile = null;
+    midiSelectionUpdating = false;
     announceDisplayMessage(`IMPORT ${file.name}`, "neutral");
     try {
       const result = await loadMidiFileAsNewProject(file);
       projectStore.set(result.project);
       importSummary = result.summary;
+      importedMidiFile = file;
       importFileName = file.name;
       projectFileName = normalizeXYFileName(result.project.fileName);
       projectCreated = false;
@@ -93,6 +100,40 @@
           ? error.message
           : "Could not import this MIDI file.";
       announceDisplayMessage("IMPORT FAILED", "error");
+    }
+  }
+
+  async function updateMidiTrackSelection(trackIds: string[]) {
+    if (!importedMidiFile) return;
+
+    loadError = "";
+    readyExport = null;
+    midiSelectionUpdating = true;
+    isPlayingStore.set(false);
+    currentTickStore.set(0);
+    announceDisplayMessage("UPDATING TRACKS", "neutral");
+
+    try {
+      const result = await loadMidiFileAsNewProject(importedMidiFile, {
+        selectedTrackIds: trackIds,
+      });
+      projectStore.set(result.project);
+      importSummary = result.summary;
+      projectFileName = normalizeXYFileName(result.project.fileName);
+      projectCreated = false;
+      announceDisplayMessage(
+        `MIDI ${result.summary.activeTracks.length} TRACKS`,
+        "ok",
+      );
+    } catch (error) {
+      console.error(error);
+      loadError =
+        error instanceof Error
+          ? error.message
+          : "Could not rebuild this MIDI selection.";
+      announceDisplayMessage("TRACK UPDATE FAILED", "error");
+    } finally {
+      midiSelectionUpdating = false;
     }
   }
 
@@ -248,8 +289,8 @@
 
   {#if $projectStore}
     <header class="workflow-topbar">
-      <a class="workflow-brand" href="/" aria-label="XY Project Lab home">
-        xy project lab
+      <a class="workflow-brand" href="/" aria-label="XY Buddy home">
+        xy buddy
       </a>
       <div class="workflow-actions">
         <label class="project-name-control">
@@ -281,14 +322,16 @@
         {importSummary}
         {projectFileName}
         {counts}
+        {midiSelectionUpdating}
         onReplaceMidi={() => midiFileInput.click()}
         onCreateProject={createXYProject}
+        onMidiTrackSelectionChange={updateMidiTrackSelection}
       />
     {/if}
   {:else}
     <section class="launch-surface" aria-label="OP-XY project launcher">
-      <div class="launch-brand" aria-label="XY Project Lab">
-        <span>xy project lab</span>
+      <div class="launch-brand" aria-label="XY buddy">
+        <span>xy buddy</span>
         <span>op-xy project utility</span>
       </div>
 

@@ -31,7 +31,7 @@ class AudioService {
       this.synth.connect(this.context.destination);
 
       // Fetch default soundfont
-      const response = await fetch(`${basePath}soundfont/A320U.sf2`);
+      const response = await fetch(`${basePath}soundfont/DefaultBankGM.sf2`);
       const arrayBuffer = await response.arrayBuffer();
 
       await this.synth.soundBankManager.addSoundBank(arrayBuffer, "main");

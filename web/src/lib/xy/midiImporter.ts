@@ -22,7 +22,9 @@ import {
   type XYProjectViewModel,
 } from "./projectViewModel";
 
-type Role = "drum" | "bass" | "lead" | "chord";
+export type MidiImportRole = "drum" | "bass" | "lead" | "chord";
+
+type Role = MidiImportRole;
 type LaneKey = `${number}:${number}`;
 
 type MidiNote = {
@@ -58,6 +60,51 @@ type SelectionResult = {
   droppedDuplicates: Array<[PartCandidate, PartCandidate, number]>;
 };
 
+export type MidiPreviewNote = {
+  id: string;
+  start16ths: number;
+  duration16ths: number;
+  note: number;
+  velocity: number;
+};
+
+export type MidiTrackSelectionOption = {
+  id: LaneKey;
+  midiTrackIndex: number;
+  channel: number;
+  name: string;
+  role: MidiImportRole;
+  isDrum: boolean;
+  noteCount: number;
+  uniquePitches: number;
+  activeBars: number;
+  pitchMin: number;
+  pitchMax: number;
+  start16ths: number;
+  end16ths: number;
+  uniquePatternCount: number;
+  bankCount: number;
+  previewNotes: MidiPreviewNote[];
+};
+
+export type MidiTrackSelectionSummary = {
+  tracks: MidiTrackSelectionOption[];
+  selectedTrackIds: LaneKey[];
+  requiredBankCount: number;
+  selectedBankCount: number;
+  maxInstrumentTracks: number;
+  maxPatternsPerTrack: number;
+  isSelectionRecommended: boolean;
+  warning: string | null;
+  sourceTotalBars: number;
+  sourceTotal16ths: number;
+  rangeStart16ths: number;
+  rangeEnd16ths: number;
+  rangeWasAutoFit: boolean;
+  totalBars: number;
+  total16ths: number;
+};
+
 export type MidiImportSummary = {
   bpm: number;
   ticksPerBeat: number;
@@ -65,9 +112,15 @@ export type MidiImportSummary = {
   patterns: number;
   scenes: number;
   totalBars: number;
+  sourceTotalBars: number;
+  sourceTotal16ths: number;
+  rangeStart16ths: number;
+  rangeEnd16ths: number;
+  rangeWasAutoFit: boolean;
   importedNotes: number;
   activeTracks: number[];
   notesPerPatternByTrack: Record<number, number[]>;
+  trackSelection: MidiTrackSelectionSummary | null;
 };
 
 export type MidiImportResult = {
@@ -77,6 +130,10 @@ export type MidiImportResult = {
 
 export type MidiImportOptions = {
   bpmOverride?: number;
+  selectedTrackIds?: string[];
+  rangeStart16ths?: number;
+  rangeEnd16ths?: number;
+  fitToCapacity?: boolean;
 };
 
 const ROLE_SLOTS: Record<number, Role> = {
@@ -119,8 +176,11 @@ const ROLE_MIN_ACTIVE_BARS: Record<Role, number> = {
 };
 
 const MAX_NOTES_PER_PATTERN = 120;
+const MAX_PREVIEW_NOTES_PER_TRACK = 900;
 const MAX_PATTERNS_PER_TRACK = 9;
 const INSTRUMENT_TRACK_COUNT = 8;
+const BAR_16THS = 16;
+const PATTERN_16THS = BAR_16THS * 4;
 
 const GM_TO_OPXY_DRUM: Record<number, number> = {
   35: 48,
@@ -173,6 +233,28 @@ function laneKey(trackIndex: number, channel: number): LaneKey {
 function splitLaneKey(key: LaneKey): [number, number] {
   const [track, channel] = key.split(":").map((part) => Number(part));
   return [track, channel];
+}
+
+function candidateId(candidate: PartCandidate): LaneKey {
+  return laneKey(candidate.key[0], candidate.key[1]);
+}
+
+function midiTrackNames(midi: MidiData): string[] {
+  return midi.tracks.map((track, index) => {
+    const nameEvent = track.find(
+      (event) => event.type === "trackName" && event.text.trim().length > 0,
+    );
+    return nameEvent?.type === "trackName"
+      ? nameEvent.text.trim()
+      : `MIDI track ${index + 1}`;
+  });
+}
+
+function bestRole(candidate: PartCandidate): Role {
+  if (candidate.isDrumChannel) return "drum";
+  return (["bass", "lead", "chord"] as Role[]).reduce((best, role) =>
+    candidate.roleScores[role] > candidate.roleScores[best] ? role : best,
+  );
 }
 
 function jaccardSimilarity(a: Set<string>, b: Set<string>): number {
@@ -243,17 +325,95 @@ function selectBarWindow(
   return notes.filter((note) => lo <= note.absTick && note.absTick < hi);
 }
 
+function ticksPer16th(midiTpb: number): number {
+  return midiTpb / 4;
+}
+
+function select16thWindow(
+  notes: MidiNote[],
+  midiTpb: number,
+  start16ths: number,
+  duration16ths: number,
+): MidiNote[] {
+  const tick16th = ticksPer16th(midiTpb);
+  const lo = start16ths * tick16th;
+  const hi = (start16ths + duration16ths) * tick16th;
+  return notes.filter((note) => lo <= note.absTick && note.absTick < hi);
+}
+
+function midiSourceTotal16ths(
+  laneNotes: Map<LaneKey, MidiNote[]>,
+  midiTpb: number,
+): number {
+  const tick16th = ticksPer16th(midiTpb);
+  let maxTick = 0;
+  for (const notes of laneNotes.values()) {
+    for (const note of notes) {
+      maxTick = Math.max(maxTick, note.absTick + note.gateTicks);
+    }
+  }
+  return Math.max(BAR_16THS, Math.ceil(maxTick / tick16th));
+}
+
+type ImportRange = {
+  start16ths: number;
+  end16ths: number;
+  total16ths: number;
+  totalBars: number;
+  numPatterns: number;
+};
+
+function rangeFromPatternCount(
+  start16ths: number,
+  numPatterns: number,
+): ImportRange {
+  const total16ths = Math.max(PATTERN_16THS, numPatterns * PATTERN_16THS);
+  return {
+    start16ths,
+    end16ths: start16ths + total16ths,
+    total16ths,
+    totalBars: total16ths / BAR_16THS,
+    numPatterns: Math.max(1, numPatterns),
+  };
+}
+
+function normalizeImportRange(
+  options: MidiImportOptions,
+  sourceTotal16ths: number,
+): ImportRange {
+  const maxPatterns = Math.min(SCENE_COUNT, SONG_MAX_CHAIN);
+  const sourceEnd = Math.max(BAR_16THS, sourceTotal16ths);
+  const start16ths = Math.max(
+    0,
+    Math.min(sourceEnd - 1, Math.round(options.rangeStart16ths ?? 0)),
+  );
+  const requestedEnd = Math.max(
+    start16ths + BAR_16THS,
+    Math.min(sourceEnd, Math.round(options.rangeEnd16ths ?? sourceEnd)),
+  );
+  const requestedPatterns = Math.ceil(
+    (requestedEnd - start16ths) / PATTERN_16THS,
+  );
+  const availablePatterns = Math.max(
+    1,
+    Math.ceil((sourceEnd - start16ths) / PATTERN_16THS),
+  );
+  return rangeFromPatternCount(
+    start16ths,
+    Math.min(requestedPatterns, availablePatterns, maxPatterns),
+  );
+}
+
 function partFingerprint(
   notesWindow: MidiNote[],
   midiTpb: number,
-  startBar: number,
+  start16ths: number,
   isDrumChannel: boolean,
 ): Set<string> {
   const sig = new Set<string>();
   if (notesWindow.length === 0) return sig;
 
-  const ticksPerBar = midiTpb * 4;
-  const lo = startBar * ticksPerBar;
+  const lo = start16ths * ticksPer16th(midiTpb);
   const scale = 1920 / midiTpb;
   for (const note of notesWindow) {
     const relTick = note.absTick - lo;
@@ -342,15 +502,21 @@ function candidateUtility(args: {
 function buildPartCandidates(
   laneNotes: Map<LaneKey, MidiNote[]>,
   midiTpb: number,
-  startBar: number,
-  totalBars: number,
+  start16ths: number,
+  total16ths: number,
 ): PartCandidate[] {
-  const ticksPerBar = midiTpb * 4;
-  const lo = startBar * ticksPerBar;
+  const totalBars = Math.max(1, Math.ceil(total16ths / BAR_16THS));
+  const tick16th = ticksPer16th(midiTpb);
+  const lo = start16ths * tick16th;
   const candidates: PartCandidate[] = [];
 
   for (const [key, notesAll] of laneNotes) {
-    const notesWindow = selectBarWindow(notesAll, midiTpb, startBar, totalBars);
+    const notesWindow = select16thWindow(
+      notesAll,
+      midiTpb,
+      start16ths,
+      total16ths,
+    );
     if (notesWindow.length < 3) continue;
 
     const pitches = notesWindow.map((note) => note.note);
@@ -365,7 +531,10 @@ function buildPartCandidates(
     for (const note of notesWindow) {
       const bar = Math.max(
         0,
-        Math.min(totalBars - 1, Math.floor((note.absTick - lo) / ticksPerBar)),
+        Math.min(
+          totalBars - 1,
+          Math.floor((note.absTick - lo) / (tick16th * BAR_16THS)),
+        ),
       );
       bars.add(bar);
     }
@@ -424,7 +593,7 @@ function buildPartCandidates(
       fingerprint: partFingerprint(
         notesWindow,
         midiTpb,
-        startBar,
+        start16ths,
         isDrumChannel,
       ),
     });
@@ -598,21 +767,66 @@ function assignPartsToSlots(
   return assignments;
 }
 
+function assignSelectedPartsToSlots(
+  candidates: PartCandidate[],
+): Map<number, PartCandidate> {
+  const assignments = new Map<number, PartCandidate>();
+  const openSlots = new Set(
+    Array.from({ length: INSTRUMENT_TRACK_COUNT }, (_, index) => index + 1),
+  );
+  const preferredSlots: Record<Role, number[]> = {
+    drum: [1, 2],
+    bass: [3],
+    lead: [4, 5, 6],
+    chord: [7, 8],
+  };
+  const melodicSlots = [3, 4, 5, 6, 7, 8];
+
+  function takeSlot(candidate: PartCandidate): number | undefined {
+    const role = bestRole(candidate);
+    const slotOrder = [
+      ...preferredSlots[role],
+      ...(candidate.isDrumChannel ? [] : melodicSlots),
+      ...Array.from(
+        { length: INSTRUMENT_TRACK_COUNT },
+        (_, index) => index + 1,
+      ),
+    ];
+    for (const slot of slotOrder) {
+      if (!openSlots.has(slot)) continue;
+      openSlots.delete(slot);
+      return slot;
+    }
+    return undefined;
+  }
+
+  for (const candidate of candidates) {
+    const slot = takeSlot(candidate);
+    if (slot === undefined) break;
+    assignments.set(slot, candidate);
+  }
+
+  return assignments;
+}
+
 function selectBestParts(
   laneNotes: Map<LaneKey, MidiNote[]>,
   midiTpb: number,
-  startBar: number,
-  totalBars: number,
+  start16ths: number,
+  total16ths: number,
 ): SelectionResult {
   const candidates = buildPartCandidates(
     laneNotes,
     midiTpb,
-    startBar,
-    totalBars,
+    start16ths,
+    total16ths,
   );
   const [rankedParts, droppedDuplicates] = dedupeCandidates(candidates);
   return {
-    assignments: assignPartsToSlots(rankedParts, totalBars),
+    assignments: assignPartsToSlots(
+      rankedParts,
+      Math.max(1, Math.ceil(total16ths / BAR_16THS)),
+    ),
     rankedParts,
     droppedDuplicates,
   };
@@ -621,16 +835,15 @@ function selectBestParts(
 function midiToXyNotes(
   midiNotes: MidiNote[],
   midiTpb: number,
-  startBar: number,
+  start16ths: number,
   isDrum: boolean,
 ): PatternNoteInput[] {
-  const ticksPerBarMidi = midiTpb * 4;
-  const barOffset = startBar * ticksPerBarMidi;
+  const tickOffsetMidi = start16ths * ticksPer16th(midiTpb);
   const scale = 1920 / midiTpb;
   const xyNotes: PatternNoteInput[] = [];
 
   for (const note of midiNotes) {
-    const midiTickInPattern = note.absTick - barOffset;
+    const midiTickInPattern = note.absTick - tickOffsetMidi;
     let xyTick = Math.round(midiTickInPattern * scale);
     xyTick = Math.round(xyTick / STEP_TICKS) * STEP_TICKS;
     const step0 = Math.floor(xyTick / STEP_TICKS);
@@ -710,7 +923,7 @@ function deriveSecondaryChordWindow(notesWindow: MidiNote[]): MidiNote[] {
 function buildTrackPatterns(
   selection: SelectionResult,
   midiTpb: number,
-  startBar: number,
+  start16ths: number,
   numPatterns: number,
   includeDerivedParts = true,
 ): Map<number, Array<PatternNoteInput[] | null>> {
@@ -732,14 +945,14 @@ function buildTrackPatterns(
     const patterns: Array<PatternNoteInput[] | null> = [];
 
     for (let patternIndex = 0; patternIndex < numPatterns; patternIndex++) {
-      const patternStart = startBar + patternIndex * 4;
+      const patternStart16ths = start16ths + patternIndex * PATTERN_16THS;
       let sourceNotes: MidiNote[] = [];
       if (candidate) {
-        sourceNotes = selectBarWindow(
+        sourceNotes = select16thWindow(
           candidate.notesAll,
           midiTpb,
-          patternStart,
-          4,
+          patternStart16ths,
+          PATTERN_16THS,
         );
       } else if (
         includeDerivedParts &&
@@ -747,11 +960,11 @@ function buildTrackPatterns(
         drumPrimary &&
         deriveMissingRoles
       ) {
-        const base = selectBarWindow(
+        const base = select16thWindow(
           drumPrimary.notesAll,
           midiTpb,
-          patternStart,
-          4,
+          patternStart16ths,
+          PATTERN_16THS,
         );
         sourceNotes = deriveSecondaryDrumWindow(base);
       } else if (
@@ -760,18 +973,23 @@ function buildTrackPatterns(
         chordPrimary &&
         deriveMissingRoles
       ) {
-        const base = selectBarWindow(
+        const base = select16thWindow(
           chordPrimary.notesAll,
           midiTpb,
-          patternStart,
-          4,
+          patternStart16ths,
+          PATTERN_16THS,
         );
         sourceNotes = deriveSecondaryChordWindow(base);
       }
 
       const xyNotes =
         sourceNotes.length > 0
-          ? midiToXyNotes(sourceNotes, midiTpb, patternStart, role === "drum")
+          ? midiToXyNotes(
+              sourceNotes,
+              midiTpb,
+              patternStart16ths,
+              role === "drum",
+            )
           : [];
       patterns.push(
         xyNotes.length > 0 ? xyNotes.slice(0, MAX_NOTES_PER_PATTERN) : null,
@@ -851,6 +1069,258 @@ function patternSignature(pattern: PatternNoteInput[]): string {
       ].join(":");
     })
     .join("|");
+}
+
+function candidatePatternBankCost(
+  candidate: PartCandidate,
+  midiTpb: number,
+  start16ths: number,
+  numPatterns: number,
+): Pick<MidiTrackSelectionOption, "uniquePatternCount" | "bankCount"> {
+  const uniqueSignatures = new Set<string>();
+
+  for (let patternIndex = 0; patternIndex < numPatterns; patternIndex++) {
+    const patternStart16ths = start16ths + patternIndex * PATTERN_16THS;
+    const sourceNotes = select16thWindow(
+      candidate.notesAll,
+      midiTpb,
+      patternStart16ths,
+      PATTERN_16THS,
+    );
+    const xyNotes =
+      sourceNotes.length > 0
+        ? midiToXyNotes(
+            sourceNotes,
+            midiTpb,
+            patternStart16ths,
+            candidate.isDrumChannel,
+          ).slice(0, MAX_NOTES_PER_PATTERN)
+        : [];
+    if (xyNotes.length > 0) uniqueSignatures.add(patternSignature(xyNotes));
+  }
+
+  const uniquePatternCount = uniqueSignatures.size;
+  return {
+    uniquePatternCount,
+    bankCount: Math.ceil(uniquePatternCount / MAX_PATTERNS_PER_TRACK),
+  };
+}
+
+function candidatePreviewNotes(
+  candidate: PartCandidate,
+  midiTpb: number,
+): MidiPreviewNote[] {
+  const tick16th = ticksPer16th(midiTpb);
+  const stride = Math.max(
+    1,
+    Math.ceil(candidate.notesWindow.length / MAX_PREVIEW_NOTES_PER_TRACK),
+  );
+  const notes: MidiPreviewNote[] = [];
+
+  for (let index = 0; index < candidate.notesWindow.length; index += stride) {
+    const note = candidate.notesWindow[index];
+    notes.push({
+      id: `${candidateId(candidate)}:${index}`,
+      start16ths: Math.max(0, note.absTick / tick16th),
+      duration16ths: Math.max(0.125, note.gateTicks / tick16th),
+      note: candidate.isDrumChannel ? remapDrumNote(note.note) : note.note,
+      velocity: note.velocity,
+    });
+  }
+
+  return notes;
+}
+
+function buildTrackSelectionOption(
+  candidate: PartCandidate,
+  trackNames: string[],
+  midiTpb: number,
+  start16ths: number,
+  numPatterns: number,
+): MidiTrackSelectionOption {
+  const id = candidateId(candidate);
+  const [midiTrackIndex, midiChannel] = candidate.key;
+  const baseName =
+    trackNames[midiTrackIndex] ?? `MIDI track ${midiTrackIndex + 1}`;
+  const displayName =
+    baseName.trim().length > 0
+      ? baseName.trim()
+      : `MIDI track ${midiTrackIndex + 1}`;
+  const previewNotes = candidatePreviewNotes(candidate, midiTpb);
+  const start16ths =
+    previewNotes.length > 0
+      ? Math.min(...previewNotes.map((note) => note.start16ths))
+      : 0;
+  const end16ths =
+    previewNotes.length > 0
+      ? Math.max(
+          ...previewNotes.map((note) => note.start16ths + note.duration16ths),
+        )
+      : start16ths + 1;
+
+  return {
+    id,
+    midiTrackIndex,
+    channel: midiChannel + 1,
+    name: displayName,
+    role: bestRole(candidate),
+    isDrum: candidate.isDrumChannel,
+    noteCount: candidate.noteCount,
+    uniquePitches: candidate.uniquePitches,
+    activeBars: candidate.activeBars,
+    pitchMin: candidate.pitchMin,
+    pitchMax: candidate.pitchMax,
+    start16ths,
+    end16ths,
+    ...candidatePatternBankCost(candidate, midiTpb, start16ths, numPatterns),
+    previewNotes,
+  };
+}
+
+function bankLimitWarning(requiredBankCount: number): string {
+  return `OP-XY has ${INSTRUMENT_TRACK_COUNT} instrument tracks - which tracks will you pick?!.`;
+}
+
+function buildTrackSelectionSummary(args: {
+  options: MidiTrackSelectionOption[];
+  selectedTrackIds: LaneKey[];
+  sourceTotal16ths: number;
+  range: ImportRange;
+  rangeWasAutoFit: boolean;
+  totalBars: number;
+}): MidiTrackSelectionSummary | null {
+  const {
+    options,
+    selectedTrackIds,
+    sourceTotal16ths,
+    range,
+    rangeWasAutoFit,
+    totalBars,
+  } = args;
+  if (options.length === 0) return null;
+
+  const selected = new Set(selectedTrackIds);
+  const requiredBankCount = options.reduce(
+    (sum, option) => sum + option.bankCount,
+    0,
+  );
+  const selectedBankCount = options.reduce(
+    (sum, option) => sum + (selected.has(option.id) ? option.bankCount : 0),
+    0,
+  );
+  const isSelectionRecommended =
+    requiredBankCount > INSTRUMENT_TRACK_COUNT ||
+    options.length > INSTRUMENT_TRACK_COUNT;
+
+  return {
+    tracks: options,
+    selectedTrackIds,
+    requiredBankCount,
+    selectedBankCount,
+    maxInstrumentTracks: INSTRUMENT_TRACK_COUNT,
+    maxPatternsPerTrack: MAX_PATTERNS_PER_TRACK,
+    isSelectionRecommended,
+    warning: isSelectionRecommended
+      ? bankLimitWarning(requiredBankCount)
+      : null,
+    sourceTotalBars: Math.max(1, Math.ceil(sourceTotal16ths / BAR_16THS)),
+    sourceTotal16ths,
+    rangeStart16ths: range.start16ths,
+    rangeEnd16ths: range.end16ths,
+    rangeWasAutoFit,
+    totalBars,
+    total16ths: totalBars * BAR_16THS,
+  };
+}
+
+function selectedCandidateList(
+  rankedParts: PartCandidate[],
+  selectedTrackIds: string[],
+): PartCandidate[] {
+  const selectedOrder = new Map(
+    selectedTrackIds.map((id, index) => [id, index] as const),
+  );
+  return rankedParts
+    .filter((candidate) => selectedOrder.has(candidateId(candidate)))
+    .sort(
+      (a, b) =>
+        (selectedOrder.get(candidateId(a)) ?? 0) -
+        (selectedOrder.get(candidateId(b)) ?? 0),
+    );
+}
+
+function defaultSelectedTrackIds(
+  rankedParts: PartCandidate[],
+  optionsById: Map<LaneKey, MidiTrackSelectionOption>,
+): LaneKey[] {
+  const selected: LaneKey[] = [];
+  let bankCount = 0;
+
+  for (const candidate of rankedParts) {
+    const id = candidateId(candidate);
+    const option = optionsById.get(id);
+    if (!option) continue;
+    if (selected.length >= INSTRUMENT_TRACK_COUNT) continue;
+    if (bankCount + option.bankCount > INSTRUMENT_TRACK_COUNT) continue;
+    selected.push(id);
+    bankCount += option.bankCount;
+  }
+
+  return selected;
+}
+
+function bankCountForSelectedCandidates(args: {
+  candidates: PartCandidate[];
+  selectedTrackIds: readonly string[];
+  midiTpb: number;
+  start16ths: number;
+  numPatterns: number;
+}): number {
+  const selected = new Set(args.selectedTrackIds);
+  return args.candidates.reduce((sum, candidate) => {
+    if (!selected.has(candidateId(candidate))) return sum;
+    return (
+      sum +
+      candidatePatternBankCost(
+        candidate,
+        args.midiTpb,
+        args.start16ths,
+        args.numPatterns,
+      ).bankCount
+    );
+  }, 0);
+}
+
+function maxSafeRangeForSelected(args: {
+  candidates: PartCandidate[];
+  selectedTrackIds: readonly string[];
+  midiTpb: number;
+  start16ths: number;
+  sourceTotal16ths: number;
+}): ImportRange | null {
+  const maxPatterns = Math.min(
+    SCENE_COUNT,
+    SONG_MAX_CHAIN,
+    Math.max(
+      1,
+      Math.ceil((args.sourceTotal16ths - args.start16ths) / PATTERN_16THS),
+    ),
+  );
+  let lastSafe: ImportRange | null = null;
+
+  for (let numPatterns = 1; numPatterns <= maxPatterns; numPatterns += 1) {
+    const bankCount = bankCountForSelectedCandidates({
+      candidates: args.candidates,
+      selectedTrackIds: args.selectedTrackIds,
+      midiTpb: args.midiTpb,
+      start16ths: args.start16ths,
+      numPatterns,
+    });
+    if (bankCount > INSTRUMENT_TRACK_COUNT) break;
+    lastSafe = rangeFromPatternCount(args.start16ths, numPatterns);
+  }
+
+  return lastSafe;
 }
 
 /**
@@ -1006,21 +1476,123 @@ export function buildMidiProjectFromBytes(
     throw new Error("SMPTE-timed MIDI files are not supported yet.");
   }
 
-  const startBar = 0;
   const laneNotes = extractMidiParts(midi);
-  const numPatterns = autoDetectPatterns(laneNotes, ticksPerBeat, startBar);
-  if (numPatterns > SONG_MAX_CHAIN || numPatterns > SCENE_COUNT) {
-    throw new Error(
-      `This MIDI needs ${numPatterns} four-bar scenes, but one OP-XY Song supports at most ${SONG_MAX_CHAIN}. Split the MIDI into shorter projects.`,
+  const trackNames = midiTrackNames(midi);
+  const sourceTotal16ths = midiSourceTotal16ths(laneNotes, ticksPerBeat);
+  let range = normalizeImportRange(options, sourceTotal16ths);
+  let rangeWasAutoFit = false;
+
+  function buildSelectionForRange(currentRange: ImportRange) {
+    const fullSelection = selectBestParts(
+      laneNotes,
+      ticksPerBeat,
+      currentRange.start16ths,
+      currentRange.total16ths,
     );
+    const trackOptions = fullSelection.rankedParts
+      .map((candidate) =>
+        buildTrackSelectionOption(
+          candidate,
+          trackNames,
+          ticksPerBeat,
+          currentRange.start16ths,
+          currentRange.numPatterns,
+        ),
+      )
+      .sort(
+        (a, b) =>
+          a.midiTrackIndex - b.midiTrackIndex ||
+          a.channel - b.channel ||
+          b.noteCount - a.noteCount,
+      );
+    const optionsById = new Map(
+      trackOptions.map((option) => [option.id, option]),
+    );
+    const requiredBankCount = trackOptions.reduce(
+      (sum, option) => sum + option.bankCount,
+      0,
+    );
+    return { fullSelection, trackOptions, optionsById, requiredBankCount };
   }
-  const totalBars = numPatterns * 4;
-  const selection = selectBestParts(
-    laneNotes,
-    ticksPerBeat,
-    startBar,
-    totalBars,
+
+  let rangeSelection = buildSelectionForRange(range);
+  const shouldUseExplicitSelection =
+    options.selectedTrackIds !== undefined ||
+    rangeSelection.requiredBankCount > INSTRUMENT_TRACK_COUNT ||
+    rangeSelection.trackOptions.length > INSTRUMENT_TRACK_COUNT;
+
+  let selection = rangeSelection.fullSelection;
+  let includeDerivedParts = true;
+  let selectedTrackIds: LaneKey[] = Array.from(
+    new Set(
+      Array.from(rangeSelection.fullSelection.assignments.values()).map((candidate) =>
+        candidateId(candidate),
+      ),
+    ),
   );
+
+  if (shouldUseExplicitSelection) {
+    selectedTrackIds =
+      options.selectedTrackIds === undefined
+        ? defaultSelectedTrackIds(
+            rangeSelection.fullSelection.rankedParts,
+            rangeSelection.optionsById,
+          )
+        : options.selectedTrackIds.filter((id): id is LaneKey =>
+            rangeSelection.optionsById.has(id as LaneKey),
+          );
+    let selectedBankCount = selectedTrackIds.reduce(
+      (sum, id) => sum + (rangeSelection.optionsById.get(id)?.bankCount ?? 0),
+      0,
+    );
+    if (
+      selectedBankCount > INSTRUMENT_TRACK_COUNT &&
+      options.fitToCapacity &&
+      selectedTrackIds.length <= INSTRUMENT_TRACK_COUNT
+    ) {
+      const safeRange = maxSafeRangeForSelected({
+        candidates: rangeSelection.fullSelection.rankedParts,
+        selectedTrackIds,
+        midiTpb: ticksPerBeat,
+        start16ths: range.start16ths,
+        sourceTotal16ths,
+      });
+      if (safeRange) {
+        range = safeRange;
+        rangeWasAutoFit = true;
+        rangeSelection = buildSelectionForRange(range);
+        selectedTrackIds = selectedTrackIds.filter((id): id is LaneKey =>
+          rangeSelection.optionsById.has(id as LaneKey),
+        );
+        selectedBankCount = selectedTrackIds.reduce(
+          (sum, id) =>
+            sum + (rangeSelection.optionsById.get(id)?.bankCount ?? 0),
+          0,
+        );
+      }
+    }
+
+    if (
+      selectedTrackIds.length > INSTRUMENT_TRACK_COUNT ||
+      selectedBankCount > INSTRUMENT_TRACK_COUNT
+    ) {
+      throw new Error(
+        `Selected MIDI tracks need ${selectedBankCount} OP-XY instrument pattern banks; choose ${INSTRUMENT_TRACK_COUNT} or fewer.`,
+      );
+    }
+
+    const selectedCandidates = selectedCandidateList(
+      rangeSelection.fullSelection.rankedParts,
+      selectedTrackIds,
+    );
+    selection = {
+      ...rangeSelection.fullSelection,
+      assignments: assignSelectedPartsToSlots(selectedCandidates),
+      rankedParts: selectedCandidates,
+    };
+    includeDerivedParts = false;
+  }
+
   if (selection.assignments.size === 0) {
     throw new Error("No usable MIDI note lanes were found.");
   }
@@ -1028,25 +1600,27 @@ export function buildMidiProjectFromBytes(
   let trackPatterns = buildTrackPatterns(
     selection,
     ticksPerBeat,
-    startBar,
-    numPatterns,
+    range.start16ths,
+    range.numPatterns,
+    includeDerivedParts,
   );
   let banked: BankedArrangement;
   try {
-    banked = bankTrackPatterns(trackPatterns, numPatterns);
+    banked = bankTrackPatterns(trackPatterns, range.numPatterns);
   } catch (error) {
     // Secondary drum/chord parts are generated conveniences, not source MIDI.
     // Prefer the complete source timeline when those extras would consume the
     // final instrument bank needed by a long arrangement.
+    if (!includeDerivedParts) throw error;
     const sourceOnlyPatterns = buildTrackPatterns(
       selection,
       ticksPerBeat,
-      startBar,
-      numPatterns,
+      range.start16ths,
+      range.numPatterns,
       false,
     );
     try {
-      banked = bankTrackPatterns(sourceOnlyPatterns, numPatterns);
+      banked = bankTrackPatterns(sourceOnlyPatterns, range.numPatterns);
       trackPatterns = sourceOnlyPatterns;
     } catch {
       throw error;
@@ -1063,7 +1637,7 @@ export function buildMidiProjectFromBytes(
   imageProject.setTempo(bpm);
 
   const activeTracks = banked.activeTracks;
-  for (let sceneIndex = 0; sceneIndex < numPatterns; sceneIndex++) {
+  for (let sceneIndex = 0; sceneIndex < range.numPatterns; sceneIndex++) {
     imageProject.setSceneRow(
       sceneIndex,
       banked.sceneRows[sceneIndex],
@@ -1072,21 +1646,34 @@ export function buildMidiProjectFromBytes(
   }
   imageProject.setSongChain(
     0,
-    Array.from({ length: numPatterns }, (_, index) => index),
+    Array.from({ length: range.numPatterns }, (_, index) => index),
     true,
   );
 
   const summary: MidiImportSummary = {
     bpm,
     ticksPerBeat,
-    patterns: numPatterns,
-    scenes: numPatterns,
-    totalBars,
+    patterns: range.numPatterns,
+    scenes: range.numPatterns,
+    totalBars: range.totalBars,
+    sourceTotalBars: Math.max(1, Math.ceil(sourceTotal16ths / BAR_16THS)),
+    sourceTotal16ths,
+    rangeStart16ths: range.start16ths,
+    rangeEnd16ths: range.end16ths,
+    rangeWasAutoFit,
     importedNotes: Object.values(notesPerPatternByTrack(trackPatterns))
       .flat()
       .reduce((sum, count) => sum + count, 0),
     activeTracks,
     notesPerPatternByTrack: notesPerPatternByTrack(trackPatterns),
+    trackSelection: buildTrackSelectionSummary({
+      options: rangeSelection.trackOptions,
+      selectedTrackIds,
+      sourceTotal16ths,
+      range,
+      rangeWasAutoFit,
+      totalBars: range.totalBars,
+    }),
   };
 
   return {

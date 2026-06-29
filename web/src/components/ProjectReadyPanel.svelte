@@ -1,6 +1,7 @@
 <script lang="ts">
   import type { MidiImportSummary } from "../lib/xy/midiImporter";
   import type { XYProjectViewModel } from "../lib/xy/projectViewModel";
+  import MidiTrackSelector from "./MidiTrackSelector.svelte";
 
   export let project: XYProjectViewModel;
   export let importSummary: MidiImportSummary | null;
@@ -8,14 +9,40 @@
   export let counts: { errors: number; warnings: number; info: number };
   export let onReplaceMidi: () => void;
   export let onCreateProject: () => void;
+  export let onMidiTrackSelectionChange: (
+    trackIds: string[],
+  ) => void = () => {};
+  export let midiSelectionUpdating = false;
+
+  $: trackSelection = importSummary?.trackSelection ?? null;
+  $: showTrackSelection =
+    !!trackSelection &&
+    (trackSelection.isSelectionRecommended ||
+      trackSelection.tracks.length > trackSelection.maxInstrumentTracks);
+  $: displayedTrackCount = trackSelection
+    ? trackSelection.selectedTrackIds.length
+    : (importSummary?.activeTracks.length ?? 0);
 </script>
 
-<section class="project-ready" aria-label="MIDI project ready to create">
+<section
+  class="project-ready"
+  class:wide={showTrackSelection}
+  aria-label="MIDI project ready to create"
+>
   <p class="workflow-kicker">MIDI imported</p>
   <h1>{projectFileName || "project.xy"}</h1>
   <p class="project-ready-copy">
     Scenes are arranged in sequence and ready to write as an OP–XY project.
   </p>
+
+  {#if showTrackSelection && trackSelection}
+    <MidiTrackSelector
+      {project}
+      selection={trackSelection}
+      selectionUpdating={midiSelectionUpdating}
+      onSelectionChange={onMidiTrackSelectionChange}
+    />
+  {/if}
 
   <dl class="import-details">
     <div>
@@ -26,7 +53,7 @@
     </div>
     <div>
       <dt>tracks</dt>
-      <dd>{importSummary?.activeTracks.length ?? 0}</dd>
+      <dd>{displayedTrackCount}</dd>
     </div>
     <div>
       <dt>tempo</dt>
@@ -48,8 +75,11 @@
 
   <div class="project-ready-actions">
     <button type="button" on:click={onReplaceMidi}>replace MIDI</button>
-    <button type="button" class="primary" on:click={onCreateProject}
-      >create .xy project</button
+    <button
+      type="button"
+      class="primary"
+      disabled={midiSelectionUpdating}
+      on:click={onCreateProject}>create .xy project</button
     >
   </div>
 </section>
@@ -59,6 +89,11 @@
     width: min(720px, 100%);
     margin: auto;
     padding: clamp(36px, 10vh, 112px) clamp(20px, 5vw, 48px);
+  }
+
+  .project-ready.wide {
+    width: min(1280px, 100%);
+    padding-top: clamp(26px, 5vh, 54px);
   }
 
   .workflow-kicker {

@@ -157,6 +157,74 @@ function longDistinctDrumMidi(): Uint8Array {
   return new Uint8Array(writeMidi(data));
 }
 
+function manyMelodicTracksMidi(trackCount: number): Uint8Array {
+  const tpb = 480;
+  const bar = tpb * 4;
+  const tracks: MidiEvent[][] = [
+    [
+      {
+        deltaTime: 0,
+        type: "setTempo",
+        meta: true,
+        microsecondsPerBeat: Math.round(60_000_000 / 112),
+      },
+      { deltaTime: 0, type: "endOfTrack", meta: true },
+    ],
+  ];
+
+  for (let trackIndex = 0; trackIndex < trackCount; trackIndex++) {
+    const pitch = 48 + trackIndex;
+    const noteEvents: Array<{
+      tick: number;
+      event: Omit<MidiEvent, "deltaTime">;
+    }> = [
+      {
+        tick: 0,
+        event: {
+          type: "trackName",
+          meta: true,
+          text: `Source ${trackIndex + 1}`,
+        },
+      },
+    ];
+
+    for (let barIndex = 0; barIndex < 8; barIndex++) {
+      const onset = barIndex * bar;
+      noteEvents.push(
+        {
+          tick: onset,
+          event: {
+            type: "noteOn",
+            channel: trackIndex % 8,
+            noteNumber: pitch,
+            velocity: 82,
+          },
+        },
+        {
+          tick: onset + tpb,
+          event: {
+            type: "noteOff",
+            channel: trackIndex % 8,
+            noteNumber: pitch,
+            velocity: 0,
+          },
+        },
+      );
+    }
+
+    tracks.push([
+      ...makeTrackFromAbsolute(noteEvents),
+      { deltaTime: 0, type: "endOfTrack", meta: true },
+    ]);
+  }
+
+  const data: MidiData = {
+    header: { format: 1, numTracks: tracks.length, ticksPerBeat: tpb },
+    tracks,
+  };
+  return new Uint8Array(writeMidi(data));
+}
+
 describe("MIDI new-project importer", () => {
   it("reuses a repeated chord pattern across Song scenes without duplicating a second chord slot", () => {
     const baseline = new Uint8Array(readFileSync(BASELINE));
@@ -218,5 +286,43 @@ describe("MIDI new-project importer", () => {
       patternByTrack: expect.arrayContaining([0, 0]),
       mutedTracks: expect.arrayContaining([true, false]),
     });
+  });
+
+  it("constrains over-capacity MIDI files with selectable source lanes", () => {
+    const baseline = new Uint8Array(readFileSync(BASELINE));
+    const midi = manyMelodicTracksMidi(10);
+    const result = buildMidiProjectFromBytes(midi, "many.mid", baseline);
+
+    expect(result.summary.trackSelection).toMatchObject({
+      isSelectionRecommended: true,
+      requiredBankCount: 10,
+      selectedBankCount: 8,
+      totalBars: 8,
+      total16ths: 128,
+    });
+    expect(result.summary.trackSelection?.tracks).toHaveLength(10);
+    expect(result.summary.trackSelection?.tracks[0]).toMatchObject({
+      name: "Source 1",
+      noteCount: 8,
+      bankCount: 1,
+    });
+    expect(result.summary.trackSelection?.selectedTrackIds).toHaveLength(8);
+    expect(result.summary.activeTracks).toHaveLength(8);
+  });
+
+  it("uses explicit selected MIDI source lanes for project generation", () => {
+    const baseline = new Uint8Array(readFileSync(BASELINE));
+    const midi = manyMelodicTracksMidi(10);
+    const result = buildMidiProjectFromBytes(midi, "many.mid", baseline, {
+      selectedTrackIds: ["2:1", "4:3"],
+    });
+
+    expect(result.summary.trackSelection?.selectedTrackIds).toEqual([
+      "2:1",
+      "4:3",
+    ]);
+    expect(result.summary.trackSelection?.selectedBankCount).toBe(2);
+    expect(result.summary.activeTracks).toHaveLength(2);
+    expect(result.summary.importedNotes).toBe(16);
   });
 });
