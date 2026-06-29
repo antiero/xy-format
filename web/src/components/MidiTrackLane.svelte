@@ -67,7 +67,7 @@
         type="checkbox"
         checked={selected}
         disabled={selectionUpdating}
-        on:change={() => onToggle(track)}
+        on:click|preventDefault={() => onToggle(track)}
         aria-label={`Include ${track.name}`}
       />
       <span aria-hidden="true"></span>

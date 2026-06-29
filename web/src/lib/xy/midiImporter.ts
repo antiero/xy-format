@@ -1147,7 +1147,7 @@ function buildTrackSelectionOption(
       ? baseName.trim()
       : `MIDI track ${midiTrackIndex + 1}`;
   const previewNotes = candidatePreviewNotes(candidate, midiTpb);
-  const start16ths =
+  const trackStart16ths =
     previewNotes.length > 0
       ? Math.min(...previewNotes.map((note) => note.start16ths))
       : 0;
@@ -1156,7 +1156,7 @@ function buildTrackSelectionOption(
       ? Math.max(
           ...previewNotes.map((note) => note.start16ths + note.duration16ths),
         )
-      : start16ths + 1;
+      : trackStart16ths + 1;
 
   return {
     id,
@@ -1170,7 +1170,7 @@ function buildTrackSelectionOption(
     activeBars: candidate.activeBars,
     pitchMin: candidate.pitchMin,
     pitchMax: candidate.pitchMax,
-    start16ths,
+    start16ths: trackStart16ths,
     end16ths,
     ...candidatePatternBankCost(candidate, midiTpb, start16ths, numPatterns),
     previewNotes,
@@ -1475,17 +1475,18 @@ export function buildMidiProjectFromBytes(
   if (!ticksPerBeat) {
     throw new Error("SMPTE-timed MIDI files are not supported yet.");
   }
+  const midiTpb = ticksPerBeat;
 
   const laneNotes = extractMidiParts(midi);
   const trackNames = midiTrackNames(midi);
-  const sourceTotal16ths = midiSourceTotal16ths(laneNotes, ticksPerBeat);
+  const sourceTotal16ths = midiSourceTotal16ths(laneNotes, midiTpb);
   let range = normalizeImportRange(options, sourceTotal16ths);
   let rangeWasAutoFit = false;
 
   function buildSelectionForRange(currentRange: ImportRange) {
     const fullSelection = selectBestParts(
       laneNotes,
-      ticksPerBeat,
+      midiTpb,
       currentRange.start16ths,
       currentRange.total16ths,
     );
@@ -1494,7 +1495,7 @@ export function buildMidiProjectFromBytes(
         buildTrackSelectionOption(
           candidate,
           trackNames,
-          ticksPerBeat,
+          midiTpb,
           currentRange.start16ths,
           currentRange.numPatterns,
         ),
@@ -1525,8 +1526,8 @@ export function buildMidiProjectFromBytes(
   let includeDerivedParts = true;
   let selectedTrackIds: LaneKey[] = Array.from(
     new Set(
-      Array.from(rangeSelection.fullSelection.assignments.values()).map((candidate) =>
-        candidateId(candidate),
+      Array.from(rangeSelection.fullSelection.assignments.values()).map(
+        (candidate) => candidateId(candidate),
       ),
     ),
   );
@@ -1553,7 +1554,7 @@ export function buildMidiProjectFromBytes(
       const safeRange = maxSafeRangeForSelected({
         candidates: rangeSelection.fullSelection.rankedParts,
         selectedTrackIds,
-        midiTpb: ticksPerBeat,
+        midiTpb,
         start16ths: range.start16ths,
         sourceTotal16ths,
       });
@@ -1599,7 +1600,7 @@ export function buildMidiProjectFromBytes(
 
   let trackPatterns = buildTrackPatterns(
     selection,
-    ticksPerBeat,
+    midiTpb,
     range.start16ths,
     range.numPatterns,
     includeDerivedParts,
@@ -1614,7 +1615,7 @@ export function buildMidiProjectFromBytes(
     if (!includeDerivedParts) throw error;
     const sourceOnlyPatterns = buildTrackPatterns(
       selection,
-      ticksPerBeat,
+      midiTpb,
       range.start16ths,
       range.numPatterns,
       false,
@@ -1652,7 +1653,7 @@ export function buildMidiProjectFromBytes(
 
   const summary: MidiImportSummary = {
     bpm,
-    ticksPerBeat,
+    ticksPerBeat: midiTpb,
     patterns: range.numPatterns,
     scenes: range.numPatterns,
     totalBars: range.totalBars,

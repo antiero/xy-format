@@ -1,5 +1,8 @@
 <script lang="ts">
-  import type { MidiImportSummary } from "../lib/xy/midiImporter";
+  import type {
+    MidiImportOptions,
+    MidiImportSummary,
+  } from "../lib/xy/midiImporter";
   import type { XYProjectViewModel } from "../lib/xy/projectViewModel";
   import MidiTrackSelector from "./MidiTrackSelector.svelte";
 
@@ -8,17 +11,25 @@
   export let projectFileName: string;
   export let counts: { errors: number; warnings: number; info: number };
   export let onReplaceMidi: () => void;
-  export let onCreateProject: () => void;
+  export let onBurnMidiToSong: () => void;
   export let onMidiTrackSelectionChange: (
-    trackIds: string[],
+    options: MidiImportOptions,
   ) => void = () => {};
   export let midiSelectionUpdating = false;
 
   $: trackSelection = importSummary?.trackSelection ?? null;
-  $: showTrackSelection =
+  $: showMidiEditor =
     !!trackSelection &&
     (trackSelection.isSelectionRecommended ||
+      trackSelection.rangeStart16ths > 0 ||
+      trackSelection.rangeEnd16ths < trackSelection.sourceTotal16ths ||
       trackSelection.tracks.length > trackSelection.maxInstrumentTracks);
+  $: canBurnMidi =
+    !trackSelection ||
+    (trackSelection.selectedTrackIds.length > 0 &&
+      trackSelection.selectedTrackIds.length <=
+        trackSelection.maxInstrumentTracks &&
+      trackSelection.selectedBankCount <= trackSelection.maxInstrumentTracks);
   $: displayedTrackCount = trackSelection
     ? trackSelection.selectedTrackIds.length
     : (importSummary?.activeTracks.length ?? 0);
@@ -26,16 +37,16 @@
 
 <section
   class="project-ready"
-  class:wide={showTrackSelection}
+  class:wide={showMidiEditor}
   aria-label="MIDI project ready to create"
 >
   <p class="workflow-kicker">MIDI imported</p>
   <h1>{projectFileName || "project.xy"}</h1>
   <p class="project-ready-copy">
-    Scenes are arranged in sequence and ready to write as an OP–XY project.
+    is ready to send to OP–XY. Press Burn to preview song.
   </p>
 
-  {#if showTrackSelection && trackSelection}
+  {#if showMidiEditor && trackSelection}
     <MidiTrackSelector
       {project}
       selection={trackSelection}
@@ -78,8 +89,8 @@
     <button
       type="button"
       class="primary"
-      disabled={midiSelectionUpdating}
-      on:click={onCreateProject}>create .xy project</button
+      disabled={midiSelectionUpdating || !canBurnMidi}
+      on:click={onBurnMidiToSong}>burn MIDI to song</button
     >
   </div>
 </section>

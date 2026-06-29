@@ -225,6 +225,76 @@ function manyMelodicTracksMidi(trackCount: number): Uint8Array {
   return new Uint8Array(writeMidi(data));
 }
 
+function manyLongDistinctTracksMidi(trackCount: number): Uint8Array {
+  const tpb = 480;
+  const bar = tpb * 4;
+  const tracks: MidiEvent[][] = [
+    [
+      {
+        deltaTime: 0,
+        type: "setTempo",
+        meta: true,
+        microsecondsPerBeat: Math.round(60_000_000 / 120),
+      },
+      { deltaTime: 0, type: "endOfTrack", meta: true },
+    ],
+  ];
+
+  for (let trackIndex = 0; trackIndex < trackCount; trackIndex++) {
+    const noteEvents: Array<{
+      tick: number;
+      event: Omit<MidiEvent, "deltaTime">;
+    }> = [
+      {
+        tick: 0,
+        event: {
+          type: "trackName",
+          meta: true,
+          text: `Long ${trackIndex + 1}`,
+        },
+      },
+    ];
+
+    for (let pattern = 0; pattern < 10; pattern++) {
+      const pitch = 48 + trackIndex * 5 + pattern;
+      for (let barIndex = 0; barIndex < 4; barIndex++) {
+        const onset = (pattern * 4 + barIndex) * bar;
+        noteEvents.push(
+          {
+            tick: onset,
+            event: {
+              type: "noteOn",
+              channel: trackIndex,
+              noteNumber: pitch,
+              velocity: 88,
+            },
+          },
+          {
+            tick: onset + tpb,
+            event: {
+              type: "noteOff",
+              channel: trackIndex,
+              noteNumber: pitch,
+              velocity: 0,
+            },
+          },
+        );
+      }
+    }
+
+    tracks.push([
+      ...makeTrackFromAbsolute(noteEvents),
+      { deltaTime: 0, type: "endOfTrack", meta: true },
+    ]);
+  }
+
+  const data: MidiData = {
+    header: { format: 1, numTracks: tracks.length, ticksPerBeat: tpb },
+    tracks,
+  };
+  return new Uint8Array(writeMidi(data));
+}
+
 describe("MIDI new-project importer", () => {
   it("reuses a repeated chord pattern across Song scenes without duplicating a second chord slot", () => {
     const baseline = new Uint8Array(readFileSync(BASELINE));
@@ -324,5 +394,20 @@ describe("MIDI new-project importer", () => {
     expect(result.summary.trackSelection?.selectedBankCount).toBe(2);
     expect(result.summary.activeTracks).toHaveLength(2);
     expect(result.summary.importedNotes).toBe(16);
+  });
+
+  it("can fit an over-bank selection by shortening the MIDI range", () => {
+    const baseline = new Uint8Array(readFileSync(BASELINE));
+    const midi = manyLongDistinctTracksMidi(5);
+    const result = buildMidiProjectFromBytes(midi, "long-many.mid", baseline, {
+      selectedTrackIds: ["1:0", "2:1", "3:2", "4:3", "5:4"],
+      fitToCapacity: true,
+    });
+
+    expect(result.summary.rangeWasAutoFit).toBe(true);
+    expect(result.summary.totalBars).toBe(36);
+    expect(result.summary.sourceTotalBars).toBe(40);
+    expect(result.summary.trackSelection?.selectedBankCount).toBe(5);
+    expect(result.summary.activeTracks).toHaveLength(5);
   });
 });

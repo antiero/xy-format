@@ -202,8 +202,8 @@
 <section class="song-mode-workspace" aria-label="Song Mode preview">
   <div class="song-mode-context">
     <div>
-      <p>arrange · song mode</p>
-      <h2>Sequence scenes into a song.</h2>
+      <p>song mode preview</p>
+      <!-- <h2>Sequence scenes into a song.</h2> -->
     </div>
     <div class="song-mode-status">
       <span>{songEvents.length} notes</span>
@@ -271,10 +271,10 @@
             on:click={togglePlayback}
           >
             {$isPlayingStore
-              ? "stop"
+              ? "pause"
               : transportState === "loading"
                 ? "load"
-                : "play song"}
+                : "play"}
           </button>
           <button type="button" on:click={rewindPlayback}>rew</button>
           <span>{songSteps.length} scenes</span>

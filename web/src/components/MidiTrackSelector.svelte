@@ -8,6 +8,7 @@
     type PlaybackEvent,
   } from "../lib/xy/playback";
   import type {
+    MidiImportOptions,
     MidiTrackSelectionOption,
     MidiTrackSelectionSummary,
   } from "../lib/xy/midiImporter";
@@ -23,7 +24,7 @@
   export let selection: MidiTrackSelectionSummary;
   export let selectionUpdating = false;
   export let onSelectionChange: (
-    trackIds: string[],
+    options: MidiImportOptions,
   ) => void | Promise<void> = () => {};
 
   let animationFrame = 0;
@@ -33,6 +34,7 @@
   let playbackError = "";
   let selectionMessage = "";
   let lastSelectionKey = "";
+  let pendingFitTrackIds: string[] | null = null;
 
   $: selectedIds = new Set(selection.selectedTrackIds);
   $: song = project.songs[0];
@@ -52,11 +54,24 @@
   $: selectedTrackCount = selection.tracks.filter((track) =>
     selectedIds.has(track.id),
   ).length;
+  $: effectiveSelectedIds = new Set(
+    pendingFitTrackIds ?? selection.selectedTrackIds,
+  );
+  $: effectiveSelectedBankCount = selectedBankCount(effectiveSelectedIds);
+  $: cycleRangeValid =
+    effectiveSelectedIds.size > 0 &&
+    effectiveSelectedIds.size <= selection.maxInstrumentTracks &&
+    effectiveSelectedBankCount <= selection.maxInstrumentTracks;
   $: {
-    const key = selection.selectedTrackIds.join("|");
+    const key = [
+      selection.selectedTrackIds.join("|"),
+      selection.rangeStart16ths,
+      selection.rangeEnd16ths,
+    ].join(":");
     if (key !== lastSelectionKey) {
       lastSelectionKey = key;
       selectionMessage = "";
+      pendingFitTrackIds = null;
     }
   }
 
@@ -82,6 +97,23 @@
       .map((track) => track.id);
   }
 
+  function formatBarBeat(position16ths: number): string {
+    const whole = Math.max(0, Math.round(position16ths));
+    const bar = Math.floor(whole / 16) + 1;
+    const beat = Math.floor((whole % 16) / 4) + 1;
+    return `${bar}.${beat}`;
+  }
+
+  function rebuildMidi(options: MidiImportOptions) {
+    stopPlayback();
+    onSelectionChange({
+      selectedTrackIds: selection.selectedTrackIds,
+      rangeStart16ths: selection.rangeStart16ths,
+      rangeEnd16ths: selection.rangeEnd16ths,
+      ...options,
+    });
+  }
+
   function toggleTrack(track: MidiTrackSelectionOption) {
     const next = new Set(selectedIds);
     if (next.has(track.id)) {
@@ -100,12 +132,28 @@
       nextTrackCount > selection.maxInstrumentTracks ||
       nextBankCount > selection.maxInstrumentTracks
     ) {
-      selectionMessage = `Selection uses ${nextBankCount} OP-XY banks; limit is ${selection.maxInstrumentTracks}.`;
+      pendingFitTrackIds = selectedTrackIdsFrom(next);
+      selectionMessage = `Selection uses ${nextBankCount} OP-XY banks over this range; limit is ${selection.maxInstrumentTracks}.`;
       return;
     }
 
-    stopPlayback();
-    onSelectionChange(selectedTrackIdsFrom(next));
+    pendingFitTrackIds = null;
+    rebuildMidi({ selectedTrackIds: selectedTrackIdsFrom(next) });
+  }
+
+  function fitPendingSelection() {
+    if (!pendingFitTrackIds) return;
+    rebuildMidi({
+      selectedTrackIds: pendingFitTrackIds,
+      fitToCapacity: true,
+    });
+  }
+
+  function changeCycleRange(start16ths: number, end16ths: number) {
+    rebuildMidi({
+      rangeStart16ths: start16ths,
+      rangeEnd16ths: end16ths,
+    });
   }
 
   function schedulePlaybackEvent(event: PlaybackEvent) {
@@ -240,7 +288,7 @@
           ? "stop"
           : transportState === "loading"
             ? "load"
-            : "play selected"}
+            : "play"}
       </button>
       <button
         type="button"
@@ -249,23 +297,47 @@
       >
       <span>{project.tempoBpm.toFixed(1)} bpm</span>
       <span>{selection.totalBars} bars</span>
+      <span
+        >{formatBarBeat(selection.rangeStart16ths)}-{formatBarBeat(
+          selection.rangeEnd16ths,
+        )}</span
+      >
       {#if selectionUpdating}
         <span>updating</span>
       {/if}
       {#if selectionMessage || playbackError}
         <strong>{selectionMessage || playbackError}</strong>
       {/if}
+      {#if pendingFitTrackIds}
+        <button
+          type="button"
+          class="fit-track"
+          disabled={selectionUpdating}
+          on:click={fitPendingSelection}>fit track</button
+        >
+      {/if}
+      {#if selection.rangeWasAutoFit}
+        <strong>Fitted to {selection.totalBars} bars</strong>
+      {/if}
     </div>
 
     <MidiTrackCanvas
       {selection}
       {selectedIds}
-      {progress}
       playheadActive={$isPlayingStore || $currentTickStore > 0}
-      timelineLength16ths={songLength16ths}
+      timelineLength16ths={Math.max(
+        selection.sourceTotal16ths,
+        selection.rangeEnd16ths,
+      )}
+      playheadPosition16ths={selection.rangeStart16ths +
+        progress * songLength16ths}
+      cycleStart16ths={selection.rangeStart16ths}
+      cycleEnd16ths={selection.rangeEnd16ths}
+      {cycleRangeValid}
       {selectionUpdating}
       onToggle={toggleTrack}
       onSeek={seekPlayback}
+      onCycleChange={changeCycleRange}
     />
   </div>
 </section>

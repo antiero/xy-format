@@ -17,6 +17,7 @@
   import { loadXYFile } from "./lib/xy/projectLoader";
   import {
     loadMidiFileAsNewProject,
+    type MidiImportOptions,
     type MidiImportSummary,
   } from "./lib/xy/midiImporter";
   import { validationCounts } from "./lib/xy/validation";
@@ -42,6 +43,7 @@
   let projectFileName = "";
   let readyExport: ReadyProjectExport | null = null;
   let importedMidiFile: File | null = null;
+  let midiImportOptions: MidiImportOptions = {};
   let midiSelectionUpdating = false;
 
   $: counts = $projectStore
@@ -53,6 +55,7 @@
     importSummary = null;
     readyExport = null;
     importedMidiFile = null;
+    midiImportOptions = {};
     midiSelectionUpdating = false;
     try {
       const project = await loadXYFile(file);
@@ -77,6 +80,7 @@
     importSummary = null;
     readyExport = null;
     importedMidiFile = null;
+    midiImportOptions = {};
     midiSelectionUpdating = false;
     announceDisplayMessage(`IMPORT ${file.name}`, "neutral");
     try {
@@ -84,6 +88,11 @@
       projectStore.set(result.project);
       importSummary = result.summary;
       importedMidiFile = file;
+      midiImportOptions = {
+        selectedTrackIds: result.summary.trackSelection?.selectedTrackIds,
+        rangeStart16ths: result.summary.rangeStart16ths,
+        rangeEnd16ths: result.summary.rangeEnd16ths,
+      };
       importFileName = file.name;
       projectFileName = normalizeXYFileName(result.project.fileName);
       projectCreated = false;
@@ -103,7 +112,7 @@
     }
   }
 
-  async function updateMidiTrackSelection(trackIds: string[]) {
+  async function updateMidiTrackSelection(options: MidiImportOptions) {
     if (!importedMidiFile) return;
 
     loadError = "";
@@ -111,14 +120,27 @@
     midiSelectionUpdating = true;
     isPlayingStore.set(false);
     currentTickStore.set(0);
-    announceDisplayMessage("UPDATING TRACKS", "neutral");
+    announceDisplayMessage(
+      options.fitToCapacity ? "FITTING MIDI RANGE" : "UPDATING MIDI",
+      "neutral",
+    );
 
     try {
-      const result = await loadMidiFileAsNewProject(importedMidiFile, {
-        selectedTrackIds: trackIds,
-      });
+      const nextOptions = {
+        ...midiImportOptions,
+        ...options,
+      };
+      const result = await loadMidiFileAsNewProject(
+        importedMidiFile,
+        nextOptions,
+      );
       projectStore.set(result.project);
       importSummary = result.summary;
+      midiImportOptions = {
+        selectedTrackIds: result.summary.trackSelection?.selectedTrackIds,
+        rangeStart16ths: result.summary.rangeStart16ths,
+        rangeEnd16ths: result.summary.rangeEnd16ths,
+      };
       projectFileName = normalizeXYFileName(result.project.fileName);
       projectCreated = false;
       announceDisplayMessage(
@@ -234,8 +256,11 @@
     return readyExport;
   }
 
-  async function createXYProject() {
-    await createReadyExport(true);
+  async function burnMidiToSong() {
+    const exportData = await createReadyExport(false, false);
+    if (exportData) {
+      announceDisplayMessage("SONG READY", "ok");
+    }
   }
 
   async function downloadXYProject() {
@@ -304,9 +329,7 @@
           />
         </label>
         {#if projectCreated}
-          <button type="button" on:click={downloadXYProject}
-            >download .xy</button
-          >
+          <button type="button" on:click={downloadXYProject}>export .xy</button>
         {/if}
         <button type="button" on:click={() => midiFileInput.click()}
           >import MIDI</button
@@ -324,7 +347,7 @@
         {counts}
         {midiSelectionUpdating}
         onReplaceMidi={() => midiFileInput.click()}
-        onCreateProject={createXYProject}
+        onBurnMidiToSong={burnMidiToSong}
         onMidiTrackSelectionChange={updateMidiTrackSelection}
       />
     {/if}
@@ -332,7 +355,7 @@
     <section class="launch-surface" aria-label="OP-XY project launcher">
       <div class="launch-brand" aria-label="XY buddy">
         <span>xy buddy</span>
-        <span>op-xy project utility</span>
+        <span>unofficial op-xy project utility</span>
       </div>
 
       <OpXyHardwareLauncher
