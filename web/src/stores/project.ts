@@ -128,6 +128,29 @@ function restoreProject(snapshot: ProjectSnapshot): XYProjectViewModel {
   );
 }
 
+function currentSelection(project: XYProjectViewModel) {
+  return {
+    activeTrackIndex: project.activeTrackIndex,
+    activePatternIndex: project.activePatternIndex,
+    activeSceneIndex: project.activeSceneIndex,
+    selectedNoteId: project.selectedNoteId,
+  };
+}
+
+export function setProjectFileName(fileName: string): void {
+  const project = get(projectWritable);
+  if (!project || project.fileName === fileName) return;
+
+  projectWritable.set(
+    buildProjectViewModel(
+      project.imageProject,
+      fileName,
+      currentSelection(project),
+      project.modified,
+    ),
+  );
+}
+
 function editCreatesHistory(edit: XYEdit): boolean {
   switch (edit.type) {
     case "set-active-track":

@@ -1,11 +1,18 @@
 import type { XYProjectViewModel } from "./projectViewModel";
 
-export function editedFileName(fileName: string): string {
-  const trimmed = fileName.trim() || "project.xy";
-  if (trimmed.toLowerCase().endsWith(".xy")) {
-    return `${trimmed.slice(0, -3)}-edited.xy`;
+const INVALID_FILENAME_CHARACTERS = /[/:\\?%*"<>|]/g;
+
+export function normalizeXYFileName(fileName: string): string {
+  const cleaned =
+    fileName
+      .trim()
+      .replace(INVALID_FILENAME_CHARACTERS, "-")
+      .replace(/\s+/g, " ") || "project";
+
+  if (cleaned.toLowerCase().endsWith(".xy")) {
+    return cleaned;
   }
-  return `${trimmed}-edited.xy`;
+  return `${cleaned}.xy`;
 }
 
 export async function exportXYProject(

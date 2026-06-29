@@ -1,5 +1,6 @@
 <script lang="ts">
   import OpXyHardwareLauncher from "./components/OpXyHardwareLauncher.svelte";
+  import ProjectReadyPanel from "./components/ProjectReadyPanel.svelte";
   import SongModeWorkspace from "./components/SongModeWorkspace.svelte";
   import {
     announceDisplayMessage,
@@ -7,14 +8,29 @@
     displayMessageStore,
     isPlayingStore,
     projectStore,
+    setProjectFileName,
   } from "./stores/project";
-  import { editedFileName, exportXYProject } from "./lib/xy/projectExporter";
+  import {
+    exportXYProjectBytes,
+    normalizeXYFileName,
+  } from "./lib/xy/projectExporter";
   import { loadXYFile } from "./lib/xy/projectLoader";
   import {
     loadMidiFileAsNewProject,
     type MidiImportSummary,
   } from "./lib/xy/midiImporter";
   import { validationCounts } from "./lib/xy/validation";
+  import {
+    bytesToBase64,
+    publishNativeExport,
+    type XYBuddyNativeExportPayload,
+  } from "./lib/nativeBridge";
+
+  type ReadyProjectExport = {
+    filename: string;
+    bytes: Uint8Array;
+    sourceMidiFilename: string | null;
+  };
 
   let xyFileInput: HTMLInputElement;
   let midiFileInput: HTMLInputElement;
@@ -23,6 +39,8 @@
   let dragging = false;
   let projectCreated = false;
   let importFileName = "";
+  let projectFileName = "";
+  let readyExport: ReadyProjectExport | null = null;
 
   $: counts = $projectStore
     ? validationCounts($projectStore.validation)
@@ -31,9 +49,11 @@
   async function openXYFile(file: File) {
     loadError = "";
     importSummary = null;
+    readyExport = null;
     try {
       const project = await loadXYFile(file);
       projectStore.set(project);
+      projectFileName = normalizeXYFileName(project.fileName);
       projectCreated = true;
       importFileName = file.name;
       currentTickStore.set(0);
@@ -51,12 +71,14 @@
   async function importMidiFile(file: File) {
     loadError = "";
     importSummary = null;
+    readyExport = null;
     announceDisplayMessage(`IMPORT ${file.name}`, "neutral");
     try {
       const result = await loadMidiFileAsNewProject(file);
       projectStore.set(result.project);
       importSummary = result.summary;
       importFileName = file.name;
+      projectFileName = normalizeXYFileName(result.project.fileName);
       projectCreated = false;
       currentTickStore.set(0);
       isPlayingStore.set(false);
@@ -104,9 +126,44 @@
     if (file) await openFile(file);
   }
 
-  async function createXYProject() {
+  function commitProjectFileName(publish = true): string {
+    const filename = normalizeXYFileName(
+      projectFileName || $projectStore?.fileName || "",
+    );
+    projectFileName = filename;
+    setProjectFileName(filename);
+    if (readyExport && readyExport.filename !== filename) {
+      readyExport = { ...readyExport, filename };
+      if (publish) publishReadyExport(readyExport);
+    }
+    return filename;
+  }
+
+  function nativeExportPayload(
+    exportData: ReadyProjectExport,
+  ): XYBuddyNativeExportPayload {
+    return {
+      filename: exportData.filename,
+      base64Data: bytesToBase64(exportData.bytes),
+      metadata: {
+        sourceMidiFilename: exportData.sourceMidiFilename,
+        generatorVersion: "xy-format web",
+        xyFormatVersion: "live",
+      },
+      compatibilityStatus: "unknownFirmware",
+    };
+  }
+
+  function publishReadyExport(exportData: ReadyProjectExport): boolean {
+    return publishNativeExport(nativeExportPayload(exportData));
+  }
+
+  async function createReadyExport(
+    publishToNative: boolean,
+    announceReady = true,
+  ): Promise<ReadyProjectExport | null> {
     const project = $projectStore;
-    if (!project) return;
+    if (!project) return null;
     if (
       counts.errors > 0 &&
       !window.confirm(
@@ -114,21 +171,53 @@
       )
     ) {
       announceDisplayMessage("PROJECT CANCELLED", "warn");
-      return;
+      return null;
     }
     announceDisplayMessage("CREATING PROJECT", "neutral");
-    const blob = await exportXYProject(project);
+    const filename = commitProjectFileName(false);
+    const currentProject = $projectStore ?? project;
+    readyExport = {
+      filename,
+      bytes: exportXYProjectBytes(currentProject),
+      sourceMidiFilename: importFileName || null,
+    };
+    projectCreated = true;
+    currentTickStore.set(0);
+    const published = publishToNative && publishReadyExport(readyExport);
+    if (announceReady) {
+      announceDisplayMessage(
+        published ? "READY IN MAC APP" : "PROJECT READY",
+        "ok",
+      );
+    }
+    return readyExport;
+  }
+
+  async function createXYProject() {
+    await createReadyExport(true);
+  }
+
+  async function downloadXYProject() {
+    const exportData = await createReadyExport(false, false);
+    if (!exportData) return;
+
+    if (publishReadyExport(exportData)) {
+      announceDisplayMessage("READY IN MAC APP", "ok");
+      return;
+    }
+
+    const blob = new Blob([exportData.bytes as BlobPart], {
+      type: "application/octet-stream",
+    });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = editedFileName(project.fileName);
+    a.download = exportData.filename;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
-    projectCreated = true;
-    currentTickStore.set(0);
-    announceDisplayMessage("PROJECT READY", "ok");
+    announceDisplayMessage("DOWNLOAD STARTED", "ok");
   }
 </script>
 
@@ -162,62 +251,39 @@
       <a class="workflow-brand" href="/" aria-label="XY Project Lab home">
         xy project lab
       </a>
-      <button type="button" on:click={() => midiFileInput.click()}
-        >import MIDI</button
-      >
+      <div class="workflow-actions">
+        <label class="project-name-control">
+          <span>project name</span>
+          <input
+            type="text"
+            bind:value={projectFileName}
+            aria-label="Project filename"
+            on:change={() => commitProjectFileName()}
+            on:blur={() => commitProjectFileName()}
+          />
+        </label>
+        {#if projectCreated}
+          <button type="button" on:click={downloadXYProject}
+            >download .xy</button
+          >
+        {/if}
+        <button type="button" on:click={() => midiFileInput.click()}
+          >import MIDI</button
+        >
+      </div>
     </header>
 
     {#if projectCreated}
       <SongModeWorkspace project={$projectStore} />
     {:else}
-      <section class="project-ready" aria-label="MIDI project ready to create">
-        <p class="workflow-kicker">MIDI imported</p>
-        <h1>{importFileName || "untitled MIDI"}</h1>
-        <p class="project-ready-copy">
-          Scenes are arranged in sequence and ready to write as an OP–XY
-          project.
-        </p>
-
-        <dl class="import-details">
-          <div>
-            <dt>scenes</dt>
-            <dd>
-              {importSummary?.scenes ??
-                $projectStore.songs[0]?.sceneChain.length ??
-                0}
-            </dd>
-          </div>
-          <div>
-            <dt>tracks</dt>
-            <dd>{importSummary?.activeTracks.length ?? 0}</dd>
-          </div>
-          <div>
-            <dt>tempo</dt>
-            <dd>{$projectStore.tempoBpm.toFixed(1)} bpm</dd>
-          </div>
-          <div>
-            <dt>notes</dt>
-            <dd>{importSummary?.importedNotes ?? 0}</dd>
-          </div>
-        </dl>
-
-        {#if counts.errors > 0 || counts.warnings > 0}
-          <p class="project-validation" class:error={counts.errors > 0}>
-            {counts.errors > 0
-              ? `${counts.errors} validation error${counts.errors === 1 ? "" : "s"}`
-              : `${counts.warnings} validation warning${counts.warnings === 1 ? "" : "s"}`}
-          </p>
-        {/if}
-
-        <div class="project-ready-actions">
-          <button type="button" on:click={() => midiFileInput.click()}
-            >replace MIDI</button
-          >
-          <button type="button" class="primary" on:click={createXYProject}
-            >create .xy project</button
-          >
-        </div>
-      </section>
+      <ProjectReadyPanel
+        project={$projectStore}
+        {importSummary}
+        {projectFileName}
+        {counts}
+        onReplaceMidi={() => midiFileInput.click()}
+        onCreateProject={createXYProject}
+      />
     {/if}
   {:else}
     <section class="launch-surface" aria-label="OP-XY project launcher">
@@ -274,78 +340,32 @@
     text-transform: uppercase;
   }
 
-  .project-ready {
-    width: min(720px, 100%);
-    margin: auto;
-    padding: clamp(36px, 10vh, 112px) clamp(20px, 5vw, 48px);
-  }
-
-  .workflow-kicker {
-    margin: 0 0 10px;
-    color: var(--xy-text-muted);
-    font-size: 11px;
-    text-transform: uppercase;
-  }
-
-  .project-ready h1 {
-    margin: 0;
-    overflow-wrap: anywhere;
-    font-size: clamp(32px, 7vw, 68px);
-    font-weight: 500;
-    letter-spacing: -0.06em;
-    line-height: 0.95;
-  }
-
-  .project-ready-copy {
-    max-width: 500px;
-    margin: 22px 0 36px;
-    color: var(--xy-text-muted);
-    font-size: 16px;
-    line-height: 1.5;
-  }
-
-  .import-details {
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    margin: 0 0 28px;
-    border-top: 1px solid var(--xy-line);
-    border-bottom: 1px solid var(--xy-line);
-  }
-
-  .import-details div {
+  .workflow-actions {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 10px;
     min-width: 0;
-    padding: 14px 10px 14px 0;
   }
 
-  .import-details div + div {
-    padding-left: 12px;
-    border-left: 1px solid var(--xy-line);
+  .project-name-control {
+    display: grid;
+    grid-template-columns: auto minmax(170px, 260px);
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
   }
 
-  .import-details dt {
+  .project-name-control span {
     color: var(--xy-text-dim);
     font-size: 10px;
     text-transform: uppercase;
   }
 
-  .import-details dd {
-    margin: 5px 0 0;
-    font-size: 17px;
-    font-variant-numeric: tabular-nums;
+  .project-name-control input {
+    min-width: 0;
   }
 
-  .project-validation {
-    margin: 0 0 20px;
-    color: var(--xy-yellow-warn);
-    font-size: 12px;
-    text-transform: uppercase;
-  }
-
-  .project-validation.error {
-    color: var(--xy-red-led);
-  }
-
-  .project-ready-actions,
   .launch-actions {
     display: flex;
     align-items: center;
@@ -361,17 +381,20 @@
   }
 
   @media (max-width: 620px) {
-    .import-details {
-      grid-template-columns: repeat(2, 1fr);
+    .workflow-topbar {
+      align-items: flex-start;
+      flex-direction: column;
     }
 
-    .import-details div:nth-child(3) {
-      border-left: 0;
-      border-top: 1px solid var(--xy-line);
+    .workflow-actions {
+      width: 100%;
+      justify-content: flex-start;
+      flex-wrap: wrap;
     }
 
-    .import-details div:nth-child(4) {
-      border-top: 1px solid var(--xy-line);
+    .project-name-control {
+      width: 100%;
+      grid-template-columns: 1fr;
     }
 
     .launch-actions {
