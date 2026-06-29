@@ -315,7 +315,7 @@ describe("MIDI new-project importer", () => {
     });
     expect(result.summary.notesPerPatternByTrack[7]).toEqual([24, 24]);
     expect(result.summary.notesPerPatternByTrack[8]).toBeUndefined();
-    expect(result.project.fileName).toBe("single-chord.xy");
+    expect(result.project.fileName).toBe("singlechord.xy");
     expect(result.project.modified).toBe(true);
     expect(result.project.tempoBpm).toBeCloseTo(101.5, 1);
     expect(result.project.tracks[6].patterns).toHaveLength(1);
@@ -409,5 +409,32 @@ describe("MIDI new-project importer", () => {
     expect(result.summary.sourceTotalBars).toBe(40);
     expect(result.summary.trackSelection?.selectedBankCount).toBe(5);
     expect(result.summary.activeTracks).toHaveLength(5);
+  });
+
+  it("shortens MIDI-derived project filenames for OP-XY projects", () => {
+    const baseline = new Uint8Array(readFileSync(BASELINE));
+    const midi = singlePolyphonicLaneMidi();
+
+    expect(
+      buildMidiProjectFromBytes(
+        midi,
+        "Deep Purple - Child In Time (Gennaro Marchese).mid",
+        baseline,
+      ).project.fileName,
+    ).toBe("childintime.xy");
+    expect(
+      buildMidiProjectFromBytes(
+        midi,
+        "Phil Collins - In The Air Tonight (Music Sales Ltd.).mid",
+        baseline,
+      ).project.fileName,
+    ).toBe("intheairtonight.xy");
+    expect(
+      buildMidiProjectFromBytes(
+        midi,
+        "01 - Artist - A Very Long Song Title.mid",
+        baseline,
+      ).project.fileName,
+    ).toBe("averylongsongtit.xy");
   });
 });

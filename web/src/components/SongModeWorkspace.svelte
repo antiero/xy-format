@@ -17,6 +17,7 @@
   import type { XYProjectViewModel } from "../lib/xy/projectViewModel";
 
   export let project: XYProjectViewModel;
+  export let onEditMidi: (() => void) | null = null;
 
   const STEPS_PER_PAGE = 32;
 
@@ -184,6 +185,11 @@
     announceDisplayMessage("REWIND", "neutral");
   }
 
+  function editMidi() {
+    stopPlayback();
+    onEditMidi?.();
+  }
+
   function sceneRingProgress(
     start16ths: number,
     length16ths: number,
@@ -263,6 +269,11 @@
 
       <footer class="song-mode-footer">
         <div class="song-mode-transport">
+          {#if onEditMidi}
+            <button type="button" class="edit-midi" on:click={editMidi}
+              >edit MIDI</button
+            >
+          {/if}
           <button
             type="button"
             class="song-play"
@@ -322,8 +333,7 @@
     margin: 0 0 18px;
   }
 
-  .song-mode-context p,
-  .song-mode-context h2 {
+  .song-mode-context p {
     margin: 0;
   }
 
@@ -331,13 +341,6 @@
     color: var(--xy-text-muted);
     font-size: 11px;
     text-transform: uppercase;
-  }
-
-  .song-mode-context h2 {
-    margin-top: 5px;
-    font-size: clamp(20px, 3vw, 31px);
-    font-weight: 500;
-    letter-spacing: -0.04em;
   }
 
   .song-mode-status,
@@ -571,6 +574,16 @@
     background: #f3f1ef;
     border-color: #f3f1ef;
     color: #050505;
+  }
+
+  .song-mode-footer .edit-midi {
+    border-color: rgba(91, 172, 134, 0.56);
+    color: #d9efe4;
+  }
+
+  .song-mode-footer .edit-midi:hover:not(:disabled) {
+    border-color: #5bac86;
+    background: rgba(91, 172, 134, 0.16);
   }
 
   .song-mode-empty {

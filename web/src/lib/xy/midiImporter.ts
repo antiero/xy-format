@@ -1035,9 +1035,36 @@ function firstTempoBpm(midi: MidiData): number {
 }
 
 function outputFileName(inputName: string): string {
-  const stem = inputName.replace(/\.[^.]+$/, "").trim() || "midi-import";
-  const cleaned = stem.replace(/[/:\\?%*"<>|]/g, "-");
-  return `${cleaned}.xy`;
+  const stem = midiProjectStem(inputName);
+  return `${stem}.xy`;
+}
+
+function midiProjectStem(inputName: string): string {
+  const withoutExtension = inputName.replace(/\.[^.]+$/, "").trim();
+  const withoutCredits = withoutExtension
+    .replace(/\s*[\[(][^\])]*[\])]\s*/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  let parts = withoutCredits
+    .split(/\s+[-–—]\s+/)
+    .map((part) => part.trim())
+    .filter(Boolean);
+
+  if (parts.length > 1 && /^\d+([._\s-]\d+)?$/.test(parts[0])) {
+    parts = parts.slice(1);
+  }
+
+  const title = parts.length > 1 ? parts.slice(1).join(" ") : parts[0];
+  const cleaned =
+    (title || withoutCredits || "midi")
+      .normalize("NFKD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toLowerCase()
+      .replace(/&/g, "and")
+      .replace(/[^a-z0-9]/g, "")
+      .slice(0, 16) || "midi";
+
+  return cleaned;
 }
 
 type BankedArrangement = {

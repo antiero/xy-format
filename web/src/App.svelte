@@ -263,6 +263,15 @@
     }
   }
 
+  function returnToMidiEditor() {
+    if (!importedMidiFile || !importSummary) return;
+    readyExport = null;
+    projectCreated = false;
+    currentTickStore.set(0);
+    isPlayingStore.set(false);
+    announceDisplayMessage("MIDI EDITOR", "neutral");
+  }
+
   async function downloadXYProject() {
     const exportData = await createReadyExport(false, false);
     if (!exportData) return;
@@ -338,7 +347,12 @@
     </header>
 
     {#if projectCreated}
-      <SongModeWorkspace project={$projectStore} />
+      <SongModeWorkspace
+        project={$projectStore}
+        onEditMidi={importedMidiFile && importSummary
+          ? returnToMidiEditor
+          : null}
+      />
     {:else}
       <ProjectReadyPanel
         project={$projectStore}
