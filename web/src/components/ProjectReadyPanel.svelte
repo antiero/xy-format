@@ -43,7 +43,7 @@
   <p class="workflow-kicker">MIDI imported</p>
   <h1>{projectFileName || "project.xy"}</h1>
   <p class="project-ready-copy">
-    is ready to send to OP–XY. Press Burn to preview song.
+    is ready to send to OP–XY. Bounce MIDI to preview song.
   </p>
 
   {#if showMidiEditor && trackSelection}
@@ -90,7 +90,7 @@
       type="button"
       class="primary"
       disabled={midiSelectionUpdating || !canBurnMidi}
-      on:click={onBurnMidiToSong}>burn MIDI to song</button
+      on:click={onBurnMidiToSong}>bounce midi to song</button
     >
   </div>
 </section>

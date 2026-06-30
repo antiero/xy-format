@@ -341,7 +341,7 @@
           <button type="button" on:click={downloadXYProject}>export .xy</button>
         {/if}
         <button type="button" on:click={() => midiFileInput.click()}
-          >import MIDI</button
+          >import .mid / .xy</button
         >
       </div>
     </header>
@@ -384,7 +384,7 @@
         <button
           type="button"
           class="primary"
-          on:click={() => midiFileInput.click()}>import MIDI</button
+          on:click={() => midiFileInput.click()}>+ MIDI / .xy</button
         >
       </div>
 
