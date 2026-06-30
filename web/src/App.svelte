@@ -168,17 +168,19 @@
     await openXYFile(file);
   }
 
-  async function handleXYFileUpload(event: Event) {
+  async function handleFileUpload(event: Event) {
     const target = event.target as HTMLInputElement;
     const file = target.files?.[0];
-    if (file) await openXYFile(file);
-    target.value = "";
-  }
-
-  async function handleMidiFileUpload(event: Event) {
-    const target = event.target as HTMLInputElement;
-    const file = target.files?.[0];
-    if (file) await importMidiFile(file);
+    if (file && file.name.toLowerCase().endsWith(".xy")) {
+      await openXYFile(file);
+    }
+    else if (file && file.name.toLowerCase().includes(".mid")) {
+      await importMidiFile(file);
+    }
+    else {
+      loadError = "Please select a valid .xy or .mid file.";
+      announceDisplayMessage("INVALID FILE", "error");
+    }
     target.value = "";
   }
 
@@ -306,18 +308,18 @@
 >
   <input
     type="file"
-    accept=".xy"
+    accept=".xy,.mid,.midi"
     tabindex="-1"
     bind:this={xyFileInput}
-    on:change={handleXYFileUpload}
+    on:change={handleFileUpload}
     class="visually-hidden"
   />
   <input
     type="file"
-    accept=".mid,.midi"
+    accept=".xy,.mid,.midi"
     tabindex="-1"
     bind:this={midiFileInput}
-    on:change={handleMidiFileUpload}
+    on:change={handleFileUpload}
     class="visually-hidden"
   />
 
@@ -393,8 +395,8 @@
       {/if}
 
       <p class="disclaimer">
-        Unofficial project-file utility for OP-XY. Teenage Engineering and OP-XY
-        are trademarks of their respective owners.
+        app by <a href="https://github.com/antiero/xy-format" target="_blank">antiero</a>.
+        not affiliated with teenage engineering. <br>made possible by reverse engineering efforts of <a href="https://github.com/kmorrill/xy-format" target="_blank">kmorrill</a>.
       </p>
     </section>
   {/if}

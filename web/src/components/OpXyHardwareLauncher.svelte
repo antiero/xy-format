@@ -31,13 +31,13 @@
       id: "open-xy",
       label: "Open .xy project",
       rect: { x: 171.211, y: 12.16, w: 159.11, h: 79.45 },
-      message: { text: "OPEN XY", tone: "neutral" },
+      message: { text: "TAP TO OPEN", tone: "neutral" },
     },
     {
       id: "import-midi",
-      label: "Import MIDI",
+      label: "Import MIDI/.xy file",
       rect: { x: 12.063, y: 12.013, w: 79.574, h: 79.595 },
-      message: { text: "IMPORT MIDI", tone: "neutral" },
+      message: { text: "TAP TO OPEN", tone: "neutral" },
     },
   ];
 

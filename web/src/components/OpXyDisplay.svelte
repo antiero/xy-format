@@ -138,10 +138,10 @@
           : "neutral")) as DisplayTone;
   $: displayText =
     message?.text ??
-    (fileName ? fileName.replace(/\.[^.]+$/, "") : "DROP XY MIDI");
+    (fileName ? fileName.replace(/\.[^.]+$/, "") : "midi / xy in");
   $: statusText = fileName
     ? `${modified ? "EDIT" : "SYNC"} ${counts.errors}E ${counts.warnings}W`
-    : "LOCAL EDITOR";
+    : "xy / midi out";
   $: modeText = modeLabels[mode] ?? "READY";
   $: tempoText = `${Math.round(tempo)}BPM`;
   $: headerModeMatrix = makeDotMatrix(modeText, 7);

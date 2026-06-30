@@ -208,8 +208,7 @@
 <section class="song-mode-workspace" aria-label="Song Mode preview">
   <div class="song-mode-context">
     <div>
-      <p>song mode preview</p>
-      <!-- <h2>Sequence scenes into a song.</h2> -->
+      <p>song mode</p>
     </div>
     <div class="song-mode-status">
       <span>{songEvents.length} notes</span>
@@ -220,7 +219,7 @@
 
   <div class="song-mode-display">
     <header class="song-mode-header">
-      <span class="song-mode-mark" aria-hidden="true">↪</span>
+      <span class="song-mode-mark" aria-hidden="true">⟲</span>
       <h3>song {song ? song.index + 1 : 1}</h3>
       <div class="song-mode-count">
         <span>count</span>
@@ -389,8 +388,6 @@
     height: 28px;
     margin-left: 18px;
     place-items: center;
-    border: 3px solid #111;
-    border-radius: 4px;
     font-size: 29px;
     font-weight: 700;
     line-height: 0;
