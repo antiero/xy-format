@@ -173,11 +173,9 @@
     const file = target.files?.[0];
     if (file && file.name.toLowerCase().endsWith(".xy")) {
       await openXYFile(file);
-    }
-    else if (file && file.name.toLowerCase().includes(".mid")) {
+    } else if (file && file.name.toLowerCase().includes(".mid")) {
       await importMidiFile(file);
-    }
-    else {
+    } else {
       loadError = "Please select a valid .xy or .mid file.";
       announceDisplayMessage("INVALID FILE", "error");
     }
@@ -395,8 +393,13 @@
       {/if}
 
       <p class="disclaimer">
-        app by <a href="https://github.com/antiero/xy-format" target="_blank">antiero</a>.
-        not affiliated with teenage engineering. <br>made possible by reverse engineering efforts of <a href="https://github.com/kmorrill/xy-format" target="_blank">kmorrill</a>.
+        app by <a href="https://github.com/antiero/xy-format" target="_blank"
+          >antiero</a
+        >. not affiliated with teenage engineering. <br />made possible by
+        reverse engineering efforts of
+        <a href="https://github.com/kmorrill/xy-format" target="_blank"
+          >kmorrill</a
+        >.
       </p>
     </section>
   {/if}
