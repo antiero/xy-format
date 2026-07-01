@@ -1,7 +1,7 @@
 <script lang="ts">
   import OpXyHardwareLauncher from "./components/OpXyHardwareLauncher.svelte";
   import ProjectReadyPanel from "./components/ProjectReadyPanel.svelte";
-  import SongModeWorkspace from "./components/SongModeWorkspace.svelte";
+  import CreatedProjectWorkspace from "./components/CreatedProjectWorkspace.svelte";
   import {
     announceDisplayMessage,
     currentTickStore,
@@ -347,7 +347,7 @@
     </header>
 
     {#if projectCreated}
-      <SongModeWorkspace
+      <CreatedProjectWorkspace
         project={$projectStore}
         onEditMidi={importedMidiFile && importSummary
           ? returnToMidiEditor
