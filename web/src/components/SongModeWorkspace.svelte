@@ -14,6 +14,7 @@
     dispatchProjectEdit,
     isPlayingStore,
   } from "../stores/project";
+  import { buildArrangerSequence } from "../lib/xy/arranger";
   import type { XYProjectViewModel } from "../lib/xy/projectViewModel";
 
   export let project: XYProjectViewModel;
@@ -31,10 +32,8 @@
   let playbackError = "";
 
   $: song = project.songs[0];
-  $: songSteps =
-    song?.supported && song.sceneChain.length > 0
-      ? collectSongPlaybackSteps(project, song.sceneChain)
-      : [];
+  $: sequence = buildArrangerSequence(project);
+  $: songSteps = collectSongPlaybackSteps(project, sequence.sceneIndexes);
   $: songEvents = collectSongPlaybackEvents(project, songSteps);
   $: songLength16ths = songSteps.reduce(
     (length, step) => length + step.length16ths,

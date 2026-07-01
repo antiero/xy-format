@@ -1,355 +1,389 @@
 <script lang="ts">
-  import { get } from "svelte/store";
+  import { onDestroy } from "svelte";
+  import { audioService } from "../lib/audio";
   import {
-    activeModeStore,
     dispatchProjectEdit,
-    sceneClipboardStore,
+    announceDisplayMessage,
+    currentTickStore,
+    isPlayingStore,
   } from "../stores/project";
-  import { display16thsAsBars } from "../lib/xy/timing";
-  import { SONG_MAX_CHAIN, type SongChain } from "../lib/xy/image_writer";
-  import type {
-    XYProjectViewModel,
-    XYSceneViewModel,
-  } from "../lib/xy/projectViewModel";
-  import { patternHasStepData } from "../lib/xy/projectViewModel";
+  import { buildArrangerFrame, type ArrangerFrame } from "../lib/xy/arranger";
+  import { exportableMidiNoteCount } from "../lib/xy/midiExporter";
+  import {
+    collectSongPlaybackEvents,
+    collectSongPlaybackSteps,
+    crossesPlaybackPosition,
+    songStepIndexAtPosition,
+    type PlaybackEvent,
+  } from "../lib/xy/playback";
+  import type { XYProjectViewModel } from "../lib/xy/projectViewModel";
+  import ArrangeExportActions from "./ArrangeExportActions.svelte";
+  import ArrangeTrackColumn from "./ArrangeTrackColumn.svelte";
 
   export let project: XYProjectViewModel;
+  export let onEditMidi: (() => void) | null = null;
 
-  let selectedSongStep = 0;
+  let selectedStepIndex = 0;
+  let frame: ArrangerFrame;
+  let includeDisabledTracks = false;
+  let animationFrame = 0;
+  let lastFrameMs = 0;
+  let lastPlaybackPosition16ths = 0;
+  let activePlaybackStep = -1;
+  let transportState: "idle" | "loading" | "playing" = "idle";
 
-  $: scene = project.scenes[project.activeSceneIndex];
-  $: song = project.songs[0] as SongChain;
-  $: presentScenes = project.scenes.filter((candidate) => candidate.present);
-  $: sceneTracksWithData = project.tracks.filter((track) => {
-    const patternIndex = scene.patternByTrack[track.index];
-    const pattern = track.patterns[patternIndex];
-    return pattern ? patternHasStepData(pattern) : false;
+  $: frame = buildArrangerFrame(project, selectedStepIndex);
+  $: exportOptions = { includeDisabledTracks };
+  $: exportableNotes = exportableMidiNoteCount(project, exportOptions);
+  $: sequenceName = frame.sequence.source === "song" ? "song 1" : "scenes";
+  $: songSteps = collectSongPlaybackSteps(project, frame.sequence.sceneIndexes);
+  $: playbackEvents = collectSongPlaybackEvents(project, songSteps, {
+    instrumentTrackCount: 8,
   });
-  $: selectedSongStep = Math.max(
+  $: songLength16ths = songSteps.reduce(
+    (length, step) => length + step.length16ths,
     0,
-    Math.min(Math.max(0, song.sceneChain.length - 1), selectedSongStep),
   );
-  $: selectedSongScene = song.sceneChain[selectedSongStep] ?? scene.index;
-
-  function selectScene(sceneIndex: number) {
-    dispatchProjectEdit({ type: "set-active-scene", sceneIndex });
+  function msPer16th(): number {
+    return 15000 / Math.max(10, project.tempoBpm || 120);
   }
-
-  function openPattern(trackIndex: number) {
-    dispatchProjectEdit({ type: "set-active-track", trackIndex });
-    activeModeStore.set("pattern");
+  function schedulePlaybackEvent(event: PlaybackEvent) {
+    const durationMs = Math.max(30, event.duration16ths * msPer16th());
+    audioService.noteOn(event.trackIndex, event.note, event.velocity);
+    audioService.noteOff(event.trackIndex, event.note, durationMs);
   }
-
-  function setScenePattern(trackIndex: number, patternIndex: number) {
+  function syncScene(position16ths: number) {
+    const stepIndex = songStepIndexAtPosition(songSteps, position16ths);
+    const step = songSteps[stepIndex];
+    if (!step || stepIndex === activePlaybackStep) return;
+    activePlaybackStep = stepIndex;
+    selectedStepIndex = stepIndex;
     dispatchProjectEdit({
-      type: "set-scene-pattern",
-      sceneIndex: scene.index,
-      trackIndex,
-      patternIndex,
+      type: "set-active-scene",
+      sceneIndex: step.sceneIndex,
     });
   }
+  function playbackFrame(now: number) {
+    if (!$isPlayingStore || songLength16ths <= 0) return;
+    if (!lastFrameMs) lastFrameMs = now;
 
-  function setSceneMute(trackIndex: number, muted: boolean) {
+    const previous = lastPlaybackPosition16ths;
+    const next = Math.min(
+      songLength16ths,
+      previous + (now - lastFrameMs) / msPer16th(),
+    );
+    lastFrameMs = now;
+
+    for (const event of playbackEvents) {
+      if (crossesPlaybackPosition(event.start16ths, previous, next, false)) {
+        schedulePlaybackEvent(event);
+      }
+    }
+
+    lastPlaybackPosition16ths = next;
+    currentTickStore.set(next);
+    syncScene(next);
+
+    if (next >= songLength16ths) {
+      stopPlayback();
+      announceDisplayMessage("SONG END", "neutral");
+      return;
+    }
+    animationFrame = requestAnimationFrame(playbackFrame);
+  }
+  function playEventsAt(position16ths: number) {
+    for (const event of playbackEvents) {
+      if (Math.abs(event.start16ths - position16ths) < 0.001) {
+        schedulePlaybackEvent(event);
+      }
+    }
+  }
+  async function togglePlayback() {
+    if ($isPlayingStore) {
+      stopPlayback();
+      announceDisplayMessage("STOP", "neutral");
+      return;
+    }
+    if (songSteps.length === 0 || playbackEvents.length === 0) return;
+
+    transportState = "loading";
+    try {
+      await audioService.ensureReady();
+      const selectedStart = songSteps[frame.selectedStepIndex]?.start16ths ?? 0;
+      lastPlaybackPosition16ths =
+        $currentTickStore >= songLength16ths
+          ? selectedStart
+          : $currentTickStore;
+      lastFrameMs = performance.now();
+      isPlayingStore.set(true);
+      transportState = "playing";
+      syncScene(lastPlaybackPosition16ths);
+      playEventsAt(lastPlaybackPosition16ths);
+      animationFrame = requestAnimationFrame(playbackFrame);
+      announceDisplayMessage("ARRANGE PLAY", "play");
+    } catch {
+      transportState = "idle";
+      isPlayingStore.set(false);
+      announceDisplayMessage("AUDIO UNAVAILABLE", "error");
+    }
+  }
+  function stopPlayback() {
+    if (animationFrame) {
+      cancelAnimationFrame(animationFrame);
+      animationFrame = 0;
+    }
+    audioService.stopAll();
+    isPlayingStore.set(false);
+    transportState = "idle";
+    lastFrameMs = 0;
+  }
+  function rewindPlayback() {
+    stopPlayback();
+    selectStep(0);
+    lastPlaybackPosition16ths = 0;
+    currentTickStore.set(0);
+    announceDisplayMessage("REWIND", "neutral");
+  }
+  function selectStep(index: number) {
+    const step = frame.sequence.steps[index];
+    if (!step) return;
+    selectedStepIndex = index;
     dispatchProjectEdit({
-      type: "set-scene-mute",
-      sceneIndex: scene.index,
-      trackIndex,
-      muted,
+      type: "set-active-scene",
+      sceneIndex: step.sceneIndex,
     });
   }
-
-  function copyScene(current: XYSceneViewModel) {
-    sceneClipboardStore.set({
-      patternByTrack: [...current.patternByTrack],
-      mutedTracks: [...current.mutedTracks],
-    });
+  function moveStep(delta: number) {
+    selectStep(
+      Math.max(
+        0,
+        Math.min(
+          frame.sequence.steps.length - 1,
+          frame.selectedStepIndex + delta,
+        ),
+      ),
+    );
   }
-
-  function pasteScene() {
-    const clipboard = get(sceneClipboardStore);
-    if (!clipboard) return;
-    clipboard.patternByTrack.forEach((patternIndex, trackIndex) => {
-      dispatchProjectEdit({
-        type: "set-scene-pattern",
-        sceneIndex: scene.index,
-        trackIndex,
-        patternIndex,
-      });
-    });
-    clipboard.mutedTracks.forEach((muted, trackIndex) => {
-      dispatchProjectEdit({
-        type: "set-scene-mute",
-        sceneIndex: scene.index,
-        trackIndex,
-        muted,
-      });
-    });
+  function editMidi() {
+    stopPlayback();
+    onEditMidi?.();
   }
-
-  function duplicateScene() {
-    const target = Math.min(98, scene.index + 1);
-    dispatchProjectEdit({
-      type: "duplicate-scene",
-      sourceSceneIndex: scene.index,
-      targetSceneIndex: target,
-    });
-    selectScene(target);
-  }
-
-  function resetScene() {
-    dispatchProjectEdit({ type: "reset-scene", sceneIndex: scene.index });
-  }
-
-  function updateSong(sceneChain: number[], loop = song.loop) {
-    dispatchProjectEdit({
-      type: "update-song-chain",
-      songIndex: 0,
-      sceneChain,
-      loop,
-    });
-  }
-
-  function addActiveSceneToSong() {
-    if (song.sceneChain.length >= SONG_MAX_CHAIN) return;
-    updateSong([...song.sceneChain, scene.index]);
-    selectedSongStep = song.sceneChain.length;
-  }
-
-  function setSongStepScene(sceneIndex: number) {
-    if (song.sceneChain.length === 0) return;
-    const next = [...song.sceneChain];
-    next[selectedSongStep] = sceneIndex;
-    updateSong(next);
-    selectScene(sceneIndex);
-  }
-
-  function removeSongStep(index: number) {
-    updateSong(song.sceneChain.filter((_, i) => i !== index));
-    selectedSongStep = Math.max(0, index - 1);
-  }
-
-  function moveSongStep(index: number, delta: number) {
-    const next = [...song.sceneChain];
-    const target = index + delta;
-    if (target < 0 || target >= next.length) return;
-    const [item] = next.splice(index, 1);
-    next.splice(target, 0, item);
-    updateSong(next);
-    selectedSongStep = target;
-  }
+  onDestroy(() => {
+    stopPlayback();
+  });
 </script>
 
-<section class="workspace arrange-workspace">
-  <div class="workspace-head">
+<section class="arranger-workspace" aria-label="OP-XY Arranger">
+  <header class="arranger-topline">
     <div>
-      <p class="eyebrow">Arrange</p>
-      <h2>Scene {scene.index + 1}</h2>
+      <p>{sequenceName}</p>
+      <h2>arrange</h2>
     </div>
-    <div class="status-strip">
-      <span>{scene.present ? "present" : "empty"}</span>
-      <span>{display16thsAsBars(scene.length16ths)}</span>
-      <span>{song.sceneChain.length}/{SONG_MAX_CHAIN} song</span>
+    <div class="arranger-status">
+      <span title="Current scene">scene {frame.scene.index + 1}</span>
+      <span title="Project tempo">{project.tempoBpm.toFixed(1)} bpm</span>
+      <span title="Exportable decoded instrument notes">{exportableNotes}</span>
+    </div>
+  </header>
+
+  <div class="arranger-display">
+    <div class="arranger-columns" aria-label="Pattern arrangement">
+      {#each frame.columns as column (column.trackIndex)}
+        <ArrangeTrackColumn {column} />
+      {/each}
     </div>
   </div>
 
-  <div class="arrange-focus-layout">
-    <aside class="scene-bank-panel">
-      <div class="section-title">
-        <span>scenes</span>
-        <span>{presentScenes.length}/99 present</span>
-      </div>
-
-      <div class="scene-action-row">
-        <button type="button" on:click={() => copyScene(scene)}>copy</button>
-        <button type="button" on:click={pasteScene}>paste</button>
-        <button type="button" on:click={duplicateScene}>clone</button>
-        <button type="button" on:click={resetScene}>reset</button>
-      </div>
-
-      <div class="scene-present-strip">
-        {#if presentScenes.length === 0}
-          <span>none</span>
-        {:else}
-          {#each presentScenes as candidate}
-            <button
-              type="button"
-              class:active={candidate.index === scene.index}
-              on:click={() => selectScene(candidate.index)}
-            >
-              {candidate.index + 1}
-            </button>
-          {/each}
-        {/if}
-      </div>
-
-      <div class="scene-keypad" aria-label="Scene bank">
-        {#each project.scenes as candidate}
+  <footer class="arranger-footer">
+    <div class="scene-nav" aria-label="Arrangement scenes">
+      <button
+        type="button"
+        aria-label="Previous scene"
+        title="Previous scene"
+        disabled={frame.selectedStepIndex === 0}
+        on:click={() => moveStep(-1)}>←</button
+      >
+      <div class="scene-strip">
+        {#each frame.sequence.steps as step (step.index)}
           <button
             type="button"
-            class:active={candidate.index === scene.index}
-            class:present={candidate.present}
-            on:click={() => selectScene(candidate.index)}
-            title={`scene ${candidate.index + 1}`}
+            class:active={step.index === frame.selectedStepIndex}
+            aria-label={`${sequenceName} step ${step.index + 1}, scene ${step.sceneIndex + 1}`}
+            title={`scene ${step.sceneIndex + 1}`}
+            on:click={() => selectStep(step.index)}
           >
-            <span>{candidate.index + 1}</span>
-            <i
-              >{candidate.present
-                ? display16thsAsBars(candidate.length16ths)
-                : ""}</i
-            >
+            {step.sceneIndex + 1}
           </button>
         {/each}
       </div>
-    </aside>
-
-    <div class="scene-detail-panel">
-      <div class="section-title">
-        <span>scene {scene.index + 1}</span>
-        <span>{display16thsAsBars(scene.length16ths)}</span>
-      </div>
-
-      <div class="scene-track-editor">
-        {#if sceneTracksWithData.length === 0}
-          <p class="empty-line">No step data in this scene.</p>
-        {:else}
-          {#each sceneTracksWithData as track}
-            {@const patternIndex = scene.patternByTrack[track.index]}
-            {@const pattern = track.patterns[patternIndex]}
-            <div
-              class="arrange-track-row"
-              class:muted={scene.mutedTracks[track.index]}
-            >
-              <button
-                type="button"
-                class="arrange-track-id"
-                on:click={() => openPattern(track.index)}
-              >
-                <span class="track-led" class:red={track.colorRole === "red"}
-                ></span>
-                <strong>{track.label}</strong>
-              </button>
-              <select
-                value={patternIndex}
-                on:change={(event) =>
-                  setScenePattern(
-                    track.index,
-                    Number((event.target as HTMLSelectElement).value),
-                  )}
-              >
-                {#each track.patterns as candidate}
-                  <option value={candidate.index}>P{candidate.index + 1}</option
-                  >
-                {/each}
-              </select>
-              <span
-                >{pattern ? `${pattern.notes.length} notes` : "missing"}</span
-              >
-              <span>{pattern ? pattern.trackScaleLabel : "-"}</span>
-              <button
-                type="button"
-                class:active={scene.mutedTracks[track.index]}
-                on:click={() =>
-                  setSceneMute(track.index, !scene.mutedTracks[track.index])}
-              >
-                {scene.mutedTracks[track.index] ? "muted" : "on"}
-              </button>
-            </div>
-          {/each}
-        {/if}
-      </div>
+      <button
+        type="button"
+        aria-label="Next scene"
+        title="Next scene"
+        disabled={frame.selectedStepIndex >= frame.sequence.steps.length - 1}
+        on:click={() => moveStep(1)}>→</button
+      >
     </div>
 
-    <aside class="song-flow-panel">
-      <div class="section-title">
-        <span>song 1</span>
-        <span
-          >{song.supported
-            ? song.loop
-              ? "loop on"
-              : "loop off"
-            : "read-only"}</span
-        >
-      </div>
-
-      {#if song.supported}
-        <div class="song-controls">
-          <button
-            type="button"
-            on:click={addActiveSceneToSong}
-            disabled={song.sceneChain.length >= SONG_MAX_CHAIN}
-            >add scene {scene.index + 1}</button
-          >
-          <button
-            type="button"
-            class:active={song.loop}
-            on:click={() => updateSong(song.sceneChain, !song.loop)}
-            >{song.loop ? "loop on" : "loop off"}</button
-          >
-        </div>
-
-        <div class="song-ribbon">
-          {#if song.sceneChain.length === 0}
-            <p class="empty-line">No scenes in Song 1.</p>
-          {:else}
-            {#each song.sceneChain as sceneIndex, index}
-              <button
-                type="button"
-                class:active={index === selectedSongStep}
-                on:click={() => {
-                  selectedSongStep = index;
-                  selectScene(sceneIndex);
-                }}
-              >
-                <span>{index + 1}</span>
-                <strong>{sceneIndex + 1}</strong>
-              </button>
-            {/each}
-          {/if}
-        </div>
-
-        {#if song.sceneChain.length > 0}
-          <div class="song-step-editor">
-            <div class="section-title">
-              <span>step {selectedSongStep + 1}</span>
-              <span>scene {selectedSongScene + 1}</span>
-            </div>
-            <select
-              value={selectedSongScene}
-              on:change={(event) =>
-                setSongStepScene(
-                  Number((event.target as HTMLSelectElement).value),
-                )}
-            >
-              {#each project.scenes as candidate}
-                <option value={candidate.index}
-                  >scene {candidate.index + 1}</option
-                >
-              {/each}
-            </select>
-            <div class="action-row">
-              <button
-                type="button"
-                on:click={() => moveSongStep(selectedSongStep, -1)}
-                disabled={selectedSongStep === 0}>up</button
-              >
-              <button
-                type="button"
-                on:click={() => moveSongStep(selectedSongStep, 1)}
-                disabled={selectedSongStep === song.sceneChain.length - 1}
-                >down</button
-              >
-              <button
-                type="button"
-                on:click={() => removeSongStep(selectedSongStep)}>remove</button
-              >
-            </div>
-          </div>
-        {/if}
-      {:else}
-        <p class="empty-line">
-          Song footer shape is not supported for web editing.
-        </p>
-      {/if}
-    </aside>
-  </div>
+    <ArrangeExportActions
+      {project}
+      bind:includeDisabledTracks
+      {exportableNotes}
+      isPlaying={$isPlayingStore}
+      {transportState}
+      playbackAvailable={playbackEvents.length > 0}
+      onTogglePlayback={togglePlayback}
+      onRewindPlayback={rewindPlayback}
+      onEditMidi={onEditMidi ? editMidi : null}
+    />
+  </footer>
 </section>
+
+<style>
+  .arranger-workspace {
+    width: min(1120px, 100%);
+    margin: 0 auto;
+    padding: 26px 18px 34px;
+  }
+
+  .arranger-topline,
+  .arranger-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 14px;
+  }
+
+  .arranger-topline {
+    margin-bottom: 14px;
+  }
+
+  .arranger-topline p,
+  .arranger-status span {
+    margin: 0;
+    color: var(--xy-text-muted);
+    font-size: 11px;
+    font-variant-numeric: tabular-nums;
+    text-transform: uppercase;
+  }
+
+  .arranger-topline h2 {
+    margin: 2px 0 0;
+    color: var(--xy-text);
+    font-size: 22px;
+    font-weight: 520;
+    line-height: 1;
+    text-transform: uppercase;
+  }
+
+  .arranger-status,
+  .scene-nav {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .arranger-status {
+    justify-content: flex-end;
+    flex-wrap: wrap;
+  }
+
+  .arranger-status span {
+    border: 1px solid #2a2a2d;
+    background: #080808;
+    padding: 6px 8px;
+  }
+
+  .arranger-display {
+    position: relative;
+    overflow-x: auto;
+    overflow-y: hidden;
+    border: 1px solid #3a3a40;
+    border-radius: 8px;
+    background: #000;
+    box-shadow: 0 18px 52px rgba(0, 0, 0, 0.38);
+    scrollbar-width: none;
+  }
+  .arranger-display::-webkit-scrollbar {
+    width: 0;
+    height: 0;
+  }
+  .arranger-display::before {
+    content: "";
+    position: absolute;
+    z-index: 2;
+    left: 0;
+    right: 0;
+    top: calc((100% - 54px - 54px) / 2);
+    height: 54px;
+    border-top: 1px solid rgba(255, 255, 255, 0.55);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.55);
+    pointer-events: none;
+  }
+
+  .arranger-columns {
+    display: grid;
+    grid-template-columns: repeat(8, minmax(92px, 1fr));
+    min-width: 736px;
+    height: 414px;
+  }
+  .arranger-footer {
+    margin-top: 12px;
+    min-width: 0;
+  }
+  .scene-nav {
+    min-width: 0;
+    flex: 1;
+  }
+  .scene-strip {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .scene-strip::-webkit-scrollbar {
+    width: 0;
+    height: 0;
+  }
+  .scene-strip button {
+    min-width: 34px;
+    padding: 0 8px;
+    font-variant-numeric: tabular-nums;
+  }
+  .scene-strip button.active {
+    border-color: #f3f1ef;
+    background: #f3f1ef;
+    color: #050505;
+  }
+  .arranger-footer button {
+    min-height: 32px;
+    border-color: #33343a;
+    background: #151515;
+    color: #efeeec;
+    box-shadow: none;
+  }
+  .arranger-footer button:hover:not(:disabled) {
+    border-color: #76777d;
+    background: #24242a;
+  }
+  .arranger-footer button.active {
+    border-color: #f3f1ef;
+    background: #f3f1ef;
+    color: #050505;
+  }
+  @media (max-width: 760px) {
+    .arranger-topline,
+    .arranger-footer {
+      align-items: flex-start;
+      flex-direction: column;
+    }
+
+    .arranger-columns {
+      grid-template-columns: repeat(8, 72px);
+      min-width: 576px;
+      height: 374px;
+    }
+  }
+</style>

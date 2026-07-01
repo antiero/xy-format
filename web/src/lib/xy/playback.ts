@@ -32,6 +32,11 @@ export type PlaybackLane = {
   events: PlaybackEvent[];
 };
 
+export type PlaybackCollectionOptions = {
+  includeMutedTracks?: boolean;
+  instrumentTrackCount?: number;
+};
+
 /** A scene positioned within a linear Song Mode playback timeline. */
 export type SongPlaybackStep = {
   index: number;
@@ -173,6 +178,7 @@ export function collectPlaybackEvents(
   trackIndex: number,
   patternIndex: number,
   sceneIndex = project.activeSceneIndex,
+  options: PlaybackCollectionOptions = {},
 ): PlaybackEvent[] {
   if (scope === "track") {
     const pattern = project.tracks[trackIndex]?.patterns[patternIndex];
@@ -188,7 +194,15 @@ export function collectPlaybackEvents(
 
   return scene.patternByTrack
     .flatMap((scenePatternIndex, sceneTrackIndex) => {
-      if (scene.mutedTracks[sceneTrackIndex]) return [];
+      if (
+        options.instrumentTrackCount !== undefined &&
+        sceneTrackIndex >= options.instrumentTrackCount
+      ) {
+        return [];
+      }
+      if (!options.includeMutedTracks && scene.mutedTracks[sceneTrackIndex]) {
+        return [];
+      }
       const pattern =
         project.tracks[sceneTrackIndex]?.patterns[scenePatternIndex];
       return pattern
@@ -231,16 +245,22 @@ export function collectSongPlaybackSteps(
 export function collectSongPlaybackEvents(
   project: XYProjectViewModel,
   steps: readonly SongPlaybackStep[],
+  options: PlaybackCollectionOptions = {},
 ): PlaybackEvent[] {
   return steps
     .flatMap((step) =>
-      collectPlaybackEvents(project, "scene", 0, 0, step.sceneIndex).map(
-        (event) => ({
-          ...event,
-          id: `song:${step.index}:${event.id}`,
-          start16ths: event.start16ths + step.start16ths,
-        }),
-      ),
+      collectPlaybackEvents(
+        project,
+        "scene",
+        0,
+        0,
+        step.sceneIndex,
+        options,
+      ).map((event) => ({
+        ...event,
+        id: `song:${step.index}:${event.id}`,
+        start16ths: event.start16ths + step.start16ths,
+      })),
     )
     .sort((a, b) => a.start16ths - b.start16ths);
 }
