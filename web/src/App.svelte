@@ -400,6 +400,9 @@
         <a href="https://github.com/kmorrill/xy-format" target="_blank"
           >kmorrill</a
         >.
+        <span class="firmware-footnote">
+          Supports firmware 1.1.15 or later.
+        </span>
       </p>
     </section>
   {/if}

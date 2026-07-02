@@ -3,6 +3,7 @@ import { decodeProject, encodeProject } from "./rle";
 export const TRACK_BASE0 = 0x0d79;
 export const TRACK_STRIDE = 17876;
 export const TRACK_COUNT = 16;
+export const MAX_PATTERNS_PER_TRACK = 16;
 
 export const OFF_PATTERN_STEPS = 0x01;
 export const OFF_BARS = OFF_PATTERN_STEPS;
@@ -27,6 +28,13 @@ export const SONG_MAX_CHAIN = 96;
 
 const TRACK_HEADER_MAGIC = [0xff, 0x00, 0xfc, 0x00];
 const TRACK_TO_SCENE_SLOT_DELTA = TRACK_BASE0 - SCENE_SLOT0;
+
+function clampPatternIndex(patternIndex: number): number {
+  return Math.max(
+    0,
+    Math.min(MAX_PATTERNS_PER_TRACK - 1, Math.trunc(patternIndex || 0)),
+  );
+}
 
 export type PatternNoteInput = {
   step: number;
@@ -376,8 +384,10 @@ export function buildArrangementFromBytes(
       continue;
     }
 
-    if (patterns.length > 16) {
-      throw new Error("OP-XY tracks support at most 16 patterns");
+    if (patterns.length > MAX_PATTERNS_PER_TRACK) {
+      throw new Error(
+        `OP-XY tracks support at most ${MAX_PATTERNS_PER_TRACK} patterns`,
+      );
     }
 
     const structs = patterns.map((pattern) =>
@@ -690,7 +700,7 @@ export class ImageProject {
     patternIndex: number,
   ): void {
     const slot = this.sceneSlot0 + sceneIndex * SCENE_SLOT_SIZE;
-    this.image[slot + trackIndex - 1] = patternIndex;
+    this.image[slot + trackIndex - 1] = clampPatternIndex(patternIndex);
     this.image[slot + 32] = 1; // flag
   }
 
@@ -742,7 +752,7 @@ export class ImageProject {
   ): void {
     const slot = this.sceneSlot0 + sceneIndex * SCENE_SLOT_SIZE;
     for (let i = 0; i < TRACK_COUNT; i++) {
-      this.image[slot + i] = Math.max(0, Math.min(8, patterns[i] ?? 0));
+      this.image[slot + i] = clampPatternIndex(patterns[i] ?? 0);
       this.image[slot + 16 + i] = mutes[i] ? SCENE_MUTE_VALUE : 0;
     }
     this.image[slot + 32] = 1;

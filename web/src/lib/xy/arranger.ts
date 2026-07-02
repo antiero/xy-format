@@ -1,4 +1,4 @@
-import { TRACK_COUNT } from "./image_writer";
+import { MAX_PATTERNS_PER_TRACK, TRACK_COUNT } from "./image_writer";
 import type {
   XYPatternViewModel,
   XYProjectViewModel,
@@ -9,7 +9,7 @@ import type {
 export const ARRANGER_TRACK_COUNT = 8;
 export const ARRANGER_PATTERN_ROWS = 16;
 export const ARRANGER_CENTER_ROW = 7;
-export const ARRANGER_MAX_PATTERNS = 16;
+export const ARRANGER_MAX_PATTERNS = MAX_PATTERNS_PER_TRACK;
 
 export type ArrangerSequenceSource = "song" | "scenes";
 
