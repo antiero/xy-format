@@ -1,25 +1,25 @@
 #!/usr/bin/env python3
-"""Interactive MIDI harness for 9-pattern × 8-track capture.
+"""Interactive MIDI harness for 16-pattern × 8-track capture.
 
 Fires one note per track (channels 1-8) for each pattern round.
 Uses a unique MIDI note per pattern so we can identify them in the binary.
 
 Workflow:
   1. On the OP-XY: create a new project
-  2. Add 8 patterns to EVERY track (T1-T8), so each has 9 patterns (A-I)
+  2. Add 15 patterns to EVERY track (T1-T8), so each has 16 patterns (A-P)
   3. Set MIDI channels 1-8 mapped to tracks 1-8
   4. Set OP-XY to receive external MIDI clock
   5. Run this script
   6. For each round: navigate all tracks to the indicated pattern,
      arm record, press Enter — the script fires 8 notes and stops
-  7. After all 9 rounds, export the .xy file
+  7. After all 16 rounds, export the .xy file
 
 Requirements:
   pip install mido python-rtmidi
 
 Usage:
-  python tools/capture_9pat.py --port "OP-XY"
-  python tools/capture_9pat.py --list-ports
+  python tools/capture_16pat.py --port "OP-XY"
+  python tools/capture_16pat.py --list-ports
 """
 
 from __future__ import annotations
@@ -50,9 +50,16 @@ PATTERN_NOTES = {
     7: 59,   # B3
     8: 60,   # C4
     9: 62,   # D4
+    10: 64,
+    11: 65,
+    12: 67,
+    13: 69,
+    14: 71,
+    15: 49,
+    16: 51,
 }
 
-PATTERN_NAMES = "ABCDEFGHI"
+PATTERN_NAMES = "ABCDEFGHIJKLMNOP"
 
 VELOCITY = 100  # safe: won't collide with any of the note values above
 
@@ -98,7 +105,7 @@ def fire_round(port: mido.ports.BaseOutput, pattern_num: int, bpm: float) -> Non
 
 def main() -> None:
     parser = argparse.ArgumentParser(
-        description="Interactive 9-pattern × 8-track MIDI capture harness"
+        description="Interactive 16-pattern × 8-track MIDI capture harness"
     )
     parser.add_argument("--list-ports", action="store_true",
                         help="List MIDI ports and exit")
@@ -107,7 +114,7 @@ def main() -> None:
     parser.add_argument("--bpm", type=float, default=120.0,
                         help="Tempo (default 120, must match project)")
     parser.add_argument("--start", type=int, default=1,
-                        help="Start from pattern N (1-9, for resuming)")
+                        help="Start from pattern N (1-16, for resuming)")
     args = parser.parse_args()
 
     if args.list_ports:
@@ -122,7 +129,7 @@ def main() -> None:
     print(f"Connected to: {args.port}")
     print()
     print("=" * 60)
-    print("9-PATTERN × 8-TRACK CAPTURE")
+    print("16-PATTERN × 8-TRACK CAPTURE")
     print("=" * 60)
     print()
     print("Each round fires 1 note on channels 1-8 (all tracks) at step 1.")
@@ -138,14 +145,14 @@ def main() -> None:
     print()
 
     try:
-        for pn in range(args.start, 10):
+        for pn in range(args.start, 17):
             letter = PATTERN_NAMES[pn - 1]
             note = PATTERN_NOTES[pn]
             names = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"]
             note_name = f"{names[note % 12]}{note // 12 - 1}"
 
             print("-" * 60)
-            print(f"ROUND {pn}/9 — Pattern {letter}")
+            print(f"ROUND {pn}/16 — Pattern {letter}")
             print(f"  Note: {note} ({note_name}), Velocity: {VELOCITY}")
             print()
             print(f"  1. Select Pattern {letter} on ALL tracks (T1-T8)")
@@ -158,7 +165,7 @@ def main() -> None:
             print()
 
         print("=" * 60)
-        print("ALL 9 ROUNDS COMPLETE!")
+        print("ALL 16 ROUNDS COMPLETE!")
         print("Export the .xy file from the OP-XY.")
         print("=" * 60)
 
