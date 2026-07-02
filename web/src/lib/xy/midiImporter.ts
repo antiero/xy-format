@@ -9,6 +9,7 @@ import {
 import {
   buildArrangementFromBytes,
   ImageProject,
+  MAX_PATTERNS_PER_TRACK,
   SCENE_COUNT,
   SONG_MAX_CHAIN,
   STEP_TICKS,
@@ -177,7 +178,6 @@ const ROLE_MIN_ACTIVE_BARS: Record<Role, number> = {
 
 const MAX_NOTES_PER_PATTERN = 120;
 const MAX_PREVIEW_NOTES_PER_TRACK = 900;
-const MAX_PATTERNS_PER_TRACK = 9;
 const INSTRUMENT_TRACK_COUNT = 8;
 const BAR_16THS = 16;
 const PATTERN_16THS = BAR_16THS * 4;
@@ -1353,9 +1353,9 @@ function maxSafeRangeForSelected(args: {
 /**
  * Convert a timeline of 4-bar windows into device-valid pattern banks.
  *
- * OP-XY exposes only nine patterns on each instrument track, but Song mode
+ * OP-XY exposes 16 patterns on each instrument track, but Song mode
  * can chain 96 scenes. Repeated windows are stored once and selected again
- * by later scenes. A source lane with more than nine distinct windows is
+ * by later scenes. A source lane with more than 16 distinct windows is
  * spread over spare instrument tracks; the scene mutes every non-selected
  * bank so only one copy of that lane plays at a time.
  */

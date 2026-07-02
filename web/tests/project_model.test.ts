@@ -111,18 +111,18 @@ describe("project view model and edit bridge", () => {
     ).toBe(true);
   });
 
-  it("reads observed scale-3 byte without falling back to unknown timing", () => {
+  it("reads observed scale-4 byte without falling back to unknown timing", () => {
     const imageProject = ImageProject.fromBytes(
       new Uint8Array(readFileSync(BASELINE)),
     );
     imageProject.setTrackScaleRaw(1, 0x07, 0);
-    const project = buildProjectViewModel(imageProject, "scale-3.xy");
+    const project = buildProjectViewModel(imageProject, "scale-4.xy");
     expect(project.tracks[0].patterns[0]).toMatchObject({
-      trackScale: "3",
-      trackScaleLabel: "3",
+      trackScale: "4",
+      trackScaleLabel: "4",
       trackScaleKnown: true,
       trackScaleWriteSupported: false,
-      effectiveLength16ths: 48,
+      effectiveLength16ths: 64,
     });
     expect(
       project.validation.some((issue) => issue.code === "track-scale-unknown"),

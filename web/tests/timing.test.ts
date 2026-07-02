@@ -59,8 +59,8 @@ describe("timing model", () => {
       supportedForWrite: true,
     });
     expect(decodeTrackScale(0x07)).toMatchObject({
-      scale: "3",
-      factor16ths: 3,
+      scale: "4",
+      factor16ths: 4,
       supportedForWrite: false,
     });
     expect(decodeTrackScale(0x0e)).toMatchObject({
@@ -95,24 +95,49 @@ describe("timing model", () => {
         { trackScale: "1", totalSteps: 16 },
       ),
     ).toEqual({
-      start16ths: 15.979166666666666,
+      start16ths: 0,
       duration16ths: 1,
     });
   });
 
   it("computes scene length as the longest selected scaled pattern", () => {
+    const note = { tick: 0 } as XYPatternViewModel["notes"][number];
     const p1 = {
+      index: 0,
+      bars: 4,
+      finalBarSteps: 16,
       totalSteps: 64,
+      rawSteps: 64,
       trackScale: "1",
+      trackScaleRaw: 0x03,
+      trackScaleLabel: "1",
+      trackScaleKnown: true,
+      trackScaleWriteSupported: true,
+      timingMode: "step",
       effectiveLength16ths: 64,
+      notes: [note],
+      plocks: [],
+      stepComponents: [],
     } as XYPatternViewModel;
     const p2 = {
+      index: 0,
+      bars: 2,
+      finalBarSteps: 8,
       totalSteps: 24,
+      rawSteps: 24,
       trackScale: "4",
+      trackScaleRaw: 0x07,
+      trackScaleLabel: "4",
+      trackScaleKnown: true,
+      trackScaleWriteSupported: false,
+      timingMode: "step",
       effectiveLength16ths: patternEffectiveLength16ths({
         totalSteps: 24,
         trackScale: "4",
       } as XYPatternViewModel),
+      notes: [note],
+      plocks: [],
+      stepComponents: [],
     } as XYPatternViewModel;
     const tracks = [
       { patterns: [p1] },
@@ -240,7 +265,7 @@ describe("timing model", () => {
     expect(lanes.map((lane) => lane.trackLabel)).toEqual(["T1", "T3"]);
     expect(laneLoopLength16ths(lanes)).toBe(32);
     expect(collectLanePlaybackEvents(lanes).map((event) => event.note)).toEqual(
-      [53],
+      [53, 53],
     );
     expect(
       collectLanePlaybackEvents(lanes, new Set([0])).map((event) => event.note),

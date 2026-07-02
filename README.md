@@ -90,7 +90,7 @@ work is field polish, productization, and edge-case validation:
 - Multisampler zones/slicing and user `.preset` file format are not fully
   decoded.
 - Limits certification remains for max scenes, visible song slots, full
-  9-pattern topology, and 120-note edge cases.
+  16-pattern topology, and 120-note edge cases.
 
 For the live status, use [the roadmap](docs/roadmap.md) and
 [the capability checklist](docs/parse_capability_checklist.md).
