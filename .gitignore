@@ -4,6 +4,7 @@ __pycache__/
 *$py.class
 
 # Packaging
+node_modules/
 build/
 develop-eggs/
 dist/

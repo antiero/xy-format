@@ -16,11 +16,12 @@ from dataclasses import dataclass, field
 
 from xy.rle import decode_project, encode_project
 
-SIG_RE = re.compile(rb"\x00\x00\x00[\x00-\x0f]\xff\x00\xfc\x00", re.S)
+SIG_RE = re.compile(rb"\x00\x00\x00[\x00-\x10]\xff\x00\xfc\x00", re.S)
 
 TRACK_BASE0 = 0x0D79
 TRACK_STRIDE = 17876
 TRACK_COUNT = 16
+MAX_PATTERNS_PER_TRACK = 16
 SCENE_SLOT0 = 0x95
 TRACK_HEADER_MAGIC = b"\xFF\x00\xFC\x00"
 TRACK_TO_SCENE_SLOT_DELTA = TRACK_BASE0 - SCENE_SLOT0
@@ -46,9 +47,9 @@ def _has_plausible_pattern_header(
         return False
     count_or_clone = image[start]
     if leader_only:
-        if not 1 <= count_or_clone <= 9:
+        if not 1 <= count_or_clone <= MAX_PATTERNS_PER_TRACK:
             return False
-    elif count_or_clone > 9:
+    elif count_or_clone > MAX_PATTERNS_PER_TRACK:
         return False
     steps = image[start + OFF_PATTERN_STEPS]
     if not 1 <= steps <= 64:
@@ -90,7 +91,7 @@ def pattern_starts_from_image(image: bytes | bytearray) -> list[int]:
         if pos < 0 or pos + TRACK_STRIDE > len(image):
             return []
         pattern_count = image[pos]
-        if not 1 <= pattern_count <= 9:
+        if not 1 <= pattern_count <= MAX_PATTERNS_PER_TRACK:
             pattern_count = 1
         starts.append(pos)
         if pos + OFF_NOTE_COUNT >= len(image):
@@ -135,7 +136,7 @@ def pattern_starts_by_track_from_image(image: bytes | bytearray) -> list[list[in
         if pos < 0 or pos + TRACK_STRIDE > len(image):
             return track_patterns
         pattern_count = image[pos]
-        if not 1 <= pattern_count <= 9:
+        if not 1 <= pattern_count <= MAX_PATTERNS_PER_TRACK:
             pattern_count = 1
         pattern_starts.append(pos)
         if pos + OFF_NOTE_COUNT >= len(image):
@@ -171,7 +172,7 @@ def leader_starts_from_image(image: bytes | bytearray) -> list[int]:
             return []
         leaders.append(pos)
         pattern_count = image[pos]
-        if not 1 <= pattern_count <= 9:
+        if not 1 <= pattern_count <= MAX_PATTERNS_PER_TRACK:
             pattern_count = 1
         if pos + OFF_NOTE_COUNT >= len(image):
             return []
@@ -235,8 +236,8 @@ class ImageProject:
         """1-based track/pattern -> physical pattern struct base offset."""
         if not 1 <= track <= TRACK_COUNT:
             raise ValueError("track must be 1..16")
-        if not 1 <= pattern <= 9:
-            raise ValueError("pattern must be 1..9")
+        if not 1 <= pattern <= MAX_PATTERNS_PER_TRACK:
+            raise ValueError(f"pattern must be 1..{MAX_PATTERNS_PER_TRACK}")
         starts_by_track = self._pattern_starts or pattern_starts_by_track_from_image(
             self.image
         )
@@ -1603,8 +1604,11 @@ def build_arrangement(
             mutes = scene_mutes[k - 1] if scene_mutes and k - 1 < len(scene_mutes) else []
             if force_scene_presence or any(row.values()) or mutes:
                 for t, pat in row.items():
-                    if not 1 <= t <= 16 or not 0 <= pat <= 8:
-                        raise ValueError("scene selection must be track 1..16, pattern 0..8")
+                    if not 1 <= t <= 16 or not 0 <= pat < MAX_PATTERNS_PER_TRACK:
+                        raise ValueError(
+                            "scene selection must be track 1..16, "
+                            f"pattern 0..{MAX_PATTERNS_PER_TRACK - 1}"
+                        )
                     g[slot + t - 1] = pat
                 for t in mutes:
                     if not 1 <= t <= 16:
@@ -1625,8 +1629,10 @@ def build_arrangement(
         if not pats:
             parts.append(base_struct + tail)
             continue
-        if len(pats) > 9:
-            raise ValueError("OP-XY tracks support at most 9 patterns")
+        if len(pats) > MAX_PATTERNS_PER_TRACK:
+            raise ValueError(
+                f"OP-XY tracks support at most {MAX_PATTERNS_PER_TRACK} patterns"
+            )
         structs = [_pattern_struct(base_struct, p) for p in pats]
         leader = bytearray(structs[0])
         leader[0] = len(pats)

@@ -6,13 +6,13 @@ Uses a unique MIDI note per pattern so we can identify them in the binary.
 
 Workflow:
   1. On the OP-XY: create a new project
-  2. Add 8 patterns to EVERY track (T1-T8), so each has 16 patterns (A-I)
+  2. Add 15 patterns to EVERY track (T1-T8), so each has 16 patterns (A-P)
   3. Set MIDI channels 1-8 mapped to tracks 1-8
   4. Set OP-XY to receive external MIDI clock
   5. Run this script
   6. For each round: navigate all tracks to the indicated pattern,
      arm record, press Enter — the script fires 8 notes and stops
-  7. After all 9 rounds, export the .xy file
+  7. After all 16 rounds, export the .xy file
 
 Requirements:
   pip install mido python-rtmidi
