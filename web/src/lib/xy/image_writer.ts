@@ -90,7 +90,7 @@ function hasPlausiblePatternHeader(
 ): boolean {
   if (start < 0 || start + OFF_NOTE_COUNT >= image.length) return false;
   const countOrClone = image[start];
-  if (leaderOnly ? countOrClone < 1 || countOrClone > 9 : countOrClone > 9) {
+  if (leaderOnly ? countOrClone < 1 || countOrClone > 16 : countOrClone > 16) {
     return false;
   }
   const steps = image[start + OFF_PATTERN_STEPS];
@@ -232,7 +232,7 @@ export function leaderStartsFromImage(image: Uint8Array): number[] {
     }
     leaders.push(pos);
     let patternCount = image[pos];
-    if (patternCount < 1 || patternCount > 9) {
+    if (patternCount < 1 || patternCount > 16) {
       patternCount = 1;
     }
     if (pos + OFF_NOTE_COUNT >= image.length) {
@@ -279,7 +279,7 @@ export function patternStartsFromImage(image: Uint8Array): number[][] {
       return trackPatterns;
     }
     let patternCount = image[pos];
-    if (patternCount < 1 || patternCount > 9) {
+    if (patternCount < 1 || patternCount > 16) {
       patternCount = 1;
     }
     patternStarts.push(pos);
@@ -315,7 +315,7 @@ export function trackDataEndFromImage(image: Uint8Array): number | null {
       return null;
     }
     let patternCount = image[pos];
-    if (patternCount < 1 || patternCount > 9) {
+    if (patternCount < 1 || patternCount > 16) {
       patternCount = 1;
     }
     if (pos + OFF_NOTE_COUNT >= image.length) {
@@ -376,8 +376,8 @@ export function buildArrangementFromBytes(
       continue;
     }
 
-    if (patterns.length > 9) {
-      throw new Error("OP-XY tracks support at most 9 patterns");
+    if (patterns.length > 16) {
+      throw new Error("OP-XY tracks support at most 16 patterns");
     }
 
     const structs = patterns.map((pattern) =>

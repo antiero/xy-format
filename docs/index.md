@@ -28,7 +28,7 @@ User-facing:
 - MIDI → .xy conversion: `docs/tools/midi_to_xy.md` (`tools/midi_to_xy.py`)
 - P-lock extraction: `tools/extract_plocks.py`
 - Corpus-wide analyses: `tools/analyze_corpus.py`
-- Multi-pattern device capture: `tools/capture_9pat.py`
+- Multi-pattern device capture: `tools/capture_16pat.py`
 - Round-trip verification: `tools/roundtrip_xy.py`
 
 Research (under `tools/analysis/`):
