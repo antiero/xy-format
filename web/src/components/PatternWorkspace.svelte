@@ -11,6 +11,7 @@
     scrollYStore,
     undoProjectEdit,
   } from "../stores/project";
+  import ProjectTempoControl from "./ProjectTempoControl.svelte";
   import { audioService } from "../lib/audio";
   import { STEP_TICKS } from "../lib/xy/image_writer";
   import {
@@ -922,7 +923,7 @@
           </div>
         </div>
         <div class="transport-readout">
-          <span>{project.tempoBpm.toFixed(1)} bpm</span>
+          <ProjectTempoControl tempoBpm={project.tempoBpm} />
           <span
             >{playbackEvents.length} note{playbackEvents.length === 1
               ? ""

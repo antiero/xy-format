@@ -19,9 +19,10 @@
   import type { XYProjectViewModel } from "../lib/xy/projectViewModel";
   import ArrangeExportActions from "./ArrangeExportActions.svelte";
   import ArrangeTrackColumn from "./ArrangeTrackColumn.svelte";
+  import ProjectTempoControl from "./ProjectTempoControl.svelte";
 
   export let project: XYProjectViewModel;
-  export let onEditMidi: (() => void) | null = null;
+  export let onTempoChange: (tempoBpm: number) => void = () => {};
 
   let selectedStepIndex = 0;
   let frame: ArrangerFrame;
@@ -164,10 +165,6 @@
       ),
     );
   }
-  function editMidi() {
-    stopPlayback();
-    onEditMidi?.();
-  }
   onDestroy(() => {
     stopPlayback();
   });
@@ -181,7 +178,7 @@
     </div>
     <div class="arranger-status">
       <span title="Current scene">scene {frame.scene.index + 1}</span>
-      <span title="Project tempo">{project.tempoBpm.toFixed(1)} bpm</span>
+      <ProjectTempoControl tempoBpm={project.tempoBpm} {onTempoChange} />
       <span title="Exportable decoded instrument notes">{exportableNotes}</span>
     </div>
   </header>
@@ -234,7 +231,6 @@
       playbackAvailable={playbackEvents.length > 0}
       onTogglePlayback={togglePlayback}
       onRewindPlayback={rewindPlayback}
-      onEditMidi={onEditMidi ? editMidi : null}
     />
   </footer>
 </section>
@@ -361,6 +357,10 @@
     color: #050505;
   }
   @media (max-width: 760px) {
+    .arranger-display {
+      overflow-x: hidden;
+    }
+
     .arranger-topline,
     .arranger-footer {
       align-items: flex-start;
@@ -368,8 +368,8 @@
     }
 
     .arranger-columns {
-      grid-template-columns: repeat(8, 72px);
-      min-width: 576px;
+      grid-template-columns: repeat(8, minmax(0, 1fr));
+      min-width: 0;
       height: 374px;
     }
   }

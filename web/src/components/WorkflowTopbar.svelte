@@ -1,6 +1,7 @@
 <script lang="ts">
   import type { MidiImportSummary } from "../lib/xy/midiImporter";
   import type { XYProjectViewModel } from "../lib/xy/projectViewModel";
+  import ProjectTempoControl from "./ProjectTempoControl.svelte";
 
   type ValidationCounts = {
     errors: number;
@@ -21,6 +22,8 @@
   export let midiSelectionUpdating = false;
   export let onProjectNameCommit: () => void = () => {};
   export let onDownloadProject: () => void | Promise<void> = () => {};
+  export let onTempoChange: (tempoBpm: number) => void = () => {};
+  export let onRefineMidi: (() => void) | null = null;
   export let onReplaceMidi: () => void = () => {};
   export let onBurnMidiToSong: () => void | Promise<void> = () => {};
 
@@ -50,7 +53,6 @@
         ]
       : []),
     { label: "notes", value: `${importSummary?.importedNotes ?? 0} notes` },
-    { label: "tempo", value: `${project.tempoBpm.toFixed(1)} bpm` },
   ] satisfies SummaryItem[];
   $: validationText =
     counts.errors > 0
@@ -79,6 +81,7 @@
         {#each midiSummaryItems as item}
           <span title={item.label}>{item.value}</span>
         {/each}
+        <ProjectTempoControl tempoBpm={project.tempoBpm} {onTempoChange} />
         {#if validationText}
           <span
             class:error={counts.errors > 0}
@@ -95,6 +98,14 @@
   <div class="workflow-actions">
     {#if projectCreated}
       <button type="button" on:click={onDownloadProject}>export .xy</button>
+      {#if onRefineMidi}
+        <button
+          type="button"
+          aria-label="Refine the imported MIDI"
+          title="Return to the MIDI editor"
+          on:click={onRefineMidi}>Refine MIDI</button
+        >
+      {/if}
       <button type="button" on:click={onReplaceMidi}>import .mid / .xy</button>
     {:else}
       <button type="button" on:click={onReplaceMidi}>replace MIDI</button>

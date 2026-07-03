@@ -21,6 +21,7 @@
     type MidiImportOptions,
     type MidiImportSummary,
   } from "./lib/xy/midiImporter";
+  import { midiImportNeedsEditor } from "./lib/xy/midiImportWorkflow";
   import { validationCounts } from "./lib/xy/validation";
   import {
     bytesToBase64,
@@ -98,6 +99,7 @@
       importSummary = result.summary;
       importedMidiFile = file;
       midiImportOptions = {
+        bpmOverride: result.summary.bpm,
         selectedTrackIds: result.summary.trackSelection?.selectedTrackIds,
         rangeStart16ths: result.summary.rangeStart16ths,
         rangeEnd16ths: result.summary.rangeEnd16ths,
@@ -107,10 +109,14 @@
       projectCreated = false;
       currentTickStore.set(0);
       isPlayingStore.set(false);
-      announceDisplayMessage(
-        `MIDI ${result.summary.importedNotes} NOTES`,
-        "ok",
-      );
+      if (midiImportNeedsEditor(result.summary)) {
+        announceDisplayMessage(
+          `MIDI ${result.summary.importedNotes} NOTES`,
+          "ok",
+        );
+      } else {
+        await burnMidiToSong();
+      }
     } catch (error) {
       console.error(error);
       loadError =
@@ -146,6 +152,7 @@
       projectStore.set(result.project);
       importSummary = result.summary;
       midiImportOptions = {
+        bpmOverride: result.summary.bpm,
         selectedTrackIds: result.summary.trackSelection?.selectedTrackIds,
         rangeStart16ths: result.summary.rangeStart16ths,
         rangeEnd16ths: result.summary.rangeEnd16ths,
@@ -239,10 +246,11 @@
   ): Promise<ReadyProjectExport | null> {
     const project = $projectStore;
     if (!project) return null;
+    const currentCounts = validationCounts(project.validation);
     if (
-      counts.errors > 0 &&
+      currentCounts.errors > 0 &&
       !window.confirm(
-        `Create this project with ${counts.errors} validation error(s)?`,
+        `Create this project with ${currentCounts.errors} validation error(s)?`,
       )
     ) {
       announceDisplayMessage("PROJECT CANCELLED", "warn");
@@ -282,6 +290,14 @@
     currentTickStore.set(0);
     isPlayingStore.set(false);
     announceDisplayMessage("MIDI EDITOR", "neutral");
+  }
+
+  function rememberTempoOverride(tempoBpm: number) {
+    readyExport = null;
+    if (importedMidiFile) {
+      midiImportOptions = { ...midiImportOptions, bpmOverride: tempoBpm };
+      if (importSummary) importSummary = { ...importSummary, bpm: tempoBpm };
+    }
   }
 
   async function downloadXYProject() {
@@ -343,6 +359,10 @@
       {midiSelectionUpdating}
       onProjectNameCommit={() => commitProjectFileName()}
       onDownloadProject={downloadXYProject}
+      onTempoChange={rememberTempoOverride}
+      onRefineMidi={importedMidiFile && importSummary?.trackSelection
+        ? returnToMidiEditor
+        : null}
       onReplaceMidi={() => midiFileInput.click()}
       onBurnMidiToSong={burnMidiToSong}
     />
@@ -350,9 +370,7 @@
     {#if projectCreated}
       <CreatedProjectWorkspace
         project={$projectStore}
-        onEditMidi={importedMidiFile && importSummary
-          ? returnToMidiEditor
-          : null}
+        onTempoChange={rememberTempoOverride}
       />
     {:else}
       <ProjectReadyPanel

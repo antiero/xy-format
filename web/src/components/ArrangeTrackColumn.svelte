@@ -69,12 +69,12 @@
 
   @media (max-width: 760px) {
     .arrange-column {
-      min-width: 72px;
+      min-width: 0;
       grid-template-rows: 46px minmax(0, 1fr);
     }
 
     .track-header {
-      font-size: 34px;
+      font-size: clamp(24px, 8vw, 34px);
     }
   }
 </style>

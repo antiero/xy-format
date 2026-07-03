@@ -25,7 +25,7 @@
   const LANE_HEADER_WIDTH = 284;
   const MOBILE_LANE_HEADER_WIDTH = 238;
   const TRACK_HEIGHT = 46;
-  const MIN_CYCLE_16THS = 64;
+  const MIN_CYCLE_16THS = 16;
 
   let lanesElement: HTMLDivElement;
   let resizeObserver: ResizeObserver | undefined;

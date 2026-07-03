@@ -80,6 +80,55 @@ function singlePolyphonicLaneMidi(): Uint8Array {
   return new Uint8Array(writeMidi(data));
 }
 
+function oneBarDrumMidi(): Uint8Array {
+  const tpb = 480;
+  const noteEvents: Array<{
+    tick: number;
+    event: Omit<MidiEvent, "deltaTime">;
+  }> = [];
+
+  for (const tick of [0, 480, 960, 1440, 1800]) {
+    const noteNumber = tick % 960 === 0 ? 36 : 42;
+    noteEvents.push(
+      {
+        tick,
+        event: {
+          type: "noteOn",
+          channel: 9,
+          noteNumber,
+          velocity: 114,
+        },
+      },
+      {
+        tick: tick + 90,
+        event: {
+          type: "noteOff",
+          channel: 9,
+          noteNumber,
+          velocity: 0,
+        },
+      },
+    );
+  }
+
+  const data: MidiData = {
+    header: { format: 0, numTracks: 1, ticksPerBeat: tpb },
+    tracks: [
+      [
+        {
+          deltaTime: 0,
+          type: "setTempo",
+          meta: true,
+          microsecondsPerBeat: 500_000,
+        },
+        ...makeTrackFromAbsolute(noteEvents),
+        { deltaTime: 30, type: "endOfTrack", meta: true },
+      ],
+    ],
+  };
+  return new Uint8Array(writeMidi(data));
+}
+
 function longDistinctDrumMidi(patternCount = 17): Uint8Array {
   const tpb = 480;
   const bar = tpb * 4;
@@ -305,6 +354,29 @@ function manyLongDistinctTracksMidi(
 }
 
 describe("MIDI new-project importer", () => {
+  it("authors a one-bar MIDI as a 16-step pattern without trailing silence", () => {
+    const baseline = new Uint8Array(readFileSync(BASELINE));
+    const result = buildMidiProjectFromBytes(
+      oneBarDrumMidi(),
+      "amen-break.mid",
+      baseline,
+    );
+
+    expect(result.summary).toMatchObject({
+      patterns: 1,
+      scenes: 1,
+      totalBars: 1,
+      sourceTotalBars: 1,
+      sourceTotal16ths: 16,
+      rangeStart16ths: 0,
+      rangeEnd16ths: 16,
+    });
+    expect(result.summary.trackSelection?.total16ths).toBe(16);
+    expect(result.project.tracks[0].patterns[0].totalSteps).toBe(16);
+    expect(result.project.scenes[0].length16ths).toBe(16);
+    expect(result.project.songs[0].sceneChain).toEqual([0]);
+  });
+
   it("reuses a repeated chord pattern across Song scenes without duplicating a second chord slot", () => {
     const baseline = new Uint8Array(readFileSync(BASELINE));
     const result = buildMidiProjectFromBytes(

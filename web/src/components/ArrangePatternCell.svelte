@@ -90,4 +90,16 @@
     width: 4px;
     height: 4px;
   }
+
+  @media (max-width: 760px) {
+    .pattern-id {
+      left: 4px;
+      top: 5px;
+      font-size: 10px;
+    }
+
+    .note-plane {
+      inset: 7px 4px 6px 14px;
+    }
+  }
 </style>

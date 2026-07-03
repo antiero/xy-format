@@ -4,7 +4,7 @@
   import SongModeWorkspace from "./SongModeWorkspace.svelte";
 
   export let project: XYProjectViewModel;
-  export let onEditMidi: (() => void) | null = null;
+  export let onTempoChange: (tempoBpm: number) => void = () => {};
 
   let mode: "arrange" | "song" = "arrange";
 </script>
@@ -26,9 +26,9 @@
   </nav>
 
   {#if mode === "arrange"}
-    <ArrangeWorkspace {project} {onEditMidi} />
+    <ArrangeWorkspace {project} {onTempoChange} />
   {:else}
-    <SongModeWorkspace {project} {onEditMidi} />
+    <SongModeWorkspace {project} {onTempoChange} />
   {/if}
 </section>
 

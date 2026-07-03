@@ -15,6 +15,7 @@
     dispatchProjectEdit,
     isPlayingStore,
   } from "../stores/project";
+  import ProjectTempoControl from "./ProjectTempoControl.svelte";
   import type { XYProjectViewModel } from "../lib/xy/projectViewModel";
 
   export let project: XYProjectViewModel;
@@ -207,7 +208,7 @@
       </label>
 
       <div class="transport-readout">
-        <span>{project.tempoBpm.toFixed(1)} bpm</span>
+        <ProjectTempoControl tempoBpm={project.tempoBpm} />
         <span>{activeLaneCount}/{lanes.length} active</span>
       </div>
 
