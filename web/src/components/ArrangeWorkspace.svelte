@@ -308,19 +308,6 @@
     width: 0;
     height: 0;
   }
-  .arranger-display::before {
-    content: "";
-    position: absolute;
-    z-index: 2;
-    left: 0;
-    right: 0;
-    top: calc((100% - 54px - 54px) / 2);
-    height: 54px;
-    border-top: 1px solid rgba(255, 255, 255, 0.55);
-    border-bottom: 1px solid rgba(255, 255, 255, 0.55);
-    pointer-events: none;
-  }
-
   .arranger-columns {
     display: grid;
     grid-template-columns: repeat(8, minmax(92px, 1fr));

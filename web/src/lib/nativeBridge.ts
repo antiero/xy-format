@@ -3,6 +3,7 @@ export type XYBuddyNativeExportPayload = {
   base64Data: string;
   metadata: {
     sourceMidiFilename: string | null;
+    maxPatternsPerTrack?: number;
     generatorVersion: string;
     xyFormatVersion: string;
   };

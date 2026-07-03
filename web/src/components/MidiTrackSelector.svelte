@@ -51,9 +51,6 @@
     songLength16ths > 0
       ? Math.max(0, Math.min(1, $currentTickStore / songLength16ths))
       : 0;
-  $: selectedTrackCount = selection.tracks.filter((track) =>
-    selectedIds.has(track.id),
-  ).length;
   $: effectiveSelectedIds = new Set(
     pendingFitTrackIds ?? selection.selectedTrackIds,
   );
@@ -254,25 +251,6 @@
 </script>
 
 <section class="midi-track-selector" aria-label="MIDI track selection">
-  <header class="selector-head">
-    <div>
-      <p>MIDI Editor</p>
-      <h2>Set tracks for OP-XY project.</h2>
-    </div>
-    <div class="selector-status" aria-live="polite">
-      <span>{selectedTrackCount}/{selection.maxInstrumentTracks} tracks</span>
-      <span
-        >{selection.selectedBankCount}/{selection.maxInstrumentTracks}
-        banks</span
-      >
-      <span>{songEvents.length} notes</span>
-    </div>
-  </header>
-
-  {#if selection.warning}
-    <p class="selector-warning">{selection.warning}</p>
-  {/if}
-
   <div class="selector-console">
     <div class="selector-transport">
       <button
@@ -295,7 +273,6 @@
         disabled={selectionUpdating}
         on:click={rewindPlayback}>rew</button
       >
-      <span>{project.tempoBpm.toFixed(1)} bpm</span>
       <span>{selection.totalBars} bars</span>
       <span
         >{formatBarBeat(selection.rangeStart16ths)}-{formatBarBeat(
@@ -347,36 +324,9 @@
     display: grid;
     gap: 14px;
     width: min(1240px, 100%);
-    margin: 28px auto 30px;
+    margin: 0 auto 30px;
   }
 
-  .selector-head {
-    display: flex;
-    align-items: end;
-    justify-content: space-between;
-    gap: 16px;
-  }
-
-  .selector-head p,
-  .selector-head h2,
-  .selector-warning {
-    margin: 0;
-  }
-
-  .selector-head p {
-    color: var(--xy-text-muted);
-    font-size: 11px;
-    text-transform: uppercase;
-  }
-
-  .selector-head h2 {
-    margin-top: 5px;
-    font-size: clamp(20px, 3vw, 30px);
-    font-weight: 520;
-    letter-spacing: 0;
-  }
-
-  .selector-status,
   .selector-transport {
     display: flex;
     align-items: center;
@@ -384,11 +334,6 @@
     flex-wrap: wrap;
   }
 
-  .selector-status {
-    justify-content: flex-end;
-  }
-
-  .selector-status span,
   .selector-transport span,
   .selector-transport strong {
     border: 1px solid #313131;
@@ -405,13 +350,6 @@
     font-weight: 560;
   }
 
-  .selector-warning {
-    color: var(--xy-yellow-warn);
-    font-size: 12px;
-    line-height: 1.45;
-    text-transform: uppercase;
-  }
-
   .selector-console {
     overflow: hidden;
     border: 1px solid #3f3f3f;
@@ -425,12 +363,5 @@
     padding: 8px 10px;
     border-bottom: 1px solid #303030;
     background: #101010;
-  }
-
-  @media (max-width: 760px) {
-    .selector-head {
-      align-items: start;
-      flex-direction: column;
-    }
   }
 </style>

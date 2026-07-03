@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  ARRANGER_PATTERN_ROWS,
   ARRANGER_CENTER_ROW,
   buildArrangerFrame,
   buildArrangerSequence,
@@ -149,6 +150,23 @@ describe("arranger frame", () => {
     expect(t1.slots[ARRANGER_CENTER_ROW].active).toBe(true);
     expect(t1.slots[ARRANGER_CENTER_ROW - 2].patternIndex).toBe(0);
     expect(t1.slots[ARRANGER_CENTER_ROW + 2].patternIndex).toBe(4);
+  });
+
+  it("keeps the first pattern visible in the arranger window", () => {
+    const frame = buildArrangerFrame(
+      project({
+        scenes: [scene(0, true, [0])],
+      }),
+      0,
+    );
+
+    const t1 = frame.columns[0];
+    expect(t1.slots).toHaveLength(ARRANGER_PATTERN_ROWS);
+    expect(t1.slots[ARRANGER_CENTER_ROW]).toMatchObject({
+      patternIndex: 0,
+      active: true,
+      exists: true,
+    });
   });
 
   it("exposes only the 8 OP-XY instrument tracks", () => {
