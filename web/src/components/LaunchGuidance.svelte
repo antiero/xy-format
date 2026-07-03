@@ -20,8 +20,8 @@
 
 <section class="launch-guidance" aria-label="How XY Buddy works">
   <p>
-    import a MIDI file / OP-XY .xy project. choose what fits. 
-    preview it, export .xy for your OP-XY, or MIDI for your DAW.
+    import a MIDI file / OP-XY .xy project. choose what fits. preview it, export
+    .xy for your OP-XY, or MIDI for your DAW.
   </p>
 
   <ol class="launch-steps" aria-label="XY Buddy workflow">
