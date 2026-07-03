@@ -90,9 +90,11 @@ function scene(
 function project({
   tracks,
   scenes = [scene(0, 16)],
+  tempoBpm = 123,
 }: {
   tracks: XYTrackViewModel[];
   scenes?: XYSceneViewModel[];
+  tempoBpm?: number;
 }): XYProjectViewModel {
   const tracksByIndex = new Map(
     tracks.map((candidate) => [candidate.index, candidate]),
@@ -101,7 +103,7 @@ function project({
   return {
     fileName: "test.xy",
     modified: false,
-    tempoBpm: 123,
+    tempoBpm,
     validation: [],
     tracks: Array.from(
       { length: 16 },
@@ -117,6 +119,19 @@ function project({
 }
 
 describe("MIDI song export", () => {
+  it("writes the edited project tempo into exported MIDI", () => {
+    const exported = exportSongMidi(
+      project({
+        tempoBpm: 178.5,
+        tracks: [track(0, [pattern(0, [note("bd", 53)])])],
+      }),
+      "tempo.xy",
+    );
+    const midi = new Midi(exported.bytes);
+
+    expect(midi.header.tempos[0]?.bpm).toBeCloseTo(178.5, 1);
+  });
+
   it("exports instrument tracks with OP-XY drum tracks on channel 10", () => {
     const exported = exportSongMidi(
       project({

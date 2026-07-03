@@ -109,7 +109,7 @@ export type MidiTrackSelectionSummary = {
 export type MidiImportSummary = {
   bpm: number;
   ticksPerBeat: number;
-  /** Legacy name for the number of four-bar timeline windows. */
+  /** Legacy name for the number of timeline windows, each up to four bars. */
   patterns: number;
   scenes: number;
   totalBars: number;
@@ -352,7 +352,10 @@ function midiSourceTotal16ths(
       maxTick = Math.max(maxTick, note.absTick + note.gateTicks);
     }
   }
-  return Math.max(BAR_16THS, Math.ceil(maxTick / tick16th));
+  return Math.max(
+    BAR_16THS,
+    Math.ceil(maxTick / (tick16th * BAR_16THS)) * BAR_16THS,
+  );
 }
 
 type ImportRange = {
@@ -363,18 +366,27 @@ type ImportRange = {
   numPatterns: number;
 };
 
-function rangeFromPatternCount(
+function rangeFromTotal16ths(
   start16ths: number,
-  numPatterns: number,
+  requestedTotal16ths: number,
 ): ImportRange {
-  const total16ths = Math.max(PATTERN_16THS, numPatterns * PATTERN_16THS);
+  const total16ths = Math.max(BAR_16THS, Math.round(requestedTotal16ths));
   return {
     start16ths,
     end16ths: start16ths + total16ths,
     total16ths,
-    totalBars: total16ths / BAR_16THS,
-    numPatterns: Math.max(1, numPatterns),
+    totalBars: Math.max(1, Math.ceil(total16ths / BAR_16THS)),
+    numPatterns: Math.max(1, Math.ceil(total16ths / PATTERN_16THS)),
   };
+}
+
+function patternStepsForRange(range: ImportRange): number[] {
+  return Array.from({ length: range.numPatterns }, (_, patternIndex) =>
+    Math.max(
+      1,
+      Math.min(PATTERN_16THS, range.total16ths - patternIndex * PATTERN_16THS),
+    ),
+  );
 }
 
 function normalizeImportRange(
@@ -385,22 +397,15 @@ function normalizeImportRange(
   const sourceEnd = Math.max(BAR_16THS, sourceTotal16ths);
   const start16ths = Math.max(
     0,
-    Math.min(sourceEnd - 1, Math.round(options.rangeStart16ths ?? 0)),
+    Math.min(sourceEnd - BAR_16THS, Math.round(options.rangeStart16ths ?? 0)),
   );
   const requestedEnd = Math.max(
     start16ths + BAR_16THS,
     Math.min(sourceEnd, Math.round(options.rangeEnd16ths ?? sourceEnd)),
   );
-  const requestedPatterns = Math.ceil(
-    (requestedEnd - start16ths) / PATTERN_16THS,
-  );
-  const availablePatterns = Math.max(
-    1,
-    Math.ceil((sourceEnd - start16ths) / PATTERN_16THS),
-  );
-  return rangeFromPatternCount(
+  return rangeFromTotal16ths(
     start16ths,
-    Math.min(requestedPatterns, availablePatterns, maxPatterns),
+    Math.min(requestedEnd - start16ths, maxPatterns * PATTERN_16THS),
   );
 }
 
@@ -924,6 +929,7 @@ function buildTrackPatterns(
   selection: SelectionResult,
   midiTpb: number,
   start16ths: number,
+  total16ths: number,
   numPatterns: number,
   includeDerivedParts = true,
 ): Map<number, Array<PatternNoteInput[] | null>> {
@@ -946,13 +952,17 @@ function buildTrackPatterns(
 
     for (let patternIndex = 0; patternIndex < numPatterns; patternIndex++) {
       const patternStart16ths = start16ths + patternIndex * PATTERN_16THS;
+      const patternSteps = Math.max(
+        1,
+        Math.min(PATTERN_16THS, total16ths - patternIndex * PATTERN_16THS),
+      );
       let sourceNotes: MidiNote[] = [];
       if (candidate) {
         sourceNotes = select16thWindow(
           candidate.notesAll,
           midiTpb,
           patternStart16ths,
-          PATTERN_16THS,
+          patternSteps,
         );
       } else if (
         includeDerivedParts &&
@@ -964,7 +974,7 @@ function buildTrackPatterns(
           drumPrimary.notesAll,
           midiTpb,
           patternStart16ths,
-          PATTERN_16THS,
+          patternSteps,
         );
         sourceNotes = deriveSecondaryDrumWindow(base);
       } else if (
@@ -977,7 +987,7 @@ function buildTrackPatterns(
           chordPrimary.notesAll,
           midiTpb,
           patternStart16ths,
-          PATTERN_16THS,
+          patternSteps,
         );
         sourceNotes = deriveSecondaryChordWindow(base);
       }
@@ -1077,7 +1087,7 @@ type BankedArrangement = {
 
 type SourcePatternBank = {
   sourceTrack: number;
-  uniquePatterns: PatternNoteInput[][];
+  uniquePatterns: Array<{ steps: number; notes: PatternNoteInput[] }>;
   windowPatternIndexes: Array<number | null>;
   hosts: number[];
 };
@@ -1102,17 +1112,22 @@ function candidatePatternBankCost(
   candidate: PartCandidate,
   midiTpb: number,
   start16ths: number,
-  numPatterns: number,
+  total16ths: number,
 ): Pick<MidiTrackSelectionOption, "uniquePatternCount" | "bankCount"> {
   const uniqueSignatures = new Set<string>();
+  const numPatterns = Math.max(1, Math.ceil(total16ths / PATTERN_16THS));
 
   for (let patternIndex = 0; patternIndex < numPatterns; patternIndex++) {
     const patternStart16ths = start16ths + patternIndex * PATTERN_16THS;
+    const patternSteps = Math.max(
+      1,
+      Math.min(PATTERN_16THS, total16ths - patternIndex * PATTERN_16THS),
+    );
     const sourceNotes = select16thWindow(
       candidate.notesAll,
       midiTpb,
       patternStart16ths,
-      PATTERN_16THS,
+      patternSteps,
     );
     const xyNotes =
       sourceNotes.length > 0
@@ -1123,7 +1138,9 @@ function candidatePatternBankCost(
             candidate.isDrumChannel,
           ).slice(0, MAX_NOTES_PER_PATTERN)
         : [];
-    if (xyNotes.length > 0) uniqueSignatures.add(patternSignature(xyNotes));
+    if (xyNotes.length > 0) {
+      uniqueSignatures.add(`${patternSteps}|${patternSignature(xyNotes)}`);
+    }
   }
 
   const uniquePatternCount = uniqueSignatures.size;
@@ -1163,7 +1180,7 @@ function buildTrackSelectionOption(
   trackNames: string[],
   midiTpb: number,
   start16ths: number,
-  numPatterns: number,
+  total16ths: number,
 ): MidiTrackSelectionOption {
   const id = candidateId(candidate);
   const [midiTrackIndex, midiChannel] = candidate.key;
@@ -1199,7 +1216,7 @@ function buildTrackSelectionOption(
     pitchMax: candidate.pitchMax,
     start16ths: trackStart16ths,
     end16ths,
-    ...candidatePatternBankCost(candidate, midiTpb, start16ths, numPatterns),
+    ...candidatePatternBankCost(candidate, midiTpb, start16ths, total16ths),
     previewNotes,
   };
 }
@@ -1256,7 +1273,7 @@ function buildTrackSelectionSummary(args: {
     rangeEnd16ths: range.end16ths,
     rangeWasAutoFit,
     totalBars,
-    total16ths: totalBars * BAR_16THS,
+    total16ths: range.total16ths,
   };
 }
 
@@ -1301,7 +1318,7 @@ function bankCountForSelectedCandidates(args: {
   selectedTrackIds: readonly string[];
   midiTpb: number;
   start16ths: number;
-  numPatterns: number;
+  total16ths: number;
 }): number {
   const selected = new Set(args.selectedTrackIds);
   return args.candidates.reduce((sum, candidate) => {
@@ -1312,7 +1329,7 @@ function bankCountForSelectedCandidates(args: {
         candidate,
         args.midiTpb,
         args.start16ths,
-        args.numPatterns,
+        args.total16ths,
       ).bankCount
     );
   }, 0);
@@ -1336,22 +1353,29 @@ function maxSafeRangeForSelected(args: {
   let lastSafe: ImportRange | null = null;
 
   for (let numPatterns = 1; numPatterns <= maxPatterns; numPatterns += 1) {
+    const candidateRange = rangeFromTotal16ths(
+      args.start16ths,
+      Math.min(
+        numPatterns * PATTERN_16THS,
+        args.sourceTotal16ths - args.start16ths,
+      ),
+    );
     const bankCount = bankCountForSelectedCandidates({
       candidates: args.candidates,
       selectedTrackIds: args.selectedTrackIds,
       midiTpb: args.midiTpb,
       start16ths: args.start16ths,
-      numPatterns,
+      total16ths: candidateRange.total16ths,
     });
     if (bankCount > INSTRUMENT_TRACK_COUNT) break;
-    lastSafe = rangeFromPatternCount(args.start16ths, numPatterns);
+    lastSafe = candidateRange;
   }
 
   return lastSafe;
 }
 
 /**
- * Convert a timeline of 4-bar windows into device-valid pattern banks.
+ * Convert a timeline of up-to-4-bar windows into device-valid pattern banks.
  *
  * OP-XY exposes 16 patterns on each instrument track, but Song mode
  * can chain 96 scenes. Repeated windows are stored once and selected again
@@ -1361,28 +1385,33 @@ function maxSafeRangeForSelected(args: {
  */
 function bankTrackPatterns(
   patterns: Map<number, Array<PatternNoteInput[] | null>>,
-  sceneCount: number,
+  patternSteps: number[],
 ): BankedArrangement {
+  const sceneCount = patternSteps.length;
   const sources: SourcePatternBank[] = [];
 
   for (const [sourceTrack, windows] of Array.from(patterns.entries()).sort(
     ([a], [b]) => a - b,
   )) {
     const uniqueBySignature = new Map<string, number>();
-    const uniquePatterns: PatternNoteInput[][] = [];
+    const uniquePatterns: Array<{
+      steps: number;
+      notes: PatternNoteInput[];
+    }> = [];
     const windowPatternIndexes: Array<number | null> = [];
 
-    for (const window of windows) {
+    for (const [windowIndex, window] of windows.entries()) {
       if (!window || window.length === 0) {
         windowPatternIndexes.push(null);
         continue;
       }
-      const key = patternSignature(window);
+      const steps = patternSteps[windowIndex] ?? PATTERN_16THS;
+      const key = `${steps}|${patternSignature(window)}`;
       let patternIndex = uniqueBySignature.get(key);
       if (patternIndex === undefined) {
         patternIndex = uniquePatterns.length;
         uniqueBySignature.set(key, patternIndex);
-        uniquePatterns.push(window);
+        uniquePatterns.push({ steps, notes: window });
       }
       windowPatternIndexes.push(patternIndex);
     }
@@ -1439,7 +1468,7 @@ function bankTrackPatterns(
         begin,
         begin + MAX_PATTERNS_PER_TRACK,
       );
-      out[host] = bank.map((notes) => ({ steps: 64, notes }));
+      out[host] = bank;
       trackTemplates[host] = source.sourceTrack;
     });
   }
@@ -1524,7 +1553,7 @@ export function buildMidiProjectFromBytes(
           trackNames,
           midiTpb,
           currentRange.start16ths,
-          currentRange.numPatterns,
+          currentRange.total16ths,
         ),
       )
       .sort(
@@ -1629,12 +1658,14 @@ export function buildMidiProjectFromBytes(
     selection,
     midiTpb,
     range.start16ths,
+    range.total16ths,
     range.numPatterns,
     includeDerivedParts,
   );
   let banked: BankedArrangement;
+  const patternSteps = patternStepsForRange(range);
   try {
-    banked = bankTrackPatterns(trackPatterns, range.numPatterns);
+    banked = bankTrackPatterns(trackPatterns, patternSteps);
   } catch (error) {
     // Secondary drum/chord parts are generated conveniences, not source MIDI.
     // Prefer the complete source timeline when those extras would consume the
@@ -1644,11 +1675,12 @@ export function buildMidiProjectFromBytes(
       selection,
       midiTpb,
       range.start16ths,
+      range.total16ths,
       range.numPatterns,
       false,
     );
     try {
-      banked = bankTrackPatterns(sourceOnlyPatterns, range.numPatterns);
+      banked = bankTrackPatterns(sourceOnlyPatterns, patternSteps);
       trackPatterns = sourceOnlyPatterns;
     } catch {
       throw error;

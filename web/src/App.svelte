@@ -99,6 +99,7 @@
       importSummary = result.summary;
       importedMidiFile = file;
       midiImportOptions = {
+        bpmOverride: result.summary.bpm,
         selectedTrackIds: result.summary.trackSelection?.selectedTrackIds,
         rangeStart16ths: result.summary.rangeStart16ths,
         rangeEnd16ths: result.summary.rangeEnd16ths,
@@ -151,6 +152,7 @@
       projectStore.set(result.project);
       importSummary = result.summary;
       midiImportOptions = {
+        bpmOverride: result.summary.bpm,
         selectedTrackIds: result.summary.trackSelection?.selectedTrackIds,
         rangeStart16ths: result.summary.rangeStart16ths,
         rangeEnd16ths: result.summary.rangeEnd16ths,
@@ -290,6 +292,14 @@
     announceDisplayMessage("MIDI EDITOR", "neutral");
   }
 
+  function rememberTempoOverride(tempoBpm: number) {
+    readyExport = null;
+    if (importedMidiFile) {
+      midiImportOptions = { ...midiImportOptions, bpmOverride: tempoBpm };
+      if (importSummary) importSummary = { ...importSummary, bpm: tempoBpm };
+    }
+  }
+
   async function downloadXYProject() {
     const exportData = await createReadyExport(false, false);
     if (!exportData) return;
@@ -349,6 +359,7 @@
       {midiSelectionUpdating}
       onProjectNameCommit={() => commitProjectFileName()}
       onDownloadProject={downloadXYProject}
+      onTempoChange={rememberTempoOverride}
       onRefineMidi={importedMidiFile && importSummary?.trackSelection
         ? returnToMidiEditor
         : null}
@@ -357,7 +368,10 @@
     />
 
     {#if projectCreated}
-      <CreatedProjectWorkspace project={$projectStore} />
+      <CreatedProjectWorkspace
+        project={$projectStore}
+        onTempoChange={rememberTempoOverride}
+      />
     {:else}
       <ProjectReadyPanel
         project={$projectStore}

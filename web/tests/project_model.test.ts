@@ -67,6 +67,24 @@ describe("project view model and edit bridge", () => {
     });
   });
 
+  it("stores an edited tempo in the exported project within OP-XY limits", () => {
+    let project = applyEdit(loadBaseline(), { type: "set-tempo", bpm: 1 });
+    expect(project.tempoBpm).toBe(40);
+
+    project = applyEdit(project, {
+      type: "set-tempo",
+      bpm: 137.4,
+    });
+    expect(project.tempoBpm).toBe(137.4);
+    expect(project.modified).toBe(true);
+
+    project = applyEdit(project, { type: "set-tempo", bpm: 999 });
+    expect(project.tempoBpm).toBe(220);
+
+    const reloaded = loadXYBytes(exportXYProjectBytes(project), "tempo.xy");
+    expect(reloaded.tempoBpm).toBe(220);
+  });
+
   it("edits scene pattern/mute state and Song 1 chain", () => {
     let project = loadBaseline();
     project = applyEdit(project, {

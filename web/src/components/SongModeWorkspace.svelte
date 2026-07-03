@@ -16,8 +16,10 @@
   } from "../stores/project";
   import { buildArrangerSequence } from "../lib/xy/arranger";
   import type { XYProjectViewModel } from "../lib/xy/projectViewModel";
+  import ProjectTempoControl from "./ProjectTempoControl.svelte";
 
   export let project: XYProjectViewModel;
+  export let onTempoChange: (tempoBpm: number) => void = () => {};
 
   const STEPS_PER_PAGE = 32;
 
@@ -205,7 +207,7 @@
     </div>
     <div class="song-mode-status">
       <span>{songEvents.length} notes</span>
-      <span>{project.tempoBpm.toFixed(1)} bpm</span>
+      <ProjectTempoControl tempoBpm={project.tempoBpm} {onTempoChange} />
       <span>{song?.loop ? "loop on" : "loop off"}</span>
     </div>
   </div>

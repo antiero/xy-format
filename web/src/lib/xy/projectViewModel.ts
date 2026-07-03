@@ -18,6 +18,7 @@ import {
   type PatternTimingMode,
   WRITABLE_TRACK_SCALE_BYTES,
 } from "./timing";
+import { normalizeProjectTempoBpm } from "./tempo";
 import { validateProject } from "./validation";
 
 export type XYTrackScale =
@@ -133,6 +134,7 @@ export type XYEdit =
   | { type: "set-active-pattern"; patternIndex: number }
   | { type: "set-active-scene"; sceneIndex: number }
   | { type: "select-note"; noteId?: string }
+  | { type: "set-tempo"; bpm: number }
   | {
       type: "add-note";
       trackIndex: number;
@@ -513,6 +515,10 @@ export function applyEdit(
       break;
     case "select-note":
       selection.selectedNoteId = edit.noteId;
+      break;
+    case "set-tempo":
+      imageProject.setTempo(normalizeProjectTempoBpm(edit.bpm));
+      modified = true;
       break;
     case "add-note": {
       addNoteToImage(project, edit.trackIndex, edit.patternIndex, edit.note);
