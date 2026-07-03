@@ -2,6 +2,7 @@
   import OpXyHardwareLauncher from "./components/OpXyHardwareLauncher.svelte";
   import ProjectReadyPanel from "./components/ProjectReadyPanel.svelte";
   import CreatedProjectWorkspace from "./components/CreatedProjectWorkspace.svelte";
+  import WorkflowTopbar from "./components/WorkflowTopbar.svelte";
   import {
     announceDisplayMessage,
     currentTickStore,
@@ -32,6 +33,7 @@
     bytes: Uint8Array;
     sourceMidiFilename: string | null;
   };
+  type LaunchImportState = "idle" | "processing";
 
   let xyFileInput: HTMLInputElement;
   let midiFileInput: HTMLInputElement;
@@ -45,10 +47,17 @@
   let importedMidiFile: File | null = null;
   let midiImportOptions: MidiImportOptions = {};
   let midiSelectionUpdating = false;
+  let launchImportState: LaunchImportState = "idle";
+
+  const LAUNCH_IMPORT_THEATRE_MS = 920;
 
   $: counts = $projectStore
     ? validationCounts($projectStore.validation)
     : { errors: 0, warnings: 0, info: 0 };
+
+  function delay(milliseconds: number): Promise<void> {
+    return new Promise((resolve) => window.setTimeout(resolve, milliseconds));
+  }
 
   async function openXYFile(file: File) {
     loadError = "";
@@ -159,26 +168,29 @@
     }
   }
 
-  async function openFile(file: File) {
-    const name = file.name.toLowerCase();
-    if (name.endsWith(".mid") || name.endsWith(".midi")) {
-      await importMidiFile(file);
-      return;
+  async function handleSelectedFile(file: File) {
+    const isLaunchImport = !$projectStore;
+    if (isLaunchImport) {
+      launchImportState = "processing";
+      announceDisplayMessage("READING FILE", "neutral");
+      await delay(LAUNCH_IMPORT_THEATRE_MS);
     }
-    await openXYFile(file);
-  }
 
-  async function handleFileUpload(event: Event) {
-    const target = event.target as HTMLInputElement;
-    const file = target.files?.[0];
-    if (file && file.name.toLowerCase().endsWith(".xy")) {
+    if (file.name.toLowerCase().endsWith(".xy")) {
       await openXYFile(file);
-    } else if (file && file.name.toLowerCase().includes(".mid")) {
+    } else if (file.name.toLowerCase().includes(".mid")) {
       await importMidiFile(file);
     } else {
       loadError = "Please select a valid .xy or .mid file.";
       announceDisplayMessage("INVALID FILE", "error");
     }
+    if (!$projectStore) launchImportState = "idle";
+  }
+
+  async function handleFileUpload(event: Event) {
+    const target = event.target as HTMLInputElement;
+    const file = target.files?.[0];
+    if (file) await handleSelectedFile(file);
     target.value = "";
   }
 
@@ -186,7 +198,7 @@
     event.preventDefault();
     dragging = false;
     const file = event.dataTransfer?.files?.[0];
-    if (file) await openFile(file);
+    if (file) await handleSelectedFile(file);
   }
 
   function commitProjectFileName(publish = true): string {
@@ -322,29 +334,18 @@
   />
 
   {#if $projectStore}
-    <header class="workflow-topbar">
-      <a class="workflow-brand" href="/" aria-label="XY Buddy home">
-        xy buddy
-      </a>
-      <div class="workflow-actions">
-        <label class="project-name-control">
-          <span>project name</span>
-          <input
-            type="text"
-            bind:value={projectFileName}
-            aria-label="Project filename"
-            on:change={() => commitProjectFileName()}
-            on:blur={() => commitProjectFileName()}
-          />
-        </label>
-        {#if projectCreated}
-          <button type="button" on:click={downloadXYProject}>export .xy</button>
-        {/if}
-        <button type="button" on:click={() => midiFileInput.click()}
-          >import .mid / .xy</button
-        >
-      </div>
-    </header>
+    <WorkflowTopbar
+      project={$projectStore}
+      {projectCreated}
+      bind:projectFileName
+      {importSummary}
+      {counts}
+      {midiSelectionUpdating}
+      onProjectNameCommit={() => commitProjectFileName()}
+      onDownloadProject={downloadXYProject}
+      onReplaceMidi={() => midiFileInput.click()}
+      onBurnMidiToSong={burnMidiToSong}
+    />
 
     {#if projectCreated}
       <CreatedProjectWorkspace
@@ -357,11 +358,7 @@
       <ProjectReadyPanel
         project={$projectStore}
         {importSummary}
-        {projectFileName}
-        {counts}
         {midiSelectionUpdating}
-        onReplaceMidi={() => midiFileInput.click()}
-        onBurnMidiToSong={burnMidiToSong}
         onMidiTrackSelectionChange={updateMidiTrackSelection}
       />
     {/if}
@@ -376,17 +373,10 @@
         tempo={120}
         message={$displayMessageStore}
         {dragging}
+        importState={launchImportState}
         onOpenXY={() => xyFileInput.click()}
         onImportMidi={() => midiFileInput.click()}
       />
-
-      <div class="launch-actions">
-        <button
-          type="button"
-          class="primary"
-          on:click={() => midiFileInput.click()}>+ MIDI / .xy</button
-        >
-      </div>
 
       {#if loadError}
         <p class="load-error launch-error">{loadError}</p>
@@ -394,100 +384,16 @@
 
       <p class="disclaimer">
         app by <a href="https://github.com/antiero/xy-format" target="_blank"
-          >antiero</a
+          >antiero (5of12)</a
         >. not affiliated with teenage engineering. <br />made possible by
         reverse engineering efforts of
         <a href="https://github.com/kmorrill/xy-format" target="_blank"
           >kmorrill</a
         >.
         <span class="firmware-footnote">
-          Supports firmware 1.1.15 or later.
+          supports op-xy firmware 1.1.15 or later.
         </span>
       </p>
     </section>
   {/if}
 </main>
-
-<style>
-  .workflow-topbar {
-    display: flex;
-    min-height: 58px;
-    align-items: center;
-    justify-content: space-between;
-    gap: 16px;
-    padding: 10px clamp(16px, 3vw, 32px);
-    border-bottom: 1px solid var(--xy-line);
-    background: rgba(5, 5, 5, 0.92);
-  }
-
-  .workflow-brand {
-    color: var(--xy-text);
-    font-size: 12px;
-    font-weight: 760;
-    text-decoration: none;
-    text-transform: uppercase;
-  }
-
-  .workflow-actions {
-    display: flex;
-    align-items: center;
-    justify-content: flex-end;
-    gap: 10px;
-    min-width: 0;
-  }
-
-  .project-name-control {
-    display: grid;
-    grid-template-columns: auto minmax(170px, 260px);
-    align-items: center;
-    gap: 8px;
-    min-width: 0;
-  }
-
-  .project-name-control span {
-    color: var(--xy-text-dim);
-    font-size: 10px;
-    text-transform: uppercase;
-  }
-
-  .project-name-control input {
-    min-width: 0;
-  }
-
-  .launch-actions {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    flex-wrap: wrap;
-  }
-
-  .launch-actions {
-    position: absolute;
-    z-index: 3;
-    left: 6vw;
-    bottom: 84px;
-  }
-
-  @media (max-width: 620px) {
-    .workflow-topbar {
-      align-items: flex-start;
-      flex-direction: column;
-    }
-
-    .workflow-actions {
-      width: 100%;
-      justify-content: flex-start;
-      flex-wrap: wrap;
-    }
-
-    .project-name-control {
-      width: 100%;
-      grid-template-columns: 1fr;
-    }
-
-    .launch-actions {
-      right: 6vw;
-      bottom: 70px;
-    }
-  }
-</style>
