@@ -1,5 +1,6 @@
 <script lang="ts">
   import OpXyHardwareLauncher from "./components/OpXyHardwareLauncher.svelte";
+  import LaunchGuidance from "./components/LaunchGuidance.svelte";
   import ProjectReadyPanel from "./components/ProjectReadyPanel.svelte";
   import CreatedProjectWorkspace from "./components/CreatedProjectWorkspace.svelte";
   import WorkflowTopbar from "./components/WorkflowTopbar.svelte";
@@ -390,14 +391,18 @@
         <span>unofficial op-xy project utility</span>
       </div>
 
-      <OpXyHardwareLauncher
-        tempo={120}
-        message={$displayMessageStore}
-        {dragging}
-        importState={launchImportState}
-        onOpenXY={() => xyFileInput.click()}
-        onImportMidi={() => midiFileInput.click()}
-      />
+      <div class="launch-stack">
+        <OpXyHardwareLauncher
+          tempo={120}
+          message={$displayMessageStore}
+          {dragging}
+          importState={launchImportState}
+          onOpenXY={() => xyFileInput.click()}
+          onImportMidi={() => midiFileInput.click()}
+        />
+
+        <LaunchGuidance />
+      </div>
 
       {#if loadError}
         <p class="load-error launch-error">{loadError}</p>
