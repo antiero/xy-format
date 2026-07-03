@@ -40,33 +40,24 @@ Note = dict[str, int]
 
 # ── GM Drum → OP-XY Drum mapping ──────────────────────────────────────
 
-# OP-XY "boop" drum kit: 24 keys C3 (48) through B4 (71)
-# Known assignments: Kick=48/49, Snare=50/51, Rim=52, Clap=53,
-#                    CH Hat=56/57, OH Hat=58
+# OP-XY drum note assignments used by PocketOperations exports. GM aliases
+# cover the common alternate kick, snare, and pedal-hat notes.
 GM_TO_OPXY_DRUM = {
-    35: 48,  # Acoustic Bass Drum → Kick 1
-    36: 48,  # Bass Drum 1 → Kick 1
-    37: 52,  # Side Stick → Rim
-    38: 50,  # Acoustic Snare → Snare 1
-    39: 53,  # Hand Clap → Clap
-    40: 51,  # Electric Snare → Snare 2
-    41: 60,  # Low Floor Tom → Tom slot
-    42: 56,  # Closed HH → CH Hat 1
-    43: 61,  # High Floor Tom → Tom slot
-    44: 57,  # Pedal HH → CH Hat 2
-    45: 62,  # Low Tom → Tom slot
-    46: 58,  # Open HH → OH Hat
-    47: 63,  # Low-Mid Tom → Tom slot
-    48: 64,  # Hi-Mid Tom → Tom slot
-    49: 54,  # Crash Cymbal 1
-    50: 65,  # High Tom → Tom slot
-    51: 55,  # Ride Cymbal 1
-    52: 66,  # Chinese Cymbal
-    53: 67,  # Ride Bell
-    54: 57,  # Tambourine → CH Hat 2
-    55: 68,  # Splash Cymbal
-    56: 69,  # Cowbell
-    57: 54,  # Crash Cymbal 2 → same slot as Crash 1
+    35: 53,
+    36: 53,
+    37: 57,
+    38: 56,
+    39: 62,
+    40: 56,
+    42: 61,
+    44: 61,
+    45: 65,
+    46: 63,
+    47: 67,
+    49: 49,
+    50: 69,
+    56: 56,
+    70: 60,
 }
 
 # Role-to-slot layout requested for arrangement usefulness
@@ -161,11 +152,11 @@ class BankedArrangement:
 
 
 def remap_drum_note(gm_note: int) -> int:
-    """Map a GM drum note to OP-XY drum range (48-71)."""
+    """Map a GM drum note to the OP-XY percussion note map."""
 
     if gm_note in GM_TO_OPXY_DRUM:
         return GM_TO_OPXY_DRUM[gm_note]
-    return max(48, min(71, gm_note))
+    return gm_note
 
 
 def _jaccard_similarity(a: set[Tuple[int, int]], b: set[Tuple[int, int]]) -> float:

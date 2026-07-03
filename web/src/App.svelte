@@ -60,6 +60,18 @@
     return new Promise((resolve) => window.setTimeout(resolve, milliseconds));
   }
 
+  function optionsFromMidiSummary(
+    summary: MidiImportSummary,
+  ): MidiImportOptions {
+    return {
+      bpmOverride: summary.bpm,
+      selectedTrackIds: summary.trackSelection?.selectedTrackIds,
+      rangeStart16ths: summary.rangeStart16ths,
+      rangeEnd16ths: summary.rangeEnd16ths,
+      mapGmDrums: summary.mapGmDrums,
+    };
+  }
+
   async function openXYFile(file: File) {
     loadError = "";
     importSummary = null;
@@ -98,12 +110,7 @@
       projectStore.set(result.project);
       importSummary = result.summary;
       importedMidiFile = file;
-      midiImportOptions = {
-        bpmOverride: result.summary.bpm,
-        selectedTrackIds: result.summary.trackSelection?.selectedTrackIds,
-        rangeStart16ths: result.summary.rangeStart16ths,
-        rangeEnd16ths: result.summary.rangeEnd16ths,
-      };
+      midiImportOptions = optionsFromMidiSummary(result.summary);
       importFileName = file.name;
       projectFileName = normalizeXYFileName(result.project.fileName);
       projectCreated = false;
@@ -151,12 +158,7 @@
       );
       projectStore.set(result.project);
       importSummary = result.summary;
-      midiImportOptions = {
-        bpmOverride: result.summary.bpm,
-        selectedTrackIds: result.summary.trackSelection?.selectedTrackIds,
-        rangeStart16ths: result.summary.rangeStart16ths,
-        rangeEnd16ths: result.summary.rangeEnd16ths,
-      };
+      midiImportOptions = optionsFromMidiSummary(result.summary);
       projectFileName = normalizeXYFileName(result.project.fileName);
       projectCreated = false;
       announceDisplayMessage(
@@ -377,6 +379,7 @@
         project={$projectStore}
         {importSummary}
         {midiSelectionUpdating}
+        mapGmDrums={midiImportOptions.mapGmDrums ?? true}
         onMidiTrackSelectionChange={updateMidiTrackSelection}
       />
     {/if}

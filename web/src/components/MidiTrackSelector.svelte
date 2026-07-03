@@ -23,9 +23,13 @@
   export let project: XYProjectViewModel;
   export let selection: MidiTrackSelectionSummary;
   export let selectionUpdating = false;
+  export let mapGmDrums = true;
   export let onSelectionChange: (
     options: MidiImportOptions,
   ) => void | Promise<void> = () => {};
+
+  const GM_DRUM_TOOLTIP =
+    "Enable this option to map GM Drum MIDI to the OP-XY's percussion drum map.";
 
   let animationFrame = 0;
   let lastFrameMs = 0;
@@ -54,6 +58,7 @@
   $: effectiveSelectedIds = new Set(
     pendingFitTrackIds ?? selection.selectedTrackIds,
   );
+  $: hasDrumTracks = selection.tracks.some((track) => track.isDrum);
   $: effectiveSelectedBankCount = selectedBankCount(effectiveSelectedIds);
   $: cycleRangeValid =
     effectiveSelectedIds.size > 0 &&
@@ -64,6 +69,7 @@
       selection.selectedTrackIds.join("|"),
       selection.rangeStart16ths,
       selection.rangeEnd16ths,
+      mapGmDrums,
     ].join(":");
     if (key !== lastSelectionKey) {
       lastSelectionKey = key;
@@ -107,8 +113,14 @@
       selectedTrackIds: selection.selectedTrackIds,
       rangeStart16ths: selection.rangeStart16ths,
       rangeEnd16ths: selection.rangeEnd16ths,
+      mapGmDrums,
       ...options,
     });
+  }
+
+  function toggleGmDrumMapping(event: Event) {
+    const checked = (event.currentTarget as HTMLInputElement).checked;
+    rebuildMidi({ mapGmDrums: checked });
   }
 
   function toggleTrack(track: MidiTrackSelectionOption) {
@@ -279,6 +291,19 @@
           selection.rangeEnd16ths,
         )}</span
       >
+      {#if hasDrumTracks}
+        <label class="drum-map-toggle" title={GM_DRUM_TOOLTIP}>
+          <input
+            type="checkbox"
+            checked={mapGmDrums}
+            disabled={selectionUpdating}
+            aria-label={GM_DRUM_TOOLTIP}
+            on:change={toggleGmDrumMapping}
+          />
+          <span aria-hidden="true"></span>
+          <strong>Map GM Drums</strong>
+        </label>
+      {/if}
       {#if selectionUpdating}
         <span>updating</span>
       {/if}
@@ -348,6 +373,73 @@
   .selector-transport strong {
     color: var(--xy-yellow-warn);
     font-weight: 560;
+  }
+
+  .drum-map-toggle {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    min-height: 30px;
+    padding: 4px 8px;
+    border: 1px solid #313131;
+    background: #0a0a0a;
+    color: var(--xy-text-muted);
+    text-transform: uppercase;
+    cursor: pointer;
+  }
+
+  .drum-map-toggle input {
+    position: absolute;
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  .drum-map-toggle > span {
+    position: relative;
+    display: inline-block;
+    width: 28px;
+    height: 14px;
+    padding: 0;
+    border: 1px solid #555;
+    border-radius: 999px;
+    background: #121212;
+  }
+
+  .drum-map-toggle > span::after {
+    content: "";
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #777;
+    transition:
+      left 120ms ease,
+      background 120ms ease;
+  }
+
+  .drum-map-toggle input:checked + span {
+    border-color: #f3f1ef;
+  }
+
+  .drum-map-toggle input:checked + span::after {
+    left: 16px;
+    background: #f3f1ef;
+  }
+
+  .drum-map-toggle input:focus-visible + span {
+    outline: 1px solid var(--xy-white-led);
+    outline-offset: 2px;
+  }
+
+  .drum-map-toggle strong {
+    border: 0;
+    background: transparent;
+    padding: 0;
+    color: inherit;
+    font-size: 10px;
   }
 
   .selector-console {
