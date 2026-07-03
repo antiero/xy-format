@@ -14,20 +14,14 @@
   export let midiSelectionUpdating = false;
 
   $: trackSelection = importSummary?.trackSelection ?? null;
-  $: showMidiEditor =
-    !!trackSelection &&
-    (trackSelection.isSelectionRecommended ||
-      trackSelection.rangeStart16ths > 0 ||
-      trackSelection.rangeEnd16ths < trackSelection.sourceTotal16ths ||
-      trackSelection.tracks.length > trackSelection.maxInstrumentTracks);
 </script>
 
 <section
   class="project-ready"
-  class:wide={showMidiEditor}
+  class:wide={!!trackSelection}
   aria-label="MIDI project editor"
 >
-  {#if showMidiEditor && trackSelection}
+  {#if trackSelection}
     <MidiTrackSelector
       {project}
       selection={trackSelection}

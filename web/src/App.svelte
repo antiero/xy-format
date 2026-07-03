@@ -21,6 +21,7 @@
     type MidiImportOptions,
     type MidiImportSummary,
   } from "./lib/xy/midiImporter";
+  import { midiImportNeedsEditor } from "./lib/xy/midiImportWorkflow";
   import { validationCounts } from "./lib/xy/validation";
   import {
     bytesToBase64,
@@ -107,10 +108,14 @@
       projectCreated = false;
       currentTickStore.set(0);
       isPlayingStore.set(false);
-      announceDisplayMessage(
-        `MIDI ${result.summary.importedNotes} NOTES`,
-        "ok",
-      );
+      if (midiImportNeedsEditor(result.summary)) {
+        announceDisplayMessage(
+          `MIDI ${result.summary.importedNotes} NOTES`,
+          "ok",
+        );
+      } else {
+        await burnMidiToSong();
+      }
     } catch (error) {
       console.error(error);
       loadError =
@@ -239,10 +244,11 @@
   ): Promise<ReadyProjectExport | null> {
     const project = $projectStore;
     if (!project) return null;
+    const currentCounts = validationCounts(project.validation);
     if (
-      counts.errors > 0 &&
+      currentCounts.errors > 0 &&
       !window.confirm(
-        `Create this project with ${counts.errors} validation error(s)?`,
+        `Create this project with ${currentCounts.errors} validation error(s)?`,
       )
     ) {
       announceDisplayMessage("PROJECT CANCELLED", "warn");
@@ -343,17 +349,15 @@
       {midiSelectionUpdating}
       onProjectNameCommit={() => commitProjectFileName()}
       onDownloadProject={downloadXYProject}
+      onRefineMidi={importedMidiFile && importSummary?.trackSelection
+        ? returnToMidiEditor
+        : null}
       onReplaceMidi={() => midiFileInput.click()}
       onBurnMidiToSong={burnMidiToSong}
     />
 
     {#if projectCreated}
-      <CreatedProjectWorkspace
-        project={$projectStore}
-        onEditMidi={importedMidiFile && importSummary
-          ? returnToMidiEditor
-          : null}
-      />
+      <CreatedProjectWorkspace project={$projectStore} />
     {:else}
       <ProjectReadyPanel
         project={$projectStore}

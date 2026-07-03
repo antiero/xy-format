@@ -21,7 +21,6 @@
   import ArrangeTrackColumn from "./ArrangeTrackColumn.svelte";
 
   export let project: XYProjectViewModel;
-  export let onEditMidi: (() => void) | null = null;
 
   let selectedStepIndex = 0;
   let frame: ArrangerFrame;
@@ -164,10 +163,6 @@
       ),
     );
   }
-  function editMidi() {
-    stopPlayback();
-    onEditMidi?.();
-  }
   onDestroy(() => {
     stopPlayback();
   });
@@ -234,7 +229,6 @@
       playbackAvailable={playbackEvents.length > 0}
       onTogglePlayback={togglePlayback}
       onRewindPlayback={rewindPlayback}
-      onEditMidi={onEditMidi ? editMidi : null}
     />
   </footer>
 </section>
@@ -361,6 +355,10 @@
     color: #050505;
   }
   @media (max-width: 760px) {
+    .arranger-display {
+      overflow-x: hidden;
+    }
+
     .arranger-topline,
     .arranger-footer {
       align-items: flex-start;
@@ -368,8 +366,8 @@
     }
 
     .arranger-columns {
-      grid-template-columns: repeat(8, 72px);
-      min-width: 576px;
+      grid-template-columns: repeat(8, minmax(0, 1fr));
+      min-width: 0;
       height: 374px;
     }
   }

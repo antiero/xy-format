@@ -21,6 +21,7 @@
   export let midiSelectionUpdating = false;
   export let onProjectNameCommit: () => void = () => {};
   export let onDownloadProject: () => void | Promise<void> = () => {};
+  export let onRefineMidi: (() => void) | null = null;
   export let onReplaceMidi: () => void = () => {};
   export let onBurnMidiToSong: () => void | Promise<void> = () => {};
 
@@ -95,6 +96,14 @@
   <div class="workflow-actions">
     {#if projectCreated}
       <button type="button" on:click={onDownloadProject}>export .xy</button>
+      {#if onRefineMidi}
+        <button
+          type="button"
+          aria-label="Refine the imported MIDI"
+          title="Return to the MIDI editor"
+          on:click={onRefineMidi}>Refine MIDI</button
+        >
+      {/if}
       <button type="button" on:click={onReplaceMidi}>import .mid / .xy</button>
     {:else}
       <button type="button" on:click={onReplaceMidi}>replace MIDI</button>

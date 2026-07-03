@@ -21,7 +21,6 @@
   export let playbackAvailable = false;
   export let onTogglePlayback: () => void | Promise<void>;
   export let onRewindPlayback: () => void;
-  export let onEditMidi: (() => void) | null = null;
 
   type ExportOverlay = {
     title: string;
@@ -220,14 +219,6 @@
     title="Rewind arrangement playback"
     on:click={onRewindPlayback}>Rew</button
   >
-  {#if onEditMidi}
-    <button
-      type="button"
-      class="subtle"
-      disabled={exporting}
-      on:click={onEditMidi}>edit MIDI</button
-    >
-  {/if}
   <label
     class="include-disabled"
     title="Include scene-muted tracks in exported MIDI"

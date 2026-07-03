@@ -18,7 +18,6 @@
   import type { XYProjectViewModel } from "../lib/xy/projectViewModel";
 
   export let project: XYProjectViewModel;
-  export let onEditMidi: (() => void) | null = null;
 
   const STEPS_PER_PAGE = 32;
 
@@ -184,11 +183,6 @@
     announceDisplayMessage("REWIND", "neutral");
   }
 
-  function editMidi() {
-    stopPlayback();
-    onEditMidi?.();
-  }
-
   function sceneRingProgress(
     start16ths: number,
     length16ths: number,
@@ -267,11 +261,6 @@
 
       <footer class="song-mode-footer">
         <div class="song-mode-transport">
-          {#if onEditMidi}
-            <button type="button" class="edit-midi" on:click={editMidi}
-              >edit MIDI</button
-            >
-          {/if}
           <button
             type="button"
             class="song-play"
@@ -472,7 +461,9 @@
   .song-scene-cell {
     position: relative;
     display: grid;
+    min-width: 0;
     min-height: 72px;
+    padding: 0;
     place-items: center;
     border-radius: 0;
     border-top: 0;
@@ -572,16 +563,6 @@
     color: #050505;
   }
 
-  .song-mode-footer .edit-midi {
-    border-color: rgba(91, 172, 134, 0.56);
-    color: #d9efe4;
-  }
-
-  .song-mode-footer .edit-midi:hover:not(:disabled) {
-    border-color: #5bac86;
-    background: rgba(91, 172, 134, 0.16);
-  }
-
   .song-mode-empty {
     display: grid;
     min-height: 290px;
@@ -633,6 +614,50 @@
     .song-mode-count strong {
       min-width: 58px;
       font-size: 27px;
+    }
+
+    .song-grid-scroll {
+      overflow-x: hidden;
+    }
+
+    .song-grid {
+      width: 100%;
+      min-width: 0;
+      grid-template-columns: 30px repeat(8, minmax(0, 1fr));
+      grid-template-rows: 22px repeat(4, clamp(44px, 11vw, 64px));
+    }
+
+    .song-grid-column-label,
+    .song-grid-row-label {
+      font-size: 11px;
+    }
+
+    .song-grid-column-label {
+      justify-content: center;
+      padding-left: 0;
+    }
+
+    .song-grid-row-label {
+      padding: 4px 3px 0 0;
+    }
+
+    .song-scene-cell,
+    .song-scene-cell.empty {
+      min-height: 0;
+    }
+
+    .song-scene-circle {
+      width: clamp(26px, 9vw, 42px);
+      height: clamp(26px, 9vw, 42px);
+      font-size: clamp(14px, 4.5vw, 22px);
+    }
+
+    .song-scene-circle::after {
+      inset: 3px;
+    }
+
+    .song-scene-cell.selected .song-scene-circle {
+      box-shadow: 0 0 0 2px #f5f3f0;
     }
 
     .song-mode-footer {
