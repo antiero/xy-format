@@ -97,23 +97,40 @@
 
   <div class="workflow-actions">
     {#if projectCreated}
-      <button type="button" on:click={onDownloadProject}>export .xy</button>
+      <button
+        type="button"
+        aria-label="Export this OP-XY project as a .xy file"
+        title="Download .xy in the browser, or send the ready project to the Mac app"
+        on:click={onDownloadProject}>export .xy</button
+      >
       {#if onRefineMidi}
         <button
           type="button"
           aria-label="Refine the imported MIDI"
-          title="Return to the MIDI editor"
+          title="Return to track and range selection before creating the OP-XY project"
           on:click={onRefineMidi}>Refine MIDI</button
         >
       {/if}
-      <button type="button" on:click={onReplaceMidi}>import .mid / .xy</button>
+      <button
+        type="button"
+        aria-label="Choose a MIDI file or OP-XY .xy project"
+        title="Open a MIDI file or OP-XY .xy project"
+        on:click={onReplaceMidi}>import .mid / .xy</button
+      >
     {:else}
-      <button type="button" on:click={onReplaceMidi}>replace MIDI</button>
+      <button
+        type="button"
+        aria-label="Choose a different MIDI file or OP-XY .xy project"
+        title="Choose a different MIDI file or OP-XY .xy project"
+        on:click={onReplaceMidi}>replace MIDI</button
+      >
       <button
         type="button"
         class="primary"
+        aria-label="Create an OP-XY project from the selected MIDI"
+        title="Create an OP-XY .xy project from the selected MIDI tracks"
         disabled={midiSelectionUpdating || !canBurnMidi}
-        on:click={onBurnMidiToSong}>bounce midi to song</button
+        on:click={onBurnMidiToSong}>create OP-XY project</button
       >
     {/if}
   </div>

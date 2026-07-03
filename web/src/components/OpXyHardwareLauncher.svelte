@@ -1,6 +1,7 @@
 <script lang="ts">
   import opxySvg from "../assets/opxy.svg";
   import type { DisplayMessage } from "../stores/project";
+  import LaunchImportFileTags from "./LaunchImportFileTags.svelte";
   import OpXyDisplay from "./OpXyDisplay.svelte";
 
   type ViewBoxRect = {
@@ -29,13 +30,13 @@
   const SCREEN_INNER: ViewBoxRect = { x: 177, y: 19, w: 147.5, h: 64 };
   const OPEN_XY_HOTSPOT: Hotspot = {
     id: "open-xy",
-    label: "Open .xy project",
+    label: "Open OP-XY .xy project",
     rect: { x: 171.211, y: 12.16, w: 159.11, h: 79.45 },
     message: { text: "TAP TO OPEN", tone: "neutral" },
   };
   const IMPORT_HOTSPOT: Hotspot = {
     id: "import-midi",
-    label: "Import MIDI or .xy file",
+    label: "Choose MIDI or OP-XY .xy file",
     rect: { x: 12.063, y: 12.013, w: 79.574, h: 79.595 },
     message: { text: "CHOOSE FILE", tone: "neutral" },
   };
@@ -117,9 +118,9 @@
     class:processing={importState === "processing"}
     class:drag-ready={dragging}
     style={popoverStyle(OPEN_XY_HOTSPOT.rect)}
-    aria-label="Import MIDI or XY file"
+    aria-label="Choose a MIDI file or OP-XY .xy project"
     aria-busy={importState === "processing"}
-    title="Import MIDI or .xy file"
+    title="Choose a MIDI file or OP-XY .xy project"
     disabled={importState === "processing"}
     on:mouseenter={() => (hoverMessage = IMPORT_HOTSPOT.message)}
     on:mouseleave={() => clearHoverMessage(IMPORT_HOTSPOT)}
@@ -127,6 +128,7 @@
     on:blur={() => clearHoverMessage(IMPORT_HOTSPOT)}
     on:click={onImportMidi}
   >
+    <LaunchImportFileTags processing={importState === "processing"} />
     {#if importState === "processing"}
       <span class="popover-loader" aria-hidden="true">
         <span></span>
