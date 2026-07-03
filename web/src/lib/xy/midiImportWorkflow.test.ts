@@ -9,6 +9,7 @@ function summary(
     sourceTotal16ths: number;
     trackCount: number;
     maxInstrumentTracks: number;
+    drumTrackCount: number;
   }> = {},
 ) {
   const values = {
@@ -18,6 +19,7 @@ function summary(
     sourceTotal16ths: 64,
     trackCount: 1,
     maxInstrumentTracks: 8,
+    drumTrackCount: 0,
     ...overrides,
   };
 
@@ -27,7 +29,9 @@ function summary(
       rangeStart16ths: values.rangeStart16ths,
       rangeEnd16ths: values.rangeEnd16ths,
       sourceTotal16ths: values.sourceTotal16ths,
-      tracks: Array.from({ length: values.trackCount }),
+      tracks: Array.from({ length: values.trackCount }, (_, index) => ({
+        isDrum: index < values.drumTrackCount,
+      })),
       maxInstrumentTracks: values.maxInstrumentTracks,
     },
   };
@@ -42,6 +46,10 @@ describe("MIDI import workflow", () => {
     expect(
       midiImportNeedsEditor(summary({ isSelectionRecommended: true })),
     ).toBe(true);
+  });
+
+  it("requires the editor when GM drum mapping can be adjusted", () => {
+    expect(midiImportNeedsEditor(summary({ drumTrackCount: 1 }))).toBe(true);
   });
 
   it("requires the editor for a shortened MIDI range", () => {

@@ -22,6 +22,7 @@ import {
   buildProjectViewModel,
   type XYProjectViewModel,
 } from "./projectViewModel";
+import { GM_DRUM_MIDI_CHANNEL, opXyDrumNoteFromGm } from "./drumMidi";
 
 export type MidiImportRole = "drum" | "bass" | "lead" | "chord";
 
@@ -109,6 +110,7 @@ export type MidiTrackSelectionSummary = {
 export type MidiImportSummary = {
   bpm: number;
   ticksPerBeat: number;
+  mapGmDrums: boolean;
   /** Legacy name for the number of timeline windows, each up to four bars. */
   patterns: number;
   scenes: number;
@@ -135,6 +137,7 @@ export type MidiImportOptions = {
   rangeStart16ths?: number;
   rangeEnd16ths?: number;
   fitToCapacity?: boolean;
+  mapGmDrums?: boolean;
 };
 
 const ROLE_SLOTS: Record<number, Role> = {
@@ -182,36 +185,14 @@ const INSTRUMENT_TRACK_COUNT = 8;
 const BAR_16THS = 16;
 const PATTERN_16THS = BAR_16THS * 4;
 
-const GM_TO_OPXY_DRUM: Record<number, number> = {
-  35: 48,
-  36: 48,
-  37: 52,
-  38: 50,
-  39: 53,
-  40: 51,
-  41: 60,
-  42: 56,
-  43: 61,
-  44: 57,
-  45: 62,
-  46: 58,
-  47: 63,
-  48: 64,
-  49: 54,
-  50: 65,
-  51: 55,
-  52: 66,
-  53: 67,
-  54: 57,
-  55: 68,
-  56: 69,
-  57: 54,
-};
-
 let baselineBytesPromise: Promise<Uint8Array> | null = null;
 
-function remapDrumNote(gmNote: number): number {
-  return GM_TO_OPXY_DRUM[gmNote] ?? Math.max(48, Math.min(71, gmNote));
+function shouldMapGmDrums(options: MidiImportOptions): boolean {
+  return options.mapGmDrums !== false;
+}
+
+function importedDrumNote(note: number, mapGmDrums: boolean): number {
+  return mapGmDrums ? opXyDrumNoteFromGm(note) : note;
 }
 
 function isNoteOn(event: MidiEvent): event is MidiNoteOnEvent {
@@ -414,6 +395,7 @@ function partFingerprint(
   midiTpb: number,
   start16ths: number,
   isDrumChannel: boolean,
+  mapGmDrums: boolean,
 ): Set<string> {
   const sig = new Set<string>();
   if (notesWindow.length === 0) return sig;
@@ -424,7 +406,9 @@ function partFingerprint(
     const relTick = note.absTick - lo;
     const xyTick = Math.round(relTick * scale);
     const qTick = Math.round(xyTick / 120) * 120;
-    const pitch = isDrumChannel ? remapDrumNote(note.note) : note.note;
+    const pitch = isDrumChannel
+      ? importedDrumNote(note.note, mapGmDrums)
+      : note.note;
     sig.add(`${qTick}:${pitch}`);
   }
   return sig;
@@ -509,6 +493,7 @@ function buildPartCandidates(
   midiTpb: number,
   start16ths: number,
   total16ths: number,
+  mapGmDrums: boolean,
 ): PartCandidate[] {
   const totalBars = Math.max(1, Math.ceil(total16ths / BAR_16THS));
   const tick16th = ticksPer16th(midiTpb);
@@ -555,7 +540,7 @@ function buildPartCandidates(
     const avgNotesPerOnset = noteCount / Math.max(1, onsetCounts.size);
 
     const [, channel] = splitLaneKey(key);
-    const isDrumChannel = channel === 9;
+    const isDrumChannel = channel === GM_DRUM_MIDI_CHANNEL;
     const drumNoteHits = pitches.filter(
       (pitch) => 27 <= pitch && pitch <= 87,
     ).length;
@@ -600,6 +585,7 @@ function buildPartCandidates(
         midiTpb,
         start16ths,
         isDrumChannel,
+        mapGmDrums,
       ),
     });
   }
@@ -819,12 +805,14 @@ function selectBestParts(
   midiTpb: number,
   start16ths: number,
   total16ths: number,
+  mapGmDrums: boolean,
 ): SelectionResult {
   const candidates = buildPartCandidates(
     laneNotes,
     midiTpb,
     start16ths,
     total16ths,
+    mapGmDrums,
   );
   const [rankedParts, droppedDuplicates] = dedupeCandidates(candidates);
   return {
@@ -842,6 +830,7 @@ function midiToXyNotes(
   midiTpb: number,
   start16ths: number,
   isDrum: boolean,
+  mapGmDrums: boolean,
 ): PatternNoteInput[] {
   const tickOffsetMidi = start16ths * ticksPer16th(midiTpb);
   const scale = 1920 / midiTpb;
@@ -863,7 +852,7 @@ function midiToXyNotes(
     );
     xyNotes.push({
       step,
-      note: isDrum ? remapDrumNote(note.note) : note.note,
+      note: isDrum ? importedDrumNote(note.note, mapGmDrums) : note.note,
       velocity: Math.max(1, Math.min(127, note.velocity)),
       tickOffset,
       gateTicks,
@@ -879,11 +868,14 @@ function midiToXyNotes(
   return xyNotes;
 }
 
-function deriveSecondaryDrumWindow(notesWindow: MidiNote[]): MidiNote[] {
+function deriveSecondaryDrumWindow(
+  notesWindow: MidiNote[],
+  mapGmDrums: boolean,
+): MidiNote[] {
   const highPerc: MidiNote[] = [];
   const baseHits: MidiNote[] = [];
   for (const note of notesWindow) {
-    const mapped = remapDrumNote(note.note);
+    const mapped = importedDrumNote(note.note, mapGmDrums);
     if (mapped >= 56 || [54, 55, 67, 68, 69, 70, 71].includes(mapped)) {
       highPerc.push(note);
     } else {
@@ -932,6 +924,7 @@ function buildTrackPatterns(
   total16ths: number,
   numPatterns: number,
   includeDerivedParts = true,
+  mapGmDrums = true,
 ): Map<number, Array<PatternNoteInput[] | null>> {
   const trackPatterns = new Map<number, Array<PatternNoteInput[] | null>>();
   const drumPrimary =
@@ -976,7 +969,7 @@ function buildTrackPatterns(
           patternStart16ths,
           patternSteps,
         );
-        sourceNotes = deriveSecondaryDrumWindow(base);
+        sourceNotes = deriveSecondaryDrumWindow(base, mapGmDrums);
       } else if (
         includeDerivedParts &&
         role === "chord" &&
@@ -999,6 +992,7 @@ function buildTrackPatterns(
               midiTpb,
               patternStart16ths,
               role === "drum",
+              mapGmDrums,
             )
           : [];
       patterns.push(
@@ -1113,6 +1107,7 @@ function candidatePatternBankCost(
   midiTpb: number,
   start16ths: number,
   total16ths: number,
+  mapGmDrums: boolean,
 ): Pick<MidiTrackSelectionOption, "uniquePatternCount" | "bankCount"> {
   const uniqueSignatures = new Set<string>();
   const numPatterns = Math.max(1, Math.ceil(total16ths / PATTERN_16THS));
@@ -1136,6 +1131,7 @@ function candidatePatternBankCost(
             midiTpb,
             patternStart16ths,
             candidate.isDrumChannel,
+            mapGmDrums,
           ).slice(0, MAX_NOTES_PER_PATTERN)
         : [];
     if (xyNotes.length > 0) {
@@ -1153,6 +1149,7 @@ function candidatePatternBankCost(
 function candidatePreviewNotes(
   candidate: PartCandidate,
   midiTpb: number,
+  mapGmDrums: boolean,
 ): MidiPreviewNote[] {
   const tick16th = ticksPer16th(midiTpb);
   const stride = Math.max(
@@ -1167,7 +1164,9 @@ function candidatePreviewNotes(
       id: `${candidateId(candidate)}:${index}`,
       start16ths: Math.max(0, note.absTick / tick16th),
       duration16ths: Math.max(0.125, note.gateTicks / tick16th),
-      note: candidate.isDrumChannel ? remapDrumNote(note.note) : note.note,
+      note: candidate.isDrumChannel
+        ? importedDrumNote(note.note, mapGmDrums)
+        : note.note,
       velocity: note.velocity,
     });
   }
@@ -1181,6 +1180,7 @@ function buildTrackSelectionOption(
   midiTpb: number,
   start16ths: number,
   total16ths: number,
+  mapGmDrums: boolean,
 ): MidiTrackSelectionOption {
   const id = candidateId(candidate);
   const [midiTrackIndex, midiChannel] = candidate.key;
@@ -1190,7 +1190,16 @@ function buildTrackSelectionOption(
     baseName.trim().length > 0
       ? baseName.trim()
       : `MIDI track ${midiTrackIndex + 1}`;
-  const previewNotes = candidatePreviewNotes(candidate, midiTpb);
+  const previewNotes = candidatePreviewNotes(candidate, midiTpb, mapGmDrums);
+  const displayPitches = previewNotes.map((note) => note.note);
+  const pitchMin =
+    displayPitches.length > 0
+      ? Math.min(...displayPitches)
+      : candidate.pitchMin;
+  const pitchMax =
+    displayPitches.length > 0
+      ? Math.max(...displayPitches)
+      : candidate.pitchMax;
   const trackStart16ths =
     previewNotes.length > 0
       ? Math.min(...previewNotes.map((note) => note.start16ths))
@@ -1212,11 +1221,17 @@ function buildTrackSelectionOption(
     noteCount: candidate.noteCount,
     uniquePitches: candidate.uniquePitches,
     activeBars: candidate.activeBars,
-    pitchMin: candidate.pitchMin,
-    pitchMax: candidate.pitchMax,
+    pitchMin,
+    pitchMax,
     start16ths: trackStart16ths,
     end16ths,
-    ...candidatePatternBankCost(candidate, midiTpb, start16ths, total16ths),
+    ...candidatePatternBankCost(
+      candidate,
+      midiTpb,
+      start16ths,
+      total16ths,
+      mapGmDrums,
+    ),
     previewNotes,
   };
 }
@@ -1319,6 +1334,7 @@ function bankCountForSelectedCandidates(args: {
   midiTpb: number;
   start16ths: number;
   total16ths: number;
+  mapGmDrums: boolean;
 }): number {
   const selected = new Set(args.selectedTrackIds);
   return args.candidates.reduce((sum, candidate) => {
@@ -1330,6 +1346,7 @@ function bankCountForSelectedCandidates(args: {
         args.midiTpb,
         args.start16ths,
         args.total16ths,
+        args.mapGmDrums,
       ).bankCount
     );
   }, 0);
@@ -1341,6 +1358,7 @@ function maxSafeRangeForSelected(args: {
   midiTpb: number;
   start16ths: number;
   sourceTotal16ths: number;
+  mapGmDrums: boolean;
 }): ImportRange | null {
   const maxPatterns = Math.min(
     SCENE_COUNT,
@@ -1366,6 +1384,7 @@ function maxSafeRangeForSelected(args: {
       midiTpb: args.midiTpb,
       start16ths: args.start16ths,
       total16ths: candidateRange.total16ths,
+      mapGmDrums: args.mapGmDrums,
     });
     if (bankCount > INSTRUMENT_TRACK_COUNT) break;
     lastSafe = candidateRange;
@@ -1532,6 +1551,7 @@ export function buildMidiProjectFromBytes(
     throw new Error("SMPTE-timed MIDI files are not supported yet.");
   }
   const midiTpb = ticksPerBeat;
+  const mapGmDrums = shouldMapGmDrums(options);
 
   const laneNotes = extractMidiParts(midi);
   const trackNames = midiTrackNames(midi);
@@ -1545,6 +1565,7 @@ export function buildMidiProjectFromBytes(
       midiTpb,
       currentRange.start16ths,
       currentRange.total16ths,
+      mapGmDrums,
     );
     const trackOptions = fullSelection.rankedParts
       .map((candidate) =>
@@ -1554,6 +1575,7 @@ export function buildMidiProjectFromBytes(
           midiTpb,
           currentRange.start16ths,
           currentRange.total16ths,
+          mapGmDrums,
         ),
       )
       .sort(
@@ -1613,6 +1635,7 @@ export function buildMidiProjectFromBytes(
         midiTpb,
         start16ths: range.start16ths,
         sourceTotal16ths,
+        mapGmDrums,
       });
       if (safeRange) {
         range = safeRange;
@@ -1661,6 +1684,7 @@ export function buildMidiProjectFromBytes(
     range.total16ths,
     range.numPatterns,
     includeDerivedParts,
+    mapGmDrums,
   );
   let banked: BankedArrangement;
   const patternSteps = patternStepsForRange(range);
@@ -1678,6 +1702,7 @@ export function buildMidiProjectFromBytes(
       range.total16ths,
       range.numPatterns,
       false,
+      mapGmDrums,
     );
     try {
       banked = bankTrackPatterns(sourceOnlyPatterns, patternSteps);
@@ -1713,6 +1738,7 @@ export function buildMidiProjectFromBytes(
   const summary: MidiImportSummary = {
     bpm,
     ticksPerBeat: midiTpb,
+    mapGmDrums,
     patterns: range.numPatterns,
     scenes: range.numPatterns,
     totalBars: range.totalBars,

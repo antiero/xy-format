@@ -12,8 +12,10 @@
     options: MidiImportOptions,
   ) => void = () => {};
   export let midiSelectionUpdating = false;
+  export let mapGmDrums = true;
 
   $: trackSelection = importSummary?.trackSelection ?? null;
+  $: activeMapGmDrums = importSummary?.mapGmDrums ?? mapGmDrums;
 </script>
 
 <section
@@ -26,6 +28,7 @@
       {project}
       selection={trackSelection}
       selectionUpdating={midiSelectionUpdating}
+      mapGmDrums={activeMapGmDrums}
       onSelectionChange={onMidiTrackSelectionChange}
     />
   {/if}

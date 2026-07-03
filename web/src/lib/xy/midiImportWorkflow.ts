@@ -1,4 +1,7 @@
-import type { MidiTrackSelectionSummary } from "./midiImporter";
+import type {
+  MidiTrackSelectionOption,
+  MidiTrackSelectionSummary,
+} from "./midiImporter";
 
 type MidiEditorTrackSelection = Pick<
   MidiTrackSelectionSummary,
@@ -6,9 +9,10 @@ type MidiEditorTrackSelection = Pick<
   | "rangeStart16ths"
   | "rangeEnd16ths"
   | "sourceTotal16ths"
-  | "tracks"
   | "maxInstrumentTracks"
->;
+> & {
+  tracks: Array<Pick<MidiTrackSelectionOption, "isDrum">>;
+};
 
 export function midiImportNeedsEditor(
   summary: { trackSelection: MidiEditorTrackSelection | null } | null,
@@ -17,6 +21,7 @@ export function midiImportNeedsEditor(
   return (
     !!selection &&
     (selection.isSelectionRecommended ||
+      selection.tracks.some((track) => track.isDrum) ||
       selection.rangeStart16ths > 0 ||
       selection.rangeEnd16ths < selection.sourceTotal16ths ||
       selection.tracks.length > selection.maxInstrumentTracks)

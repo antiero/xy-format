@@ -160,6 +160,31 @@ def _single_polyphonic_lane_midi() -> mido.MidiFile:
     return mid
 
 
+def test_gm_drums_map_to_op_xy_percussion_notes() -> None:
+    tool = _load_midi_tool_module()
+
+    gm_notes = [35, 36, 37, 38, 39, 40, 42, 44, 45, 46, 47, 49, 50, 56, 70]
+    op_xy_notes = [
+        53,
+        53,
+        57,
+        56,
+        62,
+        56,
+        61,
+        61,
+        65,
+        63,
+        67,
+        49,
+        69,
+        56,
+        60,
+    ]
+
+    assert [tool.remap_drum_note(note) for note in gm_notes] == op_xy_notes
+
+
 def test_role_mapping_prefers_drums_bass_chords() -> None:
     tool = _load_midi_tool_module()
     mid = _synthetic_mix_midi()
