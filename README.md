@@ -127,3 +127,7 @@ If a generated file crashes the device, follow
 - Preserve unknown decoded bytes until mapped.
 - Prefer byte-exact replication of device captures over heuristics.
 - Record device outcomes and every crash with artifacts and notes.
+
+## License
+
+This project is licensed under the MIT License — see the [LICENSE](LICENSE) file for details.
