@@ -7,10 +7,10 @@ Examples
 --------
 JSON spec (default):
     python tools/midi_to_xy.py input.mid
-    python tools/midi_to_xy.py input.mid -o specs/midi-to-xy/song.json --patterns 9
+    python tools/midi_to_xy.py input.mid -o specs/midi-to-xy/song.json --patterns 16
 
 Direct XY build:
-    python tools/midi_to_xy.py input.mid --format xy -o output/song.xy --patterns 9
+    python tools/midi_to_xy.py input.mid --format xy -o output/song.xy --patterns 16
 
 Analysis only:
     python tools/midi_to_xy.py input.mid --info
@@ -102,6 +102,7 @@ ROLE_MIN_ACTIVE_BARS = {
 
 # Maximum notes per OP-XY pattern (device hard cap)
 MAX_NOTES_PER_PATTERN = 120
+MAX_PATTERNS_PER_TRACK = 16
 
 
 @dataclass
@@ -1059,7 +1060,7 @@ def _auto_detect_patterns(midi_path: str, start_bar: int) -> int:
 
     total_bars = max_tick // ticks_per_bar + 1
     remaining_bars = max(1, total_bars - start_bar)
-    patterns = min(9, math.ceil(remaining_bars / 4))
+    patterns = min(MAX_PATTERNS_PER_TRACK, math.ceil(remaining_bars / 4))
     return max(1, patterns)
 
 
@@ -1138,7 +1139,7 @@ def main() -> None:
         "--patterns",
         type=int,
         default=None,
-        help="Number of 4-bar patterns (1-9, default: auto-detect)",
+        help=f"Number of 4-bar patterns (1-{MAX_PATTERNS_PER_TRACK}, default: auto-detect)",
     )
     parser.add_argument(
         "--info",
@@ -1155,7 +1156,7 @@ def main() -> None:
         start_bar = 0
 
     if args.patterns is not None:
-        num_patterns = max(1, min(9, args.patterns))
+        num_patterns = max(1, min(MAX_PATTERNS_PER_TRACK, args.patterns))
     elif args.bars:
         num_patterns = 1
     else:

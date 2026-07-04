@@ -15,7 +15,7 @@ from xy.image_writer import ImageProject
 from xy.rle import decode_project
 
 BASE = "src/one-off-changes-from-default/unnamed 1.xy"
-SIG_RE = re.compile(rb"\x00\x00\x00[\x00-\x0f]\xff\x00\xfc\x00", re.S)
+SIG_RE = re.compile(rb"\x00\x00\x00[\x00-\x10]\xff\x00\xfc\x00", re.S)
 
 
 def build(edits):
@@ -40,7 +40,7 @@ def _leader_starts(image: bytes) -> list[int]:
         start = starts[idx]
         leaders.append(start)
         count = image[start]
-        if not 1 <= count <= 9:
+        if not 1 <= count <= 16:
             count = 1
         idx += count
     if len(leaders) < 16 and len(starts) >= 16:
@@ -131,6 +131,14 @@ def test_build_arrangement_replicates_j06():
     from xy.image_writer import build_arrangement
     out = build_arrangement(BASE, {t: [[]] * 9 for t in range(1, 9)})
     assert out == open("src/one-off-changes-from-default/j06_all16_p9_blank.xy", "rb").read()
+
+
+def test_build_arrangement_supports_sixteen_patterns_per_track():
+    from xy.image_writer import ImageProject, build_arrangement, pattern_starts_from_image
+    out = build_arrangement(BASE, {1: [[]] * 16}, scenes=[{1: 15}])
+    reloaded = ImageProject.from_bytes(out)
+    assert len(pattern_starts_from_image(reloaded.image)) >= 16
+    assert reloaded.pattern_start(1, 16) > reloaded.pattern_start(1, 15)
 
 
 def test_build_arrangement_accepts_explicit_pattern_steps():

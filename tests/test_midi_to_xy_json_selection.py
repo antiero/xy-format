@@ -204,3 +204,17 @@ def test_json_payload_is_schema_valid_for_compiler() -> None:
     assert "descriptor_strategy" not in payload
     assert len(payload["tracks"]) == 8
     assert all(len(track["patterns"]) == 2 for track in payload["tracks"])
+
+
+def test_auto_detect_patterns_caps_at_sixteen(tmp_path: Path) -> None:
+    tool = _load_midi_tool_module()
+    tpb = 480
+    mid = mido.MidiFile(ticks_per_beat=tpb)
+    track = mido.MidiTrack()
+    mid.tracks.append(track)
+    track.append(mido.Message("note_on", channel=0, note=60, velocity=90, time=70 * 4 * tpb))
+    track.append(mido.Message("note_off", channel=0, note=60, velocity=0, time=tpb))
+    midi_path = tmp_path / "long.mid"
+    mid.save(midi_path)
+
+    assert tool._auto_detect_patterns(str(midi_path), start_bar=0) == 16

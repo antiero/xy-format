@@ -80,7 +80,7 @@ One tiny probe file + a glance at the device UI each:
    micro-timing? probability?).
 3. Scene-row flag byte semantics (0x01 vs 0x00 visible behavior).
 4. Limits certification pack: 99 scenes, 14 songs, 120-note patterns,
-   full 9-pattern topology — confirm writer bounds match device bounds.
+   full 16-pattern topology — confirm writer bounds match device bounds.
 
 ## Tier 3 — Product (device = acceptance testing, not discovery)
 

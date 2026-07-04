@@ -28,7 +28,7 @@ Sources: [teenage.engineering/products/op-xy](https://teenage.engineering/produc
 |-------|-------|-------|
 | Instrument tracks | 8 | T1-T8 |
 | Auxiliary tracks | 8 | T9-T16 |
-| Patterns per track | 9 | |
+| Patterns per track | 16 | Increased from 9 in OP-XY OS 1.1.15 (2026-07-01) |
 | Scenes | 99 | |
 | Scenes per song | 96 | |
 | Songs per project | 14 | Some sources differ by firmware |
@@ -48,5 +48,5 @@ Sources: [teenage.engineering/products/op-xy](https://teenage.engineering/produc
 
 ## Format Implications
 - 120-note cap defines parser/writer stress-test ceiling.
-- 9-pattern limit drives clone-struct and scene-selection bounds.
+- 16-pattern limit drives clone-struct and scene-selection bounds.
 - 8-voice per-track and 24-voice total are hard constraints for chord-generation tests.
