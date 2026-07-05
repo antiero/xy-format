@@ -1,6 +1,8 @@
 type EmbedModeContext = {
   search: string;
   userAgent: string;
+  platform?: string;
+  maxTouchPoints?: number;
   nativeAppGlobal?: unknown;
   nativeBridge?: unknown;
 };
@@ -44,6 +46,25 @@ export function isXYBuddyNativeEmbed(
     nativeBridge: (window as { __xyBuddyNativeBridge?: unknown })
       .__xyBuddyNativeBridge,
   });
+}
+
+export function isAppleClient(context?: Partial<EmbedModeContext>): boolean {
+  const userAgent =
+    context?.userAgent ??
+    (typeof navigator === "undefined" ? "" : navigator.userAgent);
+  const platform =
+    context?.platform ??
+    (typeof navigator === "undefined" ? "" : navigator.platform);
+  const maxTouchPoints =
+    context?.maxTouchPoints ??
+    (typeof navigator === "undefined" ? 0 : navigator.maxTouchPoints);
+
+  if (/\b(iPhone|iPad|iPod)\b/i.test(userAgent)) return true;
+  if (/\b(visionOS|Vision|Apple Vision)\b/i.test(userAgent)) return true;
+  if (/\b(Macintosh|Mac OS X)\b/i.test(userAgent)) return true;
+  if (/\b(iPhone|iPad|iPod|Mac)\b/i.test(platform)) return true;
+
+  return platform === "MacIntel" && maxTouchPoints > 1;
 }
 
 export function applyNativeEmbedClass(): boolean {

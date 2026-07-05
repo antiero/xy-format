@@ -1,10 +1,12 @@
 import { describe, expect, it } from "vitest";
 import worker, {
+  type Env,
+} from "./index";
+import {
   MAX_STEPS_PER_EVENT,
   corsHeaders,
   normaliseStepCount,
-  type Env,
-} from "./index";
+} from "./stats";
 
 class MemoryKV {
   private store = new Map<string, string>();
@@ -57,6 +59,9 @@ describe("corsHeaders", () => {
     });
     expect(corsHeaders("http://localhost:5173")).toMatchObject({
       "Access-Control-Allow-Origin": "http://localhost:5173",
+    });
+    expect(corsHeaders("http://127.0.0.1:5174")).toMatchObject({
+      "Access-Control-Allow-Origin": "http://127.0.0.1:5174",
     });
   });
 

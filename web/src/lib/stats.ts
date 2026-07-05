@@ -6,6 +6,7 @@ export const MAX_STEPS_PER_EVENT = 4096;
 
 const STATS_API_BASE = import.meta.env.VITE_STATS_API_BASE ?? "";
 const STATS_UPDATED_EVENT = "xybuddy-stats-updated";
+const STATS_MOCK_STEPS_PARAM = "xybuddyStatsSteps";
 
 function statsUrl(path: string): string {
   return `${STATS_API_BASE}${path}`;
@@ -28,6 +29,30 @@ function parseStatsPayload(value: unknown): XYBuddyStats | null {
   if (!Number.isFinite(totalSteps) || totalSteps < 0) return null;
 
   return { totalSteps: Math.floor(totalSteps) };
+}
+
+export function statsFromSearch(search: string): XYBuddyStats | null {
+  try {
+    const params = new URLSearchParams(search);
+    const mockSteps = params.get(STATS_MOCK_STEPS_PARAM);
+    if (mockSteps === null) return null;
+
+    const totalSteps = Number(mockSteps);
+    if (!Number.isFinite(totalSteps) || totalSteps < 0) return null;
+
+    return { totalSteps: Math.floor(totalSteps) };
+  } catch {
+    return null;
+  }
+}
+
+export function initialStatsFromLocation(
+  location: Pick<Location, "search"> | null | undefined = typeof window ===
+  "undefined"
+    ? null
+    : window.location,
+): XYBuddyStats | null {
+  return location ? statsFromSearch(location.search) : null;
 }
 
 function notifyStatsUpdated(stats: XYBuddyStats): void {

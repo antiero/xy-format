@@ -1374,11 +1374,12 @@ button.primary {
 .launch-surface {
   position: relative;
   flex: 1;
-  min-height: 100vh;
-  display: grid;
-  place-items: center;
-  padding: clamp(72px, 9vh, 118px) 3vw;
-  overflow: hidden;
+  min-height: 100svh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: clamp(58px, 7vh, 88px) 3vw clamp(20px, 3vh, 34px);
+  overflow-x: hidden;
   background:
     linear-gradient(rgba(247, 247, 242, 0.018) 1px, transparent 1px),
     linear-gradient(90deg, rgba(247, 247, 242, 0.012) 1px, transparent 1px),
@@ -1403,15 +1404,18 @@ button.primary {
 .launch-brand span:first-child {
   color: var(--xy-text);
   font-weight: 760;
+  font-size: 14px;
 }
 
 .launch-stack {
   display: grid;
+  flex: 1 1 auto;
   width: min(1180px, 94vw);
+  align-content: center;
   justify-items: center;
-  gap: clamp(18px, 3vh, 30px);
-  margin-top: clamp(46px, 7vh, 72px);
-  margin-bottom: clamp(24px, 4vh, 44px);
+  gap: clamp(14px, 2.3vh, 24px);
+  margin-top: clamp(34px, 5vh, 58px);
+  margin-bottom: clamp(14px, 2.5vh, 28px);
 }
 
 .tempo-input {
@@ -1434,11 +1438,22 @@ button.primary {
 
 .disclaimer {
   position: absolute;
+  text-align: center;
   left: 6vw;
   bottom: 26px;
   max-width: 620px;
   color: var(--xy-text-dim);
   font-size: 12px;
+}
+
+.site-footer {
+  position: static;
+  left: auto;
+  right: auto;
+  bottom: auto;
+  width: min(1180px, 94vw);
+  max-width: 1180px;
+  margin-top: auto;
 }
 
 .firmware-footnote {

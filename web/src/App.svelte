@@ -1,6 +1,7 @@
 <script lang="ts">
   import OpXyHardwareLauncher from "./components/OpXyHardwareLauncher.svelte";
   import LaunchGuidance from "./components/LaunchGuidance.svelte";
+  import ConversionCounter from "./components/ConversionCounter.svelte";
   import MacAppNotice from "./components/MacAppNotice.svelte";
   import ProjectReadyPanel from "./components/ProjectReadyPanel.svelte";
   import CreatedProjectWorkspace from "./components/CreatedProjectWorkspace.svelte";
@@ -31,7 +32,7 @@
     publishNativeExport,
     type XYBuddyNativeExportPayload,
   } from "./lib/nativeBridge";
-  import { isXYBuddyNativeEmbed } from "./lib/embedMode";
+  import { isAppleClient, isXYBuddyNativeEmbed } from "./lib/embedMode";
   import { reportConvertedSteps } from "./lib/stats";
 
   type ReadyProjectExport = {
@@ -55,6 +56,7 @@
   let midiSelectionUpdating = false;
   let launchImportState: LaunchImportState = "idle";
   const isNativeEmbed = isXYBuddyNativeEmbed();
+  const canShowMacCompanion = !isNativeEmbed && isAppleClient();
 
   const LAUNCH_IMPORT_THEATRE_MS = 920;
 
@@ -406,7 +408,8 @@
     <section class="launch-surface" aria-label="OP-XY project launcher">
       <div class="launch-brand" aria-label="XY buddy">
         <span>xy buddy</span>
-        <span>unofficial op-xy project utility</span>
+        unofficial op-xy project utility<br />
+        supports firmware 1.1.15 / later
       </div>
 
       <div class="launch-stack">
@@ -421,7 +424,9 @@
 
         <LaunchGuidance />
 
-        {#if !isNativeEmbed}
+        <ConversionCounter />
+
+        {#if canShowMacCompanion}
           <MacAppNotice />
         {/if}
       </div>

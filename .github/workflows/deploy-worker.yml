@@ -1,0 +1,50 @@
+name: Deploy XYBuddy Stats Worker
+
+on:
+  push:
+    branches: ["main"]
+    paths:
+      - "worker/**"
+      - ".github/workflows/deploy-worker.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: "xybuddy-stats-worker"
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Deploy Worker
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: worker/.nvmrc
+          cache: "npm"
+          cache-dependency-path: worker/package-lock.json
+
+      - name: Use pinned npm
+        run: |
+          npm install --global "$(node -p "require('./worker/package.json').packageManager")"
+          npm --version
+
+      - name: Install dependencies
+        working-directory: ./worker
+        run: npm ci
+
+      - name: Check Worker
+        working-directory: ./worker
+        run: npm run check
+
+      - name: Deploy Worker
+        working-directory: ./worker
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: npm run deploy

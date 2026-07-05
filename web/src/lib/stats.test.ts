@@ -2,8 +2,10 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   MAX_STEPS_PER_EVENT,
   fetchStats,
+  initialStatsFromLocation,
   normaliseConvertedSteps,
   reportConvertedSteps,
+  statsFromSearch,
 } from "./stats";
 
 afterEach(() => {
@@ -42,6 +44,31 @@ describe("fetchStats", () => {
     );
 
     await expect(fetchStats()).resolves.toBeNull();
+  });
+});
+
+describe("statsFromSearch", () => {
+  it("returns null when no mock counter value is present", () => {
+    expect(statsFromSearch("?embed=macos")).toBeNull();
+  });
+
+  it("floors valid mock counter values", () => {
+    expect(statsFromSearch("?xybuddyStatsSteps=1234.9")).toEqual({
+      totalSteps: 1234,
+    });
+  });
+
+  it("rejects invalid mock counter values", () => {
+    expect(statsFromSearch("?xybuddyStatsSteps=nope")).toBeNull();
+    expect(statsFromSearch("?xybuddyStatsSteps=-1")).toBeNull();
+  });
+
+  it("can read a mock counter value from a location-like object", () => {
+    expect(
+      initialStatsFromLocation({ search: "?xybuddyStatsSteps=4096" }),
+    ).toEqual({
+      totalSteps: 4096,
+    });
   });
 });
 
