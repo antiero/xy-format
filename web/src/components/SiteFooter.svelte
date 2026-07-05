@@ -9,7 +9,8 @@
       href="https://github.com/kmorrill/xy-format"
       target="_blank"
       rel="noreferrer">xy-format by kmorrill</a
-    ><br />*privacy notice: step counter records number of converted steps only, not your files.
+    ><br />*privacy notice: step counter records number of converted steps only,
+    not your files.
   </p>
 </footer>
 
