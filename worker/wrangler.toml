@@ -9,5 +9,4 @@ routes = [
 
 [[kv_namespaces]]
 binding = "XYBUDDY_STATS"
-id = "00000000000000000000000000000000"
-preview_id = "00000000000000000000000000000000"
+id = "1ae725ec512044eda32621a83b13ce5f"
