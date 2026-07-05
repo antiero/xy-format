@@ -54,6 +54,8 @@ jobs:
 
       - name: Build project
         working-directory: ./web
+        env:
+          VITE_STATS_API_BASE: https://api.xybuddy.xyz
         run: npm run build
 
       - name: Upload artifact

@@ -1,0 +1,13 @@
+name = "xybuddy-stats"
+main = "src/index.ts"
+compatibility_date = "2024-11-11"
+workers_dev = false
+
+routes = [
+  { pattern = "api.xybuddy.xyz/*", custom_domain = true }
+]
+
+[[kv_namespaces]]
+binding = "XYBUDDY_STATS"
+id = "00000000000000000000000000000000"
+preview_id = "00000000000000000000000000000000"

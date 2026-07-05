@@ -116,6 +116,11 @@ button:focus-visible {
   border: 0;
 }
 
+.xybuddy-native-embed .web-only,
+.xybuddy-native-embed [data-web-only="true"] {
+  display: none !important;
+}
+
 .app-shell {
   min-height: 100vh;
   display: flex;
