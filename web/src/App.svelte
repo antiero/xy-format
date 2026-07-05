@@ -1,8 +1,11 @@
 <script lang="ts">
   import OpXyHardwareLauncher from "./components/OpXyHardwareLauncher.svelte";
   import LaunchGuidance from "./components/LaunchGuidance.svelte";
+  import ConversionCounter from "./components/ConversionCounter.svelte";
+  import MacAppNotice from "./components/MacAppNotice.svelte";
   import ProjectReadyPanel from "./components/ProjectReadyPanel.svelte";
   import CreatedProjectWorkspace from "./components/CreatedProjectWorkspace.svelte";
+  import SiteFooter from "./components/SiteFooter.svelte";
   import WorkflowTopbar from "./components/WorkflowTopbar.svelte";
   import {
     announceDisplayMessage,
@@ -29,6 +32,8 @@
     publishNativeExport,
     type XYBuddyNativeExportPayload,
   } from "./lib/nativeBridge";
+  import { isAppleClient, isXYBuddyNativeEmbed } from "./lib/embedMode";
+  import { reportConvertedSteps } from "./lib/stats";
 
   type ReadyProjectExport = {
     filename: string;
@@ -50,6 +55,8 @@
   let midiImportOptions: MidiImportOptions = {};
   let midiSelectionUpdating = false;
   let launchImportState: LaunchImportState = "idle";
+  const isNativeEmbed = isXYBuddyNativeEmbed();
+  const canShowMacCompanion = !isNativeEmbed && isAppleClient();
 
   const LAUNCH_IMPORT_THEATRE_MS = 920;
 
@@ -71,6 +78,16 @@
       rangeEnd16ths: summary.rangeEnd16ths,
       mapGmDrums: summary.mapGmDrums,
     };
+  }
+
+  function convertedSequencerSteps(summary: MidiImportSummary | null): number {
+    if (!summary) return 0;
+
+    const selectedRangeSteps = Math.max(
+      0,
+      summary.rangeEnd16ths - summary.rangeStart16ths,
+    );
+    return selectedRangeSteps * summary.activeTracks.length;
   }
 
   async function openXYFile(file: File) {
@@ -282,6 +299,9 @@
   async function burnMidiToSong() {
     const exportData = await createReadyExport(false, false);
     if (exportData) {
+      // Anonymous aggregate community counter. Only sequencer step counts leave
+      // the browser; filenames, MIDI contents, and project bytes stay local.
+      void reportConvertedSteps(convertedSequencerSteps(importSummary));
       announceDisplayMessage("SONG READY", "ok");
     }
   }
@@ -388,7 +408,8 @@
     <section class="launch-surface" aria-label="OP-XY project launcher">
       <div class="launch-brand" aria-label="XY buddy">
         <span>xy buddy</span>
-        <span>unofficial op-xy project utility</span>
+        unofficial op-xy project utility<br />
+        supports firmware 1.1.15 / later
       </div>
 
       <div class="launch-stack">
@@ -402,24 +423,19 @@
         />
 
         <LaunchGuidance />
+
+        <ConversionCounter />
+
+        {#if canShowMacCompanion}
+          <MacAppNotice />
+        {/if}
       </div>
 
       {#if loadError}
         <p class="load-error launch-error">{loadError}</p>
       {/if}
 
-      <p class="disclaimer">
-        app by <a href="https://github.com/antiero/xy-format" target="_blank"
-          >antiero (5of12)</a
-        >. not affiliated with teenage engineering. <br />made possible by
-        reverse engineering efforts of
-        <a href="https://github.com/kmorrill/xy-format" target="_blank"
-          >kmorrill</a
-        >.
-        <span class="firmware-footnote">
-          supports op-xy firmware 1.1.15 or later.
-        </span>
-      </p>
+      <SiteFooter />
     </section>
   {/if}
 </main>
