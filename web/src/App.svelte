@@ -25,6 +25,12 @@
     type MidiImportOptions,
     type MidiImportSummary,
   } from "./lib/xy/midiImporter";
+  import {
+    midiImportNoteCount,
+    projectNoteCount,
+    type MidiImportNoteCountSource,
+    type ProjectNoteCountSource,
+  } from "./lib/xy/conversionStats";
   import { midiImportNeedsEditor } from "./lib/xy/midiImportWorkflow";
   import { validationCounts } from "./lib/xy/validation";
   import {
@@ -68,6 +74,18 @@
     return new Promise((resolve) => window.setTimeout(resolve, milliseconds));
   }
 
+  function reportConvertedProjectNotes(project: ProjectNoteCountSource): void {
+    // Anonymous aggregate community counter. Only transformed note counts leave
+    // the browser; filenames, MIDI contents, and project bytes stay local.
+    void reportConvertedSteps(projectNoteCount(project));
+  }
+
+  function reportConvertedMidiNotes(summary: MidiImportNoteCountSource): void {
+    // Anonymous aggregate community counter. Only transformed note counts leave
+    // the browser; filenames, MIDI contents, and project bytes stay local.
+    void reportConvertedSteps(midiImportNoteCount(summary));
+  }
+
   function optionsFromMidiSummary(
     summary: MidiImportSummary,
   ): MidiImportOptions {
@@ -78,16 +96,6 @@
       rangeEnd16ths: summary.rangeEnd16ths,
       mapGmDrums: summary.mapGmDrums,
     };
-  }
-
-  function convertedSequencerSteps(summary: MidiImportSummary | null): number {
-    if (!summary) return 0;
-
-    const selectedRangeSteps = Math.max(
-      0,
-      summary.rangeEnd16ths - summary.rangeStart16ths,
-    );
-    return selectedRangeSteps * summary.activeTracks.length;
   }
 
   async function openXYFile(file: File) {
@@ -104,6 +112,7 @@
       projectCreated = true;
       importFileName = file.name;
       currentTickStore.set(0);
+      reportConvertedProjectNotes(project);
       announceDisplayMessage(`LOADED ${file.name}`, "ok");
     } catch (error) {
       console.error(error);
@@ -277,6 +286,8 @@
       return null;
     }
     announceDisplayMessage("CREATING PROJECT", "neutral");
+    const shouldReportMidiGeneratedProject =
+      !!importedMidiFile && !!importSummary && !projectCreated;
     const filename = commitProjectFileName(false);
     const currentProject = $projectStore ?? project;
     readyExport = {
@@ -286,6 +297,9 @@
     };
     projectCreated = true;
     currentTickStore.set(0);
+    if (shouldReportMidiGeneratedProject && importSummary) {
+      reportConvertedMidiNotes(importSummary);
+    }
     const published = publishToNative && publishReadyExport(readyExport);
     if (announceReady) {
       announceDisplayMessage(
@@ -299,9 +313,6 @@
   async function burnMidiToSong() {
     const exportData = await createReadyExport(false, false);
     if (exportData) {
-      // Anonymous aggregate community counter. Only sequencer step counts leave
-      // the browser; filenames, MIDI contents, and project bytes stay local.
-      void reportConvertedSteps(convertedSequencerSteps(importSummary));
       announceDisplayMessage("SONG READY", "ok");
     }
   }
