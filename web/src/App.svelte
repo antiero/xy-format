@@ -419,8 +419,7 @@
     <section class="launch-surface" aria-label="OP-XY project launcher">
       <div class="launch-brand" aria-label="XY buddy">
         <span>xy buddy</span>
-        unofficial op-xy project utility<br />
-        supports firmware 1.1.15 / later
+        unofficial op-xy project utility
       </div>
 
       <div class="launch-stack">

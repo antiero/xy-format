@@ -99,8 +99,8 @@
     {#if projectCreated}
       <button
         type="button"
-        aria-label="Export this OP-XY project as a .xy file"
-        title="Download .xy in the browser, or send the ready project to the Mac app"
+        aria-label="Export this OP-XY project as a .xy file (requires firmware 1.1.15 or later)"
+        title="Download .xy for OP-XY. Requires firmware 1.1.15 or later"
         on:click={onDownloadProject}>export .xy</button
       >
       {#if onRefineMidi}
