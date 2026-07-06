@@ -41,6 +41,7 @@
 
   .notice-content {
     display: flex;
+    flex: 1 1 auto;
     min-width: 0;
     align-items: center;
     gap: 10px;
@@ -67,10 +68,12 @@
     color: var(--xy-text-muted);
     font-size: 12px;
     line-height: 1.45;
+    white-space: nowrap;
   }
 
   .mac-app-notice a {
     display: inline-flex;
+    flex: 0 0 auto;
     align-items: center;
     gap: 7px;
     border: 1px solid rgba(247, 247, 242, 0.16);
@@ -93,12 +96,12 @@
   @media (max-width: 620px) {
     .mac-app-notice {
       align-items: center;
-      flex-direction: column;
-      gap: 10px;
+      gap: 12px;
+      padding: 10px 12px;
     }
 
     .notice-content {
-      align-items: flex-start;
+      align-items: center;
     }
   }
 </style>

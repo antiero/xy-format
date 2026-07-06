@@ -400,6 +400,10 @@
   }
 
   @media (max-width: 620px) {
+    .opxy-hardware {
+      margin-top: clamp(12px, calc(780px - 100svh), 64px);
+    }
+
     .launch-import-popover {
       min-width: 96px;
       min-height: 42px;
