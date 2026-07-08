@@ -45,7 +45,7 @@ def test_drum_pp_changes_preset_path_field_vs_baseline() -> None:
     _, var_img = decode_project((PROBES / "e1-t1-drum-pp.xy").read_bytes())
     project = ImageProject.from_file(str(PROBES / "e0-baseline-empty.xy"))
     path_start = project.track_start(1) + PRESET_PATH_OFFSET
-    path_slice = slice(path_start, path_start + 64)
+    path_slice = slice(path_start, path_start + 48)
     assert base_img[path_slice] != var_img[path_slice]
     assert _track1_path(PROBES / "e0-baseline-empty.xy") == "drum/boop"
     assert _track1_path(PROBES / "e1-t1-drum-pp.xy") == "drum/pp"

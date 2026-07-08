@@ -19,6 +19,13 @@ from xy.rle import decode_project, encode_project
 SIG_RE = re.compile(rb"\x00\x00\x00[\x00-\x10]\xff\x00\xfc\x00", re.S)
 
 TRACK_BASE0 = 0x0D79
+TRACK_BASE_BY_FIRMWARE = {
+    0x0E: 3933,
+    0x0F: 3933,
+    0x10: 3433,
+    0x11: 3433,
+    0x13: 3449,
+}
 TRACK_STRIDE = 17876
 TRACK_COUNT = 16
 MAX_PATTERNS_PER_TRACK = 16
@@ -37,18 +44,28 @@ NOTE_SIZE = 12
 STEP_TICKS = 480
 
 
-def pattern_starts_from_image(image: bytes | bytearray) -> list[int]:
+def track_base_from_header(header: bytes) -> int:
+    """Return the decoded Track 1 offset for a known firmware family."""
+
+    if len(header) < 6:
+        return TRACK_BASE0
+    return TRACK_BASE_BY_FIRMWARE.get(header[5], TRACK_BASE0)
+
+
+def pattern_starts_from_image(
+    image: bytes | bytearray, track_base: int = TRACK_BASE0
+) -> list[int]:
     """Return decoded-image starts for every physical pattern struct.
 
     Track discovery used to key off bytes inside the Bar region. Those bytes
     are legitimate user state, so authored Bar edits can erase the signature.
-    The decoded image has a stable leader layout: T1 starts at 0x0D79, each
+    The decoded image has a firmware-dependent Track 1 base. Each ordinary
     pattern struct has a fixed base size, and the note vector extends its
     containing pattern by 12 bytes per note.
     """
 
     starts: list[int] = []
-    pos = TRACK_BASE0
+    pos = track_base
     for _ in range(TRACK_COUNT):
         if pos < 0 or pos + TRACK_STRIDE > len(image):
             return []
@@ -74,11 +91,13 @@ def pattern_starts_from_image(image: bytes | bytearray) -> list[int]:
     return starts
 
 
-def leader_starts_from_image(image: bytes | bytearray) -> list[int]:
+def leader_starts_from_image(
+    image: bytes | bytearray, track_base: int = TRACK_BASE0
+) -> list[int]:
     """Return the 16 decoded-image logical track leader starts."""
 
     leaders: list[int] = []
-    pos = TRACK_BASE0
+    pos = track_base
     for _ in range(TRACK_COUNT):
         if pos < 0 or pos + TRACK_STRIDE > len(image):
             return []
@@ -124,7 +143,9 @@ class ImageProject:
         return p
 
     def _rescan(self) -> None:
-        starts = leader_starts_from_image(self.image)
+        starts = leader_starts_from_image(
+            self.image, track_base_from_header(self.header)
+        )
         if starts:
             self._starts = starts
             return
@@ -140,7 +161,9 @@ class ImageProject:
             raise ValueError("track must be 1..16")
         if not 1 <= pattern <= MAX_PATTERNS_PER_TRACK:
             raise ValueError(f"pattern must be 1..{MAX_PATTERNS_PER_TRACK}")
-        starts = pattern_starts_from_image(self.image)
+        starts = pattern_starts_from_image(
+            self.image, track_base_from_header(self.header)
+        )
         if not starts:
             raise ValueError("could not locate pattern structs")
         index = 0
@@ -249,7 +272,7 @@ class ImageProject:
         if count >= 120:
             raise ValueError("pattern note limit reached")
         rec = (
-            tick.to_bytes(4, "little")
+            tick.to_bytes(4, "little", signed=True)
             + gate.to_bytes(4, "little")
             + bytes([note & 0x7F, velocity & 0x7F, 0, 0])
         )
@@ -1138,7 +1161,7 @@ class ImageProject:
     # --- drum-voice parameters (decoded from device capture + manual) -----
     # 24 voice slots, 128 B each, at track+0x3957 (the drum sampler table).
     PRESET_PATH = 0x453F
-    PRESET_PATH_MAX = 64
+    PRESET_PATH_MAX = 48
     DRUM_TABLE = 0x3957
     DRUM_SLOT = 0x80
     DRUM_TUNE = 0x00       # u8 root note, default 0x3c, ±48 semitones
@@ -1372,8 +1395,10 @@ class ImageProject:
         """Copy instrument identity (engine, params, samples, preset string,
         trailer) from a donor file's track. Donor track must be a pristine
         17,876-byte leader struct (no events)."""
-        _, dimg = decode_project(open(donor_path, "rb").read())
-        dstarts = leader_starts_from_image(dimg)
+        donor_header, dimg = decode_project(open(donor_path, "rb").read())
+        dstarts = leader_starts_from_image(
+            dimg, track_base_from_header(donor_header)
+        )
         if not dstarts:
             dstarts = [m.start() - 3 for m in SIG_RE.finditer(dimg)]
         ds = dstarts[donor_track - 1]
@@ -1449,7 +1474,8 @@ def _pattern_struct(base_struct: bytes, pattern) -> bytes:
             raise ValueError("pattern note limit exceeded")
         tick = (n["step"] - 1) * STEP_TICKS + n.get("tick_offset", 0)
         gate = n.get("gate_ticks", 240)
-        recs += tick.to_bytes(4, "little") + gate.to_bytes(4, "little")
+        recs += tick.to_bytes(4, "little", signed=True)
+        recs += gate.to_bytes(4, "little")
         recs += bytes([n["note"] & 0x7F, n.get("velocity", 100) & 0x7F, 0, 0])
     st[cpos] = len(recs) // NOTE_SIZE
     st[cpos + 1 : cpos + 1] = recs
@@ -1478,7 +1504,7 @@ def build_arrangement(
     song_chain: optional list of 0-based scene ids for Song 1.
     """
     header, base = decode_project(open(base_path, "rb").read())
-    starts = leader_starts_from_image(base)
+    starts = leader_starts_from_image(base, track_base_from_header(header))
     if not starts:
         starts = [m.start() - 3 for m in SIG_RE.finditer(base)]
     g = bytearray(base[: starts[0]])

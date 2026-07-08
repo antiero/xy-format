@@ -9,17 +9,18 @@
 
 ```
 .xy file = 8-byte header + RLE-encoded image
-image (~290 KB) = global header (3,449 B)
-                + 16 track structs (17,876 B each, + clones for patterns)
-                + 14-slot song-table footer
+image (~290 KB) = firmware-dependent global header
+                + 16 track leaders and their pattern structs
+                + firmware-dependent song-table footer
 ```
 
 - Codec: `xy/rle.py` (`decode_project` / `encode_project`) — greedy
   canonical RLE; round-trips 245/246 corpus files byte-exact.
 - Decoded field map: `docs/format/decoded_image_map.md`.
-- Reading: decode → index fixed-offset struct fields / count-prefixed
-  vectors. Legacy `xy/container.py` (signature-scan over raw bytes) still
-  works but operates pre-RLE; prefer the decoded image for new analysis.
+- Reading: decode → choose the Track 1 base from container header byte 5 →
+  index track-relative fields and variable-length vectors. A pattern has a
+  17,876-byte base, but live automation can append further data. Legacy
+  signature scanning is not a reliable structural locator.
 - Authoring: `docs/engineering/authoring.md` (`xy/image_writer.py`).
 
 ## Principles

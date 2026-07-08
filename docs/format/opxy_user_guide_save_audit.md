@@ -86,7 +86,7 @@ Guide refs: section 7.1 p.22-23; section 7.2 p.24; section 7.3 p.25; section 7.4
 | Step sequencing / live recording / step recording | Notes, chords, velocity, timing, and gate. | Decoded: note vector near track `+0x456F`: `[count] + 12-byte {tick, gate, note, velocity, flags[2]}`. Tick carries microtiming/nudge; gate carries note length. |
 | Chords | Multiple note records at same tick. | Decoded as repeated 12-byte records. 120-note pattern cap is enforced by writer. |
 | Extend note | Gate length. | Decoded as `u32 gate` in each note record. |
-| Nudge step | Off-grid tick value. | Decoded as non-grid `u32 tick`. |
+| Nudge step | Off-grid tick value. | Decoded as non-grid signed `i32 tick`; negative values represent pickup notes. |
 | Clear notes / clear all | Delete note vector rows, optionally p-locks. | Operation derived from decoded vectors/tables; no separate field. |
 | Copy step | Notes + locks + step components copied between step slots. | Operation over decoded note rows, p-lock row, and component slot; no separate field. |
 | Change sequence octave/semitone | Mass note transposition. | Operation over note values, not a separate field unless project transpose is used. |

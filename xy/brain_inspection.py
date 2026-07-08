@@ -137,7 +137,7 @@ def read_brain(project: ImageProject) -> BrainInspection:
             break
         notes.append(
             BrainNote(
-                tick=int.from_bytes(record[0:4], "little"),
+                tick=int.from_bytes(record[0:4], "little", signed=True),
                 gate_ticks=int.from_bytes(record[4:8], "little"),
                 note=record[8],
                 velocity=record[9],

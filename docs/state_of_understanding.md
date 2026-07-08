@@ -12,6 +12,30 @@ Format per entry: **Settled** (corpus/device-validated), **Believed**
 
 ---
 
+## 2026-07-09 — Real-device corpus corrects the baseline-only model
+
+### Settled
+
+- Track 1's decoded offset depends on container header byte 5:
+  `0x0E/0x0F` → 3,933; `0x10/0x11` → 3,433; `0x13` → 3,449.
+- A pattern has a 17,876-byte base, but live recording can append automation
+  data beyond the note vector. Signature bytes are neither universal nor
+  unique, so fixed-stride and signature-only scanning are insufficient.
+- Note ticks are signed i32 values; negative ticks are pickup notes. Live-take
+  flag bytes are not restricted to the programmed-note defaults.
+- The preset-path field at `+0x453F` is 48 bytes.
+- Song-table layout is firmware-dependent and runs to EOF.
+
+### Still to implement
+
+- A resilient boundary scanner for live-automation growth and clone structs.
+- Version-aware parsing of every observed song-table family.
+
+Evidence: [GitHub issue #19](https://github.com/kmorrill/xy-format/issues/19),
+reporting validation across 1,039 device-saved files.
+
+---
+
 ## 2026-06-09 (later) — Round-trip passed; container layer solved
 
 ### One-sentence status

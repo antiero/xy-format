@@ -69,6 +69,19 @@ def test_brain_inspection_uses_decoded_track_locator_after_earlier_track_growth(
     assert brain.routed_tracks == (1,)
 
 
+def test_brain_live_pickup_tick_is_signed_and_flags_are_preserved() -> None:
+    project = ImageProject.from_file(str(PROBES / "t09-brain-route-t1-only.xy"))
+    project.add_note(9, tick=-129, note=60)
+    vector = project.track_start(9) + 0x456F
+    project.image[vector + 11 : vector + 13] = bytes([251, 255])
+
+    note = inspect_brain_bytes(project.to_bytes()).notes[0]
+
+    assert note.tick == -129
+    assert note.step is None
+    assert note.flags == (251, 255)
+
+
 def test_brain_known_raw_parameter_words() -> None:
     assert _brain("t09-brain-mode-auto.xy").param_words == (0x7FFFFFFF, 0, 0, 0)
     assert _brain("t09-brain-mode-manual.xy").param_words == (
