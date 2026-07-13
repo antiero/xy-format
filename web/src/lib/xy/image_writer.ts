@@ -1,4 +1,17 @@
 import { decodeProject, encodeProject } from "./rle";
+import { GLOBAL_SCENE_LENGTH, GLOBAL_TIME_SIGNATURE } from "./projectConfig";
+
+export {
+  GLOBAL_SCENE_LENGTH,
+  GLOBAL_TIME_SIGNATURE,
+  SCENE_LENGTH_NAMES,
+  TIME_SIGNATURE_NAMES,
+} from "./projectConfig";
+export type {
+  ProjectTimeSignature,
+  ProjectTimeSignatureRaw,
+  SceneLengthModeRaw,
+} from "./projectConfig";
 
 export const TRACK_BASE0 = 0x0d79;
 export const TRACK_STRIDE = 17876;
@@ -474,6 +487,30 @@ export class ImageProject {
   public setTempo(bpm: number): void {
     const view = new DataView(this.image.buffer);
     view.setUint16(GLOBAL_TEMPO, Math.round(bpm * 10), true);
+  }
+
+  public getSceneLengthMode(): number {
+    return this.image[GLOBAL_SCENE_LENGTH];
+  }
+
+  public setSceneLengthMode(mode: number): void {
+    if (mode !== 0 && mode !== 1 && mode !== 2) {
+      throw new Error(
+        "scene length mode must be 0=longest, 1=shortest, 2=time signature",
+      );
+    }
+    this.image[GLOBAL_SCENE_LENGTH] = mode;
+  }
+
+  public getTimeSignatureRaw(): number {
+    return this.image[GLOBAL_TIME_SIGNATURE];
+  }
+
+  public setTimeSignature(raw: number): void {
+    if (raw < 0x10 || raw > 0x15) {
+      throw new Error("time signature raw enum must be 0x10..0x15");
+    }
+    this.image[GLOBAL_TIME_SIGNATURE] = raw;
   }
 
   public getPatternSteps(track: number, patternIndex: number = 0): number {

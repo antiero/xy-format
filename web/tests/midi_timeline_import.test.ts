@@ -117,6 +117,60 @@ function goldenBrownTimingMidi(): Uint8Array {
   return new Uint8Array(writeMidi(data));
 }
 
+function constantMeterMidi(numerator: number, denominator: number): Uint8Array {
+  const ticksPerBeat = 384;
+  const events: Array<{
+    tick: number;
+    event: Omit<MidiEvent, "deltaTime">;
+  }> = [
+    {
+      tick: 0,
+      event: {
+        type: "timeSignature",
+        meta: true,
+        numerator,
+        denominator,
+        metronome: 24,
+        thirtyseconds: 8,
+      },
+    },
+  ];
+  [0, 384, 768, 1152].forEach((tick, index) => {
+    events.push(
+      {
+        tick,
+        event: {
+          type: "noteOn",
+          channel: 0,
+          noteNumber: 60 + index,
+          velocity: 88,
+        },
+      },
+      {
+        tick: tick + 192,
+        event: {
+          type: "noteOff",
+          channel: 0,
+          noteNumber: 60 + index,
+          velocity: 0,
+        },
+      },
+    );
+  });
+
+  return new Uint8Array(
+    writeMidi({
+      header: { format: 0, numTracks: 1, ticksPerBeat },
+      tracks: [
+        [
+          ...trackFromAbsolute(events),
+          { deltaTime: 0, type: "endOfTrack", meta: true },
+        ],
+      ],
+    }),
+  );
+}
+
 describe("variable MIDI timeline import", () => {
   it("groups four musical bars and bakes tempo changes into pattern timing", () => {
     const midi = parseMidi(goldenBrownTimingMidi());
@@ -174,6 +228,8 @@ describe("variable MIDI timeline import", () => {
       sourceTotal16ths: 148,
       importedNotes: 9,
     });
+    expect(result.project.imageProject.getSceneLengthMode()).toBe(0);
+    expect(result.project.imageProject.getTimeSignatureRaw()).toBe(0x10);
     expect(
       result.project.scenes.slice(0, 3).map((scene) => scene.length16ths),
     ).toEqual([47, 52, 48]);
@@ -195,5 +251,16 @@ describe("variable MIDI timeline import", () => {
       (15 / result.summary.bpm);
     const sourceSeconds = 6 * (60 / 200) + 31 * (60 / 190);
     expect(Math.abs(playbackSeconds - sourceSeconds)).toBeLessThan(0.02);
+  });
+
+  it("writes a supported constant MIDI meter to the project header", () => {
+    const result = buildMidiProjectFromBytes(
+      constantMeterMidi(6, 8),
+      "six-eight.mid",
+      new Uint8Array(readFileSync(BASELINE)),
+    );
+
+    expect(result.project.imageProject.getSceneLengthMode()).toBe(0);
+    expect(result.project.imageProject.getTimeSignatureRaw()).toBe(0x13);
   });
 });

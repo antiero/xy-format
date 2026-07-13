@@ -23,6 +23,10 @@ import {
 } from "./projectViewModel";
 import { GM_DRUM_MIDI_CHANNEL, opXyDrumNoteFromGm } from "./drumMidi";
 import {
+  projectTimeSignatureRaw,
+  type ProjectTimeSignatureRaw,
+} from "./projectConfig";
+import {
   buildMidiPatternWindows,
   buildMidiTimeline,
   midiBarIndexAtTick,
@@ -398,6 +402,32 @@ function rangeFromBounds(
 
 function patternStepsForRange(range: ImportRange): number[] {
   return range.windows.map((window) => window.steps);
+}
+
+function dominantProjectTimeSignature(
+  timeline: MidiTimeline,
+  range: ImportRange,
+): ProjectTimeSignatureRaw | null {
+  const startTick = range.windows[0]?.sourceStartTick ?? 0;
+  const endTick = range.windows.at(-1)?.sourceEndTick ?? timeline.sourceEndTick;
+  const counts = new Map<ProjectTimeSignatureRaw, number>();
+
+  for (const bar of timeline.bars) {
+    if (bar.endTick <= startTick || bar.startTick >= endTick) continue;
+    const raw = projectTimeSignatureRaw(bar.numerator, bar.denominator);
+    if (raw === null) continue;
+    counts.set(raw, (counts.get(raw) ?? 0) + 1);
+  }
+
+  let dominant: ProjectTimeSignatureRaw | null = null;
+  let dominantBars = 0;
+  for (const [raw, bars] of counts) {
+    if (bars > dominantBars) {
+      dominant = raw;
+      dominantBars = bars;
+    }
+  }
+  return dominant;
 }
 
 function normalizeImportRange(
@@ -1763,6 +1793,12 @@ export function buildMidiProjectFromBytes(
   const imageProject = ImageProject.fromBytes(arrangementBytes);
   const bpm = timeline.projectBpm;
   imageProject.setTempo(bpm);
+  // OP-XY stores one global time-signature enum, not a meter map. Keep scene
+  // length driven by the imported patterns, and use the dominant supported
+  // source meter only as the project's global musical-grid setting.
+  imageProject.setSceneLengthMode(0);
+  const timeSignature = dominantProjectTimeSignature(timeline, range);
+  if (timeSignature !== null) imageProject.setTimeSignature(timeSignature);
 
   const activeTracks = banked.activeTracks;
   for (let sceneIndex = 0; sceneIndex < range.numPatterns; sceneIndex++) {
