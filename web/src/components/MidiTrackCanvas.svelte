@@ -38,7 +38,20 @@
     MIN_CYCLE_16THS,
     timelineLength16ths || selection.total16ths,
   );
-  $: totalBars = Math.max(1, Math.ceil(total16ths / 16));
+  $: sourceBars =
+    selection.sourceBars.length > 0
+      ? selection.sourceBars
+      : Array.from(
+          { length: Math.max(1, Math.ceil(total16ths / 16)) },
+          (_, index) => ({
+            index,
+            start16ths: index * 16,
+            end16ths: Math.min(total16ths, (index + 1) * 16),
+            numerator: 4,
+            denominator: 4,
+          }),
+        );
+  $: totalBars = sourceBars.length;
   $: laneHeaderWidth =
     viewportWidth > 0 && viewportWidth <= 760
       ? MOBILE_LANE_HEADER_WIDTH
@@ -49,9 +62,11 @@
     1,
     Math.ceil(totalBars / Math.max(1, laneWidth / 58)),
   );
-  $: visibleBars = Array.from({ length: totalBars }, (_, bar) => bar).filter(
-    (bar) =>
-      bar === 0 || bar === totalBars - 1 || (bar + 1) % barLabelStep === 0,
+  $: visibleBars = sourceBars.filter(
+    (_, index) =>
+      index === 0 ||
+      index === totalBars - 1 ||
+      (index + 1) % barLabelStep === 0,
   );
   $: {
     if (!cycleDragHandle) {
@@ -247,8 +262,10 @@
         on:pointerdown={(event) => beginCycleDrag("end", event)}
       ></button>
       {#each visibleBars as bar}
-        <span class="bar-label" style={`left: ${(bar / totalBars) * 100}%;`}
-          >{bar + 1}</span
+        <span
+          class="bar-label"
+          style={`left: ${(bar.start16ths / total16ths) * 100}%;`}
+          >{bar.index + 1}</span
         >
       {/each}
     </div>

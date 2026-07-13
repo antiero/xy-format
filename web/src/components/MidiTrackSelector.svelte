@@ -101,10 +101,23 @@
   }
 
   function formatBarBeat(position16ths: number): string {
-    const whole = Math.max(0, Math.round(position16ths));
-    const bar = Math.floor(whole / 16) + 1;
-    const beat = Math.floor((whole % 16) / 4) + 1;
-    return `${bar}.${beat}`;
+    const position = Math.max(0, position16ths);
+    const lastSourceBar = selection.sourceBars.at(-1);
+    if (lastSourceBar && position >= lastSourceBar.end16ths) {
+      return `${lastSourceBar.index + 2}.1`;
+    }
+    const sourceBar =
+      selection.sourceBars.find(
+        (bar) => bar.start16ths <= position && position < bar.end16ths,
+      ) ?? lastSourceBar;
+    if (!sourceBar) {
+      const whole = Math.round(position);
+      return `${Math.floor(whole / 16) + 1}.${Math.floor((whole % 16) / 4) + 1}`;
+    }
+    const beatLength16ths = 16 / sourceBar.denominator;
+    const beat =
+      Math.floor((position - sourceBar.start16ths) / beatLength16ths) + 1;
+    return `${sourceBar.index + 1}.${Math.max(1, beat)}`;
   }
 
   function rebuildMidi(options: MidiImportOptions) {
