@@ -3,6 +3,7 @@
     MidiPreviewNote,
     MidiTrackSelectionOption,
   } from "../lib/xy/midiImporter";
+  import { OP_XY_PRESET_CHOICES } from "../lib/xy/opXyPresets";
 
   export let track: MidiTrackSelectionOption;
   export let index: number;
@@ -14,6 +15,10 @@
   export let laneHeaderWidth: number;
   export let selectionUpdating = false;
   export let onToggle: (track: MidiTrackSelectionOption) => void = () => {};
+  export let onPresetChange: (
+    track: MidiTrackSelectionOption,
+    presetId: string,
+  ) => void = () => {};
 
   $: compact = trackHeight < 42;
 
@@ -52,9 +57,13 @@
       `top: ${top}%`,
     ].join("; ");
   }
+
+  function changePreset(event: Event) {
+    onPresetChange(track, (event.currentTarget as HTMLSelectElement).value);
+  }
 </script>
 
-<label
+<div
   class="midi-lane"
   class:selected
   class:muted={!selected}
@@ -72,9 +81,22 @@
       />
       <span aria-hidden="true"></span>
     </span>
-    <span class="lane-title">
+    <span
+      class="lane-title"
+      title={`GM ${track.programNumber + 1}: ${track.programName} · MIDI channel ${track.channel}`}
+    >
       <strong>{track.name}</strong>
-      <span>Ch {track.channel} · {track.noteCount} notes</span>
+      <select
+        value={track.presetId}
+        disabled={selectionUpdating || !selected}
+        aria-label={`OP-XY sound for ${track.name}`}
+        title={`Choose the OP-XY sound for GM ${track.programNumber + 1}: ${track.programName}`}
+        on:change={changePreset}
+      >
+        {#each OP_XY_PRESET_CHOICES as preset (preset.id)}
+          <option value={preset.id}>{preset.category} / {preset.label}</option>
+        {/each}
+      </select>
     </span>
     <span class="lane-bank">{track.bankCount}</span>
   </span>
@@ -89,7 +111,7 @@
       {/each}
     </span>
   </span>
-</label>
+</div>
 
 <style>
   .midi-lane {
@@ -176,10 +198,27 @@
     white-space: nowrap;
   }
 
-  .lane-title span {
+  .lane-title select {
+    min-width: 0;
+    width: 100%;
+    height: 17px;
+    border: 0;
+    padding: 0 14px 0 0;
+    background: transparent;
     color: #9a9a9a;
     font-size: 10px;
     text-transform: uppercase;
+    text-overflow: ellipsis;
+    cursor: pointer;
+  }
+
+  .lane-title select:focus-visible {
+    outline: 1px solid #f4f4f4;
+    outline-offset: 1px;
+  }
+
+  .lane-title select:disabled {
+    cursor: default;
   }
 
   .lane-bank {
@@ -252,7 +291,7 @@
     font-size: 12px;
   }
 
-  .midi-lane.compact .lane-title span {
+  .midi-lane.compact .lane-title select {
     display: none;
   }
 

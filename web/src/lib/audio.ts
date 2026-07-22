@@ -65,6 +65,14 @@ class AudioService {
     this.synth.noteOn(outChannel, outNote, velocity, { time });
   }
 
+  setProgram(trackIndex: number, programNumber: number) {
+    if (!this.synth) return;
+    this.synth.programChange(
+      outputMidiChannelForTrack(trackIndex),
+      Math.max(0, Math.min(127, Math.round(programNumber))),
+    );
+  }
+
   noteOff(channel: number, note: number, delayMs: number = 0) {
     if (!this.synth || !this.context) return;
 

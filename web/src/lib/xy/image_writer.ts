@@ -30,6 +30,7 @@ export const NOTE_SIZE = 12;
 export const STEP_TICKS = 480;
 
 export const GLOBAL_TEMPO = 0x00;
+export const GLOBAL_MIDI_CHANNEL = 0x55;
 
 export const SCENE_SLOT0 = 0x95;
 export const SCENE_SLOT_SIZE = 33;
@@ -366,6 +367,7 @@ export function buildArrangementFromBytes(
   baselineBytes: Uint8Array,
   trackPatterns: TrackPatternMap,
   trackTemplates: TrackTemplateMap = {},
+  trackStructTemplates: Record<number, Uint8Array> = {},
 ): Uint8Array {
   const { header, image: base } = decodeProject(baselineBytes);
   const starts = leaderStartsFromImage(base);
@@ -382,10 +384,15 @@ export function buildArrangementFromBytes(
       throw new Error(`invalid template track ${templateTrack} for T${track}`);
     }
     const templateStart = starts[templateTrack - 1];
-    const baseStruct = base.subarray(
-      templateStart,
-      templateStart + TRACK_STRIDE,
-    );
+    const suppliedStruct = trackStructTemplates[track];
+    if (suppliedStruct && suppliedStruct.length !== TRACK_STRIDE) {
+      throw new Error(
+        `invalid raw track template length ${suppliedStruct.length} for T${track}`,
+      );
+    }
+    const baseStruct =
+      suppliedStruct ??
+      base.subarray(templateStart, templateStart + TRACK_STRIDE);
     const tail =
       track === TRACK_COUNT
         ? base.subarray(start + TRACK_STRIDE)
@@ -413,6 +420,22 @@ export function buildArrangementFromBytes(
   }
 
   return encodeProject(header, concatBytes(parts));
+}
+
+/** Extract the pristine leader struct used as a byte-authoritative sound donor. */
+export function trackStructTemplateFromBytes(
+  projectBytes: Uint8Array,
+  track: number = 1,
+): Uint8Array {
+  if (track < 1 || track > TRACK_COUNT) {
+    throw new Error("track template source must be 1..16");
+  }
+  const { image } = decodeProject(projectBytes);
+  const starts = leaderStartsFromImage(image);
+  if (starts.length !== TRACK_COUNT) {
+    throw new Error("could not locate donor track structs");
+  }
+  return image.slice(starts[track - 1], starts[track - 1] + TRACK_STRIDE);
 }
 
 // Basic implementation of the ImageProject functionality
@@ -487,6 +510,18 @@ export class ImageProject {
   public setTempo(bpm: number): void {
     const view = new DataView(this.image.buffer);
     view.setUint16(GLOBAL_TEMPO, Math.round(bpm * 10), true);
+  }
+
+  /** Configure the device's project MIDI input channel for an instrument track. */
+  public setMidiChannel(track: number, channel: number | null): void {
+    if (track < 1 || track > 8) {
+      throw new Error("MIDI channel track must be 1..8");
+    }
+    if (channel !== null && (channel < 1 || channel > 16)) {
+      throw new Error("MIDI channel must be 1..16 or null");
+    }
+    this.image[GLOBAL_MIDI_CHANNEL + track - 1] =
+      channel === null ? 0xff : channel - 1;
   }
 
   public getSceneLengthMode(): number {

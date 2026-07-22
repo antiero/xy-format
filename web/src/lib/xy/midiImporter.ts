@@ -34,6 +34,13 @@ import {
   type MidiPatternWindow,
   type MidiTimeline,
 } from "./midiTimeline";
+import { collectMidiProgramTimeline, midiProgramAtTick } from "./gmPrograms";
+import {
+  loadOpXyPresetDonors,
+  opXyPresetById,
+  opXyTrackStructFromDonor,
+  recommendedOpXyPresetId,
+} from "./opXyPresets";
 
 export type MidiImportRole = "drum" | "bass" | "lead" | "chord";
 
@@ -97,6 +104,12 @@ export type MidiTrackSelectionOption = {
   end16ths: number;
   uniquePatternCount: number;
   bankCount: number;
+  programNumber: number;
+  programName: string;
+  bankMSB: number;
+  bankLSB: number;
+  presetId: string;
+  assignedOpXyTracks: number[];
   previewNotes: MidiPreviewNote[];
 };
 
@@ -158,6 +171,7 @@ export type MidiImportOptions = {
   rangeEnd16ths?: number;
   fitToCapacity?: boolean;
   mapGmDrums?: boolean;
+  presetIdsByTrack?: Record<string, string>;
 };
 
 const ROLE_SLOTS: Record<number, Role> = {
@@ -1074,6 +1088,7 @@ type BankedArrangement = {
   sceneRows: number[][];
   sceneMutes: boolean[][];
   activeTracks: number[];
+  sourceHosts: Record<number, number[]>;
 };
 
 type SourcePatternBank = {
@@ -1179,6 +1194,8 @@ function buildTrackSelectionOption(
   timeline: MidiTimeline,
   range: ImportRange,
   mapGmDrums: boolean,
+  programTimeline: ReturnType<typeof collectMidiProgramTimeline>,
+  presetIdsByTrack: Record<string, string>,
 ): MidiTrackSelectionOption {
   const id = candidateId(candidate);
   const [midiTrackIndex, midiChannel] = candidate.key;
@@ -1212,6 +1229,21 @@ function buildTrackSelectionOption(
           ...previewNotes.map((note) => note.start16ths + note.duration16ths),
         )
       : trackStart16ths + 1;
+  const firstNoteTick = candidate.notesWindow[0]?.absTick ?? 0;
+  const program = midiProgramAtTick(
+    programTimeline,
+    midiChannel,
+    firstNoteTick,
+  );
+  const recommendedPresetId = recommendedOpXyPresetId(
+    program.programNumber,
+    bestRole(candidate),
+    candidate.isDrumChannel,
+  );
+  const requestedPresetId = presetIdsByTrack[id];
+  const presetId = opXyPresetById(requestedPresetId)
+    ? requestedPresetId
+    : recommendedPresetId;
 
   return {
     id,
@@ -1228,6 +1260,9 @@ function buildTrackSelectionOption(
     start16ths: trackStart16ths,
     end16ths,
     ...candidatePatternBankCost(candidate, timeline, range.windows, mapGmDrums),
+    ...program,
+    presetId,
+    assignedOpXyTracks: [],
     previewNotes,
   };
 }
@@ -1600,6 +1635,9 @@ function bankTrackPatterns(
     sceneRows,
     sceneMutes,
     activeTracks,
+    sourceHosts: Object.fromEntries(
+      sources.map((source) => [source.sourceTrack, [...source.hosts]]),
+    ),
   };
 }
 
@@ -1621,6 +1659,7 @@ export function buildMidiProjectFromBytes(
   fileName: string,
   baselineBytes: Uint8Array,
   options: MidiImportOptions = {},
+  presetDonors: Record<string, Uint8Array> = {},
 ): MidiImportResult {
   const midi = parseMidi(midiBytes);
   const mapGmDrums = shouldMapGmDrums(options);
@@ -1634,6 +1673,7 @@ export function buildMidiProjectFromBytes(
   });
   const midiTpb = timeline.ticksPerBeat;
   const trackNames = midiTrackNames(midi);
+  const programTimeline = collectMidiProgramTimeline(midi);
   const sourceTotal16ths = timeline.sourceTotal16ths;
   let range = normalizeImportRange(options, timeline);
   let rangeWasAutoFit = false;
@@ -1653,6 +1693,8 @@ export function buildMidiProjectFromBytes(
           timeline,
           currentRange,
           mapGmDrums,
+          programTimeline,
+          options.presetIdsByTrack ?? {},
         ),
       )
       .sort(
@@ -1785,10 +1827,34 @@ export function buildMidiProjectFromBytes(
     }
   }
 
+  const rawTrackTemplates: Record<number, Uint8Array> = {};
+  for (const [sourceTrackText, hosts] of Object.entries(banked.sourceHosts)) {
+    const sourceTrack = Number(sourceTrackText);
+    const candidate = selection.assignments.get(sourceTrack);
+    if (!candidate) continue;
+    const option = rangeSelection.optionsById.get(candidateId(candidate));
+    let preset = option ? opXyPresetById(option.presetId) : undefined;
+    if (preset?.donorUrl && !presetDonors[preset.id]) {
+      preset = preset.fallbackPresetId
+        ? opXyPresetById(preset.fallbackPresetId)
+        : undefined;
+    }
+    if (option) option.assignedOpXyTracks = hosts.map((host) => host - 1);
+    for (const host of hosts) {
+      const donorBytes = preset ? presetDonors[preset.id] : undefined;
+      if (donorBytes && preset) {
+        rawTrackTemplates[host] = opXyTrackStructFromDonor(preset, donorBytes);
+      } else if (preset?.templateTrack) {
+        banked.trackTemplates[host] = preset.templateTrack;
+      }
+    }
+  }
+
   const arrangementBytes = buildArrangementFromBytes(
     baselineBytes,
     banked.trackPatterns,
     banked.trackTemplates,
+    rawTrackTemplates,
   );
   const imageProject = ImageProject.fromBytes(arrangementBytes);
   const bpm = timeline.projectBpm;
@@ -1797,6 +1863,9 @@ export function buildMidiProjectFromBytes(
   // length driven by the imported patterns, and use the dominant supported
   // source meter only as the project's global musical-grid setting.
   imageProject.setSceneLengthMode(0);
+  for (let track = 1; track <= INSTRUMENT_TRACK_COUNT; track++) {
+    imageProject.setMidiChannel(track, track);
+  }
   const timeSignature = dominantProjectTimeSignature(timeline, range);
   if (timeSignature !== null) imageProject.setTimeSignature(timeSignature);
 
@@ -1876,14 +1945,16 @@ export async function loadMidiFileAsNewProject(
   file: File,
   options: MidiImportOptions = {},
 ): Promise<MidiImportResult> {
-  const [midiBuffer, baseline] = await Promise.all([
+  const [midiBuffer, baseline, presetDonors] = await Promise.all([
     file.arrayBuffer(),
     defaultBaselineBytes(),
+    loadOpXyPresetDonors(),
   ]);
   return buildMidiProjectFromBytes(
     new Uint8Array(midiBuffer),
     file.name,
     baseline,
     options,
+    presetDonors,
   );
 }

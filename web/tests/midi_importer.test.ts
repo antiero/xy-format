@@ -129,6 +129,74 @@ function oneBarDrumMidi(): Uint8Array {
   return new Uint8Array(writeMidi(data));
 }
 
+function programmedHarpsichordMidi(): Uint8Array {
+  const tpb = 480;
+  const events: Array<{
+    tick: number;
+    event: Omit<MidiEvent, "deltaTime">;
+  }> = [
+    { tick: 0, event: { type: "trackName", meta: true, text: "Harpsi" } },
+    {
+      tick: 0,
+      event: { type: "controller", channel: 2, controllerType: 0, value: 3 },
+    },
+    {
+      tick: 0,
+      event: { type: "controller", channel: 2, controllerType: 32, value: 5 },
+    },
+    {
+      tick: 0,
+      event: { type: "programChange", channel: 2, programNumber: 6 },
+    },
+  ];
+  for (let beat = 0; beat < 16; beat++) {
+    const tick = beat * tpb;
+    events.push(
+      {
+        tick,
+        event: {
+          type: "noteOn",
+          channel: 2,
+          noteNumber: 60 + (beat % 4),
+          velocity: 90,
+        },
+      },
+      {
+        tick: tick + tpb / 2,
+        event: {
+          type: "noteOff",
+          channel: 2,
+          noteNumber: 60 + (beat % 4),
+          velocity: 0,
+        },
+      },
+    );
+  }
+  const data: MidiData = {
+    header: { format: 0, numTracks: 1, ticksPerBeat: tpb },
+    tracks: [
+      [
+        ...makeTrackFromAbsolute(events),
+        { deltaTime: 0, type: "endOfTrack", meta: true },
+      ],
+    ],
+  };
+  return new Uint8Array(writeMidi(data));
+}
+
+function trackString(
+  result: ReturnType<typeof buildMidiProjectFromBytes>,
+  track: number,
+  relativeOffset: number,
+  capacity: number,
+): string {
+  const project = result.project.imageProject;
+  const start = project.trackStart(track) + relativeOffset;
+  const bytes = project.image.subarray(start, start + capacity);
+  const end = bytes.indexOf(0);
+  return new TextDecoder().decode(end >= 0 ? bytes.subarray(0, end) : bytes);
+}
+
 function longDistinctDrumMidi(patternCount = 17): Uint8Array {
   const tpb = 480;
   const bar = tpb * 4;
@@ -354,6 +422,52 @@ function manyLongDistinctTracksMidi(
 }
 
 describe("MIDI new-project importer", () => {
+  it("uses Bank Select and Program Change to recommend and author a harpsichord sound", () => {
+    const baseline = new Uint8Array(readFileSync(BASELINE));
+    const donor = new Uint8Array(
+      readFileSync("../src/presets/presetprojs/nt-harpsicord.xy"),
+    );
+    const result = buildMidiProjectFromBytes(
+      programmedHarpsichordMidi(),
+      "golden-brown.mid",
+      baseline,
+      {},
+      { "nt-harpsicord": donor },
+    );
+    const track = result.summary.trackSelection?.tracks[0];
+
+    expect(track).toMatchObject({
+      programNumber: 6,
+      programName: "Harpsichord",
+      bankMSB: 3,
+      bankLSB: 5,
+      presetId: "nt-harpsicord",
+    });
+    expect(track?.assignedOpXyTracks).toHaveLength(1);
+    const opXyTrack = (track?.assignedOpXyTracks[0] ?? 0) + 1;
+    expect(trackString(result, opXyTrack, 0x453f, 48)).toBe(
+      "pluck/nt-harpsicord",
+    );
+    expect(trackString(result, opXyTrack, 0x395f, 72)).toContain(
+      "/fat32/presets/pluck/nt-harpsicord.preset/",
+    );
+  });
+
+  it("falls back to a built-in pluck when an installed preset donor is unavailable", () => {
+    const baseline = new Uint8Array(readFileSync(BASELINE));
+    const result = buildMidiProjectFromBytes(
+      programmedHarpsichordMidi(),
+      "golden-brown.mid",
+      baseline,
+    );
+    const track = result.summary.trackSelection?.tracks[0];
+
+    expect(track?.presetId).toBe("nt-harpsicord");
+    expect(
+      trackString(result, (track?.assignedOpXyTracks[0] ?? 0) + 1, 0x453f, 48),
+    ).toBe("pluck/dielectric");
+  });
+
   it("authors a one-bar MIDI as a 16-step pattern without trailing silence", () => {
     const baseline = new Uint8Array(readFileSync(BASELINE));
     const result = buildMidiProjectFromBytes(

@@ -10,8 +10,11 @@
   },
   "scripts": {
     "preinstall": "node scripts/verify-package-manager.mjs",
+    "predev": "node scripts/sync-opxy-presets.mjs",
     "dev": "vite",
+    "prebuild": "node scripts/sync-opxy-presets.mjs",
     "build": "vite build",
+    "presets:sync": "node scripts/sync-opxy-presets.mjs",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "lint": "prettier --check .",
