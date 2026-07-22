@@ -79,3 +79,4 @@ fingerbot_*_config.json
 *.swo
 *~
 /worker/.wrangler
+web/public/opxy-presets/

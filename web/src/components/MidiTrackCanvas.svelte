@@ -16,6 +16,10 @@
   export let cycleEnd16ths = 0;
   export let cycleRangeValid = true;
   export let onToggle: (track: MidiTrackSelectionOption) => void = () => {};
+  export let onPresetChange: (
+    track: MidiTrackSelectionOption,
+    presetId: string,
+  ) => void = () => {};
   export let onSeek: (position16ths: number) => void = () => {};
   export let onCycleChange: (
     start16ths: number,
@@ -291,6 +295,7 @@
       {laneHeaderWidth}
       {selectionUpdating}
       {onToggle}
+      {onPresetChange}
     />
   {/each}
 
