@@ -99,12 +99,8 @@
       }
     }
   }
-  async function togglePlayback() {
-    if ($isPlayingStore) {
-      stopPlayback();
-      announceDisplayMessage("STOP", "neutral");
-      return;
-    }
+  async function startPlayback() {
+    if ($isPlayingStore) return;
     if (songSteps.length === 0 || playbackEvents.length === 0) return;
 
     transportState = "loading";
@@ -144,6 +140,14 @@
     lastPlaybackPosition16ths = 0;
     currentTickStore.set(0);
     announceDisplayMessage("REWIND", "neutral");
+  }
+  function stopFromTransport() {
+    if ($isPlayingStore) {
+      stopPlayback();
+      announceDisplayMessage("STOP", "neutral");
+      return;
+    }
+    rewindPlayback();
   }
   function selectStep(index: number) {
     const step = frame.sequence.steps[index];
@@ -229,8 +233,9 @@
       isPlaying={$isPlayingStore}
       {transportState}
       playbackAvailable={playbackEvents.length > 0}
-      onTogglePlayback={togglePlayback}
-      onRewindPlayback={rewindPlayback}
+      canResetPlayback={$currentTickStore > 0 || frame.selectedStepIndex > 0}
+      onPlayPlayback={startPlayback}
+      onStopPlayback={stopFromTransport}
     />
   </footer>
 </section>

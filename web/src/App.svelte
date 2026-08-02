@@ -95,6 +95,12 @@
       rangeStart16ths: summary.rangeStart16ths,
       rangeEnd16ths: summary.rangeEnd16ths,
       mapGmDrums: summary.mapGmDrums,
+      presetIdsByTrack: Object.fromEntries(
+        (summary.trackSelection?.tracks ?? []).map((track) => [
+          track.id,
+          track.presetId,
+        ]),
+      ),
     };
   }
 

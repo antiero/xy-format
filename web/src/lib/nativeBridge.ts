@@ -10,10 +10,25 @@ export type XYBuddyNativeExportPayload = {
   compatibilityStatus: "unknownFirmware";
 };
 
+export type XYBuddyNativeMidiOutput = {
+  id: string;
+  name: string;
+};
+
+export type XYBuddyNativeMidiMessage = {
+  outputId: string;
+  data: number[];
+  delayMs?: number;
+};
+
 type XYBuddyNativeBridge = {
   version?: number;
   supportsExplicitExports?: boolean;
+  supportsNativeMidiOutput?: boolean;
+  nativeMidiOutputs?: XYBuddyNativeMidiOutput[];
   pushExport?: (payload: XYBuddyNativeExportPayload) => number;
+  requestNativeMidiOutputs?: () => number;
+  sendNativeMidi?: (message: XYBuddyNativeMidiMessage) => number;
 };
 
 declare global {
@@ -46,5 +61,40 @@ export function publishNativeExport(
   window.dispatchEvent(
     new CustomEvent("xybuddy-export-ready", { detail: payload }),
   );
+  return true;
+}
+
+export function nativeMidiOutputAvailable(): boolean {
+  if (typeof window === "undefined") return false;
+  return Boolean(
+    window.__xyBuddyNativeBridge?.supportsNativeMidiOutput &&
+    window.__xyBuddyNativeBridge?.sendNativeMidi,
+  );
+}
+
+export async function requestNativeMidiOutputs(): Promise<
+  XYBuddyNativeMidiOutput[]
+> {
+  const bridge = window.__xyBuddyNativeBridge;
+  if (!bridge?.requestNativeMidiOutputs) return [];
+  bridge.requestNativeMidiOutputs();
+  const current = bridge.nativeMidiOutputs ?? [];
+  if (current.length > 0) return current;
+
+  return new Promise((resolve) => {
+    const finish = () => {
+      window.clearTimeout(timeout);
+      window.removeEventListener("xybuddy-midi-outputs", finish);
+      resolve(window.__xyBuddyNativeBridge?.nativeMidiOutputs ?? []);
+    };
+    const timeout = window.setTimeout(finish, 1200);
+    window.addEventListener("xybuddy-midi-outputs", finish, { once: true });
+  });
+}
+
+export function sendNativeMidi(message: XYBuddyNativeMidiMessage): boolean {
+  const bridge = window.__xyBuddyNativeBridge;
+  if (!bridge?.sendNativeMidi) return false;
+  bridge.sendNativeMidi(message);
   return true;
 }

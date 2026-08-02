@@ -1,6 +1,12 @@
 <script lang="ts">
   import { onDestroy } from "svelte";
   import { audioService } from "../lib/audio";
+  import { isXYBuddyNativeEmbed } from "../lib/embedMode";
+  import {
+    isSafariBrowser,
+    webMidiOutputService,
+    XYBUDDY_TESTFLIGHT_URL,
+  } from "../lib/webMidi";
   import {
     collectSongPlaybackEvents,
     collectSongPlaybackSteps,
@@ -18,7 +24,10 @@
     currentTickStore,
     isPlayingStore,
   } from "../stores/project";
+  import MidiDrumMapToggle from "./MidiDrumMapToggle.svelte";
+  import MidiOutputControl from "./MidiOutputControl.svelte";
   import MidiTrackCanvas from "./MidiTrackCanvas.svelte";
+  import TransportControls from "./TransportControls.svelte";
 
   export let project: XYProjectViewModel;
   export let selection: MidiTrackSelectionSummary;
@@ -28,9 +37,6 @@
     options: MidiImportOptions,
   ) => void | Promise<void> = () => {};
 
-  const GM_DRUM_TOOLTIP =
-    "Enable this option to map GM Drum MIDI to the OP-XY's percussion drum map.";
-
   let animationFrame = 0;
   let lastFrameMs = 0;
   let lastPlaybackPosition16ths = 0;
@@ -39,6 +45,8 @@
   let selectionMessage = "";
   let lastSelectionKey = "";
   let pendingFitTrackIds: string[] | null = null;
+  let previewTarget: "soundfont" | "opxy" = "soundfont";
+  const showSafariMidiNote = !isXYBuddyNativeEmbed() && isSafariBrowser();
 
   $: selectedIds = new Set(selection.selectedTrackIds);
   $: song = project.songs[0];
@@ -131,8 +139,28 @@
     });
   }
 
-  function toggleGmDrumMapping(event: Event) {
-    const checked = (event.currentTarget as HTMLInputElement).checked;
+  function changePreset(track: MidiTrackSelectionOption, presetId: string) {
+    rebuildMidi({
+      presetIdsByTrack: Object.fromEntries(
+        selection.tracks.map((candidate) => [
+          candidate.id,
+          candidate.id === track.id ? presetId : candidate.presetId,
+        ]),
+      ),
+    });
+  }
+
+  function midiOutputReady() {
+    playbackError = "";
+    announceDisplayMessage("OP-XY MIDI READY", "ok");
+  }
+
+  function midiOutputFailed(message: string) {
+    playbackError = message;
+    announceDisplayMessage("MIDI UNAVAILABLE", "error");
+  }
+
+  function toggleGmDrumMapping(checked: boolean) {
     rebuildMidi({ mapGmDrums: checked });
   }
 
@@ -180,8 +208,13 @@
 
   function schedulePlaybackEvent(event: PlaybackEvent) {
     const durationMs = Math.max(30, event.duration16ths * msPer16th());
-    audioService.noteOn(event.trackIndex, event.note, event.velocity);
-    audioService.noteOff(event.trackIndex, event.note, durationMs);
+    if (previewTarget === "opxy") {
+      webMidiOutputService.noteOn(event.trackIndex, event.note, event.velocity);
+      webMidiOutputService.noteOff(event.trackIndex, event.note, durationMs);
+    } else {
+      audioService.noteOn(event.trackIndex, event.note, event.velocity);
+      audioService.noteOff(event.trackIndex, event.note, durationMs);
+    }
   }
 
   function playbackFrame(now: number) {
@@ -197,6 +230,7 @@
       next %= songLength16ths;
       didWrap = true;
       audioService.stopAll();
+      webMidiOutputService.stopAll();
     }
 
     for (const event of songEvents) {
@@ -210,25 +244,32 @@
     animationFrame = requestAnimationFrame(playbackFrame);
   }
 
-  async function togglePlayback() {
-    if ($isPlayingStore) {
-      stopPlayback();
-      announceDisplayMessage("STOP", "neutral");
-      return;
-    }
+  async function startPlayback() {
+    if ($isPlayingStore) return;
     if (songEvents.length === 0) return;
 
     playbackError = "";
     transportState = "loading";
     try {
-      await audioService.ensureReady();
+      if (previewTarget === "soundfont") {
+        await audioService.ensureReady();
+        for (const track of selection.tracks) {
+          if (!selectedIds.has(track.id)) continue;
+          for (const opXyTrackIndex of track.assignedOpXyTracks) {
+            audioService.setProgram(opXyTrackIndex, track.programNumber);
+          }
+        }
+      }
       lastPlaybackPosition16ths =
         $currentTickStore >= songLength16ths ? 0 : $currentTickStore;
       lastFrameMs = performance.now();
       isPlayingStore.set(true);
       transportState = "playing";
       animationFrame = requestAnimationFrame(playbackFrame);
-      announceDisplayMessage("MIDI PREVIEW", "play");
+      announceDisplayMessage(
+        previewTarget === "opxy" ? "OP-XY PREVIEW" : "MIDI PREVIEW",
+        "play",
+      );
     } catch (error) {
       transportState = "idle";
       isPlayingStore.set(false);
@@ -244,14 +285,28 @@
       animationFrame = 0;
     }
     audioService.stopAll();
+    webMidiOutputService.stopAll();
     isPlayingStore.set(false);
     transportState = "idle";
     lastFrameMs = 0;
   }
 
+  function stopFromTransport() {
+    if (!$isPlayingStore) {
+      stopPlayback();
+      lastPlaybackPosition16ths = 0;
+      currentTickStore.set(0);
+      announceDisplayMessage("REWIND", "neutral");
+      return;
+    }
+    stopPlayback();
+    announceDisplayMessage("STOP", "neutral");
+  }
+
   function seekPlayback(position16ths: number) {
     const next = clampPlaybackPosition(position16ths);
     audioService.stopAll();
+    webMidiOutputService.stopAll();
     lastPlaybackPosition16ths = next;
     currentTickStore.set(next);
 
@@ -263,13 +318,6 @@
     }
   }
 
-  function rewindPlayback() {
-    stopPlayback();
-    lastPlaybackPosition16ths = 0;
-    currentTickStore.set(0);
-    announceDisplayMessage("REWIND", "neutral");
-  }
-
   onDestroy(() => {
     stopPlayback();
   });
@@ -278,26 +326,23 @@
 <section class="midi-track-selector" aria-label="MIDI track selection">
   <div class="selector-console">
     <div class="selector-transport">
-      <button
-        type="button"
-        class="transport-play"
-        class:active={$isPlayingStore}
-        disabled={selectionUpdating ||
-          transportState === "loading" ||
-          songEvents.length === 0}
-        on:click={togglePlayback}
-      >
-        {$isPlayingStore
-          ? "stop"
-          : transportState === "loading"
-            ? "load"
-            : "play"}
-      </button>
-      <button
-        type="button"
+      <TransportControls
+        isPlaying={$isPlayingStore}
+        loading={transportState === "loading"}
+        playDisabled={selectionUpdating || songEvents.length === 0}
+        stopDisabled={selectionUpdating ||
+          (!$isPlayingStore && $currentTickStore <= 0)}
+        playLabel="Play MIDI preview"
+        stopLabel="Stop MIDI preview"
+        onPlay={startPlayback}
+        onStop={stopFromTransport}
+      />
+      <MidiOutputControl
+        bind:target={previewTarget}
         disabled={selectionUpdating}
-        on:click={rewindPlayback}>rew</button
-      >
+        onReady={midiOutputReady}
+        onError={midiOutputFailed}
+      />
       <span>{selection.totalBars} bars</span>
       <span
         >{formatBarBeat(selection.rangeStart16ths)}-{formatBarBeat(
@@ -305,17 +350,11 @@
         )}</span
       >
       {#if hasDrumTracks}
-        <label class="drum-map-toggle" title={GM_DRUM_TOOLTIP}>
-          <input
-            type="checkbox"
-            checked={mapGmDrums}
-            disabled={selectionUpdating}
-            aria-label={GM_DRUM_TOOLTIP}
-            on:change={toggleGmDrumMapping}
-          />
-          <span aria-hidden="true"></span>
-          <strong>Map GM Drums</strong>
-        </label>
+        <MidiDrumMapToggle
+          checked={mapGmDrums}
+          disabled={selectionUpdating}
+          onChange={toggleGmDrumMapping}
+        />
       {/if}
       {#if selectionUpdating}
         <span>updating</span>
@@ -351,10 +390,19 @@
       {cycleRangeValid}
       {selectionUpdating}
       onToggle={toggleTrack}
+      onPresetChange={changePreset}
       onSeek={seekPlayback}
       onCycleChange={changeCycleRange}
     />
   </div>
+  {#if showSafariMidiNote}
+    <p class="safari-midi-note">
+      MIDI output in Safari requires the
+      <a href={XYBUDDY_TESTFLIGHT_URL} target="_blank" rel="noreferrer"
+        >XYBuddy app</a
+      >.
+    </p>
+  {/if}
 </section>
 
 <style>
@@ -388,79 +436,29 @@
     font-weight: 560;
   }
 
-  .drum-map-toggle {
-    position: relative;
-    display: inline-flex;
-    align-items: center;
-    gap: 7px;
-    min-height: 30px;
-    padding: 4px 8px;
-    border: 1px solid #313131;
-    background: #0a0a0a;
-    color: var(--xy-text-muted);
-    text-transform: uppercase;
-    cursor: pointer;
-  }
-
-  .drum-map-toggle input {
-    position: absolute;
-    opacity: 0;
-    pointer-events: none;
-  }
-
-  .drum-map-toggle > span {
-    position: relative;
-    display: inline-block;
-    width: 28px;
-    height: 14px;
-    padding: 0;
-    border: 1px solid #555;
-    border-radius: 999px;
-    background: #121212;
-  }
-
-  .drum-map-toggle > span::after {
-    content: "";
-    position: absolute;
-    top: 2px;
-    left: 2px;
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
-    background: #777;
-    transition:
-      left 120ms ease,
-      background 120ms ease;
-  }
-
-  .drum-map-toggle input:checked + span {
-    border-color: #f3f1ef;
-  }
-
-  .drum-map-toggle input:checked + span::after {
-    left: 16px;
-    background: #f3f1ef;
-  }
-
-  .drum-map-toggle input:focus-visible + span {
-    outline: 1px solid var(--xy-white-led);
-    outline-offset: 2px;
-  }
-
-  .drum-map-toggle strong {
-    border: 0;
-    background: transparent;
-    padding: 0;
-    color: inherit;
-    font-size: 10px;
-  }
-
   .selector-console {
     overflow: hidden;
     border: 1px solid #3f3f3f;
     border-radius: 3px;
     background: #050505;
     box-shadow: 0 18px 42px rgba(0, 0, 0, 0.34);
+  }
+
+  .safari-midi-note {
+    margin: -4px 2px 0;
+    color: #777;
+    font-size: 10px;
+    line-height: 1.4;
+  }
+
+  .safari-midi-note a {
+    color: #999;
+    text-underline-offset: 2px;
+  }
+
+  .safari-midi-note a:hover,
+  .safari-midi-note a:focus-visible {
+    color: var(--xy-text);
   }
 
   .selector-transport {

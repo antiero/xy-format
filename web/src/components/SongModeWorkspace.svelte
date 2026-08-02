@@ -17,6 +17,7 @@
   import { buildArrangerSequence } from "../lib/xy/arranger";
   import type { XYProjectViewModel } from "../lib/xy/projectViewModel";
   import ProjectTempoControl from "./ProjectTempoControl.svelte";
+  import TransportControls from "./TransportControls.svelte";
 
   export let project: XYProjectViewModel;
   export let onTempoChange: (tempoBpm: number) => void = () => {};
@@ -120,12 +121,8 @@
     }
   }
 
-  async function togglePlayback() {
-    if ($isPlayingStore) {
-      stopPlayback();
-      announceDisplayMessage("STOP", "neutral");
-      return;
-    }
+  async function startPlayback() {
+    if ($isPlayingStore) return;
     if (songSteps.length === 0 || songEvents.length === 0) return;
 
     playbackError = "";
@@ -183,6 +180,15 @@
     stopPlayback();
     selectSongStep(0);
     announceDisplayMessage("REWIND", "neutral");
+  }
+
+  function stopFromTransport() {
+    if ($isPlayingStore) {
+      stopPlayback();
+      announceDisplayMessage("STOP", "neutral");
+      return;
+    }
+    rewindPlayback();
   }
 
   function sceneRingProgress(
@@ -263,20 +269,18 @@
 
       <footer class="song-mode-footer">
         <div class="song-mode-transport">
-          <button
-            type="button"
-            class="song-play"
-            class:active={$isPlayingStore}
-            disabled={transportState === "loading" || songEvents.length === 0}
-            on:click={togglePlayback}
-          >
-            {$isPlayingStore
-              ? "pause"
-              : transportState === "loading"
-                ? "load"
-                : "play"}
-          </button>
-          <button type="button" on:click={rewindPlayback}>rew</button>
+          <TransportControls
+            isPlaying={$isPlayingStore}
+            loading={transportState === "loading"}
+            playDisabled={songEvents.length === 0}
+            stopDisabled={!$isPlayingStore &&
+              $currentTickStore <= 0 &&
+              selectedSongStep === 0}
+            playLabel="Play song"
+            stopLabel="Stop song playback"
+            onPlay={startPlayback}
+            onStop={stopFromTransport}
+          />
           <span>{songSteps.length} scenes</span>
         </div>
         <div class="song-page-controls">
@@ -557,12 +561,6 @@
   .song-mode-footer button:hover:not(:disabled) {
     background: #24242a;
     border-color: #6b6c72;
-  }
-
-  .song-mode-footer .song-play.active {
-    background: #f3f1ef;
-    border-color: #f3f1ef;
-    color: #050505;
   }
 
   .song-mode-empty {
