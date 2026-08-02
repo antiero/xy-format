@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import {
+  OP_XY_FACTORY_CATEGORIES,
   OP_XY_PRESET_CHOICES,
   opXyTrackStructFromDonor,
   recommendedOpXyPresetId,
@@ -13,6 +14,22 @@ function readString(bytes: Uint8Array, offset: number, capacity: number) {
 }
 
 describe("OP-XY preset catalog", () => {
+  it("uses only the factory shipping preset folders", () => {
+    expect(OP_XY_FACTORY_CATEGORIES).toEqual([
+      "bass",
+      "drum",
+      "keys",
+      "lead",
+      "organ",
+      "pad",
+      "pluck",
+      "strings",
+    ]);
+    expect(
+      new Set(OP_XY_PRESET_CHOICES.map((preset) => preset.category)),
+    ).toEqual(new Set(OP_XY_FACTORY_CATEGORIES));
+  });
+
   it("maps the Golden Brown harpsichord program to a plucked device preset", () => {
     expect(recommendedOpXyPresetId(6, "chord", false)).toBe("nt-harpsicord");
   });

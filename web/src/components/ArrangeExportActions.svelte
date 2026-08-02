@@ -12,6 +12,7 @@
   import type { XYProjectViewModel } from "../lib/xy/projectViewModel";
   import { createZipArchive, type ZipProgress } from "../lib/zip";
   import { announceDisplayMessage } from "../stores/project";
+  import TransportControls from "./TransportControls.svelte";
 
   export let project: XYProjectViewModel;
   export let includeDisabledTracks = false;
@@ -19,8 +20,9 @@
   export let isPlaying = false;
   export let transportState: "idle" | "loading" | "playing" = "idle";
   export let playbackAvailable = false;
-  export let onTogglePlayback: () => void | Promise<void>;
-  export let onRewindPlayback: () => void;
+  export let canResetPlayback = false;
+  export let onPlayPlayback: () => void | Promise<void>;
+  export let onStopPlayback: () => void;
 
   type ExportOverlay = {
     title: string;
@@ -202,23 +204,16 @@
 </script>
 
 <div class="export-actions">
-  <button
-    type="button"
-    class:active={isPlaying}
-    disabled={exporting || transportState === "loading" || !playbackAvailable}
-    aria-label={isPlaying ? "Stop arrangement playback" : "Play arrangement"}
-    title={isPlaying ? "Stop arrangement playback" : "Play arrangement"}
-    on:click={onTogglePlayback}
-  >
-    {isPlaying ? "Stop" : transportState === "loading" ? "Load" : "Play"}
-  </button>
-  <button
-    type="button"
-    disabled={exporting}
-    aria-label="Rewind arrangement playback"
-    title="Rewind arrangement playback"
-    on:click={onRewindPlayback}>Rew</button
-  >
+  <TransportControls
+    {isPlaying}
+    loading={transportState === "loading"}
+    playDisabled={exporting || !playbackAvailable}
+    stopDisabled={exporting || (!isPlaying && !canResetPlayback)}
+    playLabel="Play arrangement"
+    stopLabel="Stop arrangement playback"
+    onPlay={onPlayPlayback}
+    onStop={onStopPlayback}
+  />
   <label
     class="include-disabled"
     title="Include scene-muted tracks in exported MIDI"
@@ -298,12 +293,6 @@
   .export-actions button:hover:not(:disabled) {
     border-color: #76777d;
     background: #24242a;
-  }
-
-  .export-actions button.active {
-    border-color: #f3f1ef;
-    background: #f3f1ef;
-    color: #050505;
   }
 
   .include-disabled {

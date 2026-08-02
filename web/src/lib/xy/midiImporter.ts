@@ -180,7 +180,7 @@ const ROLE_SLOTS: Record<number, Role> = {
   3: "bass",
   4: "lead",
   5: "lead",
-  6: "lead",
+  6: "chord",
   7: "chord",
   8: "chord",
 };
@@ -824,9 +824,9 @@ function assignSelectedPartsToSlots(
   );
   const preferredSlots: Record<Role, number[]> = {
     drum: [1, 2],
-    bass: [3],
+    bass: [3, 2],
     lead: [4, 5, 6],
-    chord: [7, 8],
+    chord: [7, 8, 6],
   };
   const melodicSlots = [3, 4, 5, 6, 7, 8];
 
@@ -982,7 +982,9 @@ function buildTrackPatterns(
   const drumPrimary =
     selection.assignments.get(1) ?? selection.assignments.get(2);
   const chordPrimary =
-    selection.assignments.get(7) ?? selection.assignments.get(8);
+    selection.assignments.get(7) ??
+    selection.assignments.get(8) ??
+    selection.assignments.get(6);
   const deriveMissingRoles =
     new Set(
       Array.from(selection.assignments.values()).map((candidate) =>

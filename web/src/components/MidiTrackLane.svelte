@@ -3,7 +3,11 @@
     MidiPreviewNote,
     MidiTrackSelectionOption,
   } from "../lib/xy/midiImporter";
-  import { OP_XY_PRESET_CHOICES } from "../lib/xy/opXyPresets";
+  import {
+    OP_XY_FACTORY_CATEGORIES,
+    OP_XY_PRESET_CHOICES,
+    opXyFactoryTrackDescription,
+  } from "../lib/xy/opXyPresets";
 
   export let track: MidiTrackSelectionOption;
   export let index: number;
@@ -21,6 +25,34 @@
   ) => void = () => {};
 
   $: compact = trackHeight < 42;
+  $: assignedTrackNumbers = track.assignedOpXyTracks
+    .map((trackIndex) => trackIndex + 1)
+    .sort((a, b) => a - b);
+  $: destinationLabel = formatDestinationLabel(assignedTrackNumbers);
+  $: destinationTitle = assignedTrackNumbers.length
+    ? assignedTrackNumbers
+        .map((trackNumber) => opXyFactoryTrackDescription(trackNumber))
+        .join(" · ")
+    : "Disabled — not assigned to an OP-XY track";
+
+  const presetGroups = OP_XY_FACTORY_CATEGORIES.map((category) => ({
+    category,
+    presets: OP_XY_PRESET_CHOICES.filter(
+      (preset) => preset.category === category,
+    ),
+  }));
+
+  function formatDestinationLabel(trackNumbers: number[]): string {
+    if (trackNumbers.length === 0) return "off";
+    if (trackNumbers.length === 1) return `T${trackNumbers[0]}`;
+    const contiguous = trackNumbers.every(
+      (trackNumber, index) =>
+        index === 0 || trackNumber === trackNumbers[index - 1] + 1,
+    );
+    return contiguous
+      ? `T${trackNumbers[0]}–${trackNumbers.at(-1)}`
+      : `T${trackNumbers.join("/")}`;
+  }
 
   function regionStyle(track: MidiTrackSelectionOption, index: number): string {
     const start = Math.max(0, Math.min(total16ths, track.start16ths));
@@ -86,19 +118,29 @@
       title={`GM ${track.programNumber + 1}: ${track.programName} · MIDI channel ${track.channel}`}
     >
       <strong>{track.name}</strong>
-      <select
-        value={track.presetId}
-        disabled={selectionUpdating || !selected}
-        aria-label={`OP-XY sound for ${track.name}`}
-        title={`Choose the OP-XY sound for GM ${track.programNumber + 1}: ${track.programName}`}
-        on:change={changePreset}
-      >
-        {#each OP_XY_PRESET_CHOICES as preset (preset.id)}
-          <option value={preset.id}>{preset.category} / {preset.label}</option>
-        {/each}
-      </select>
+      <span class="preset-select">
+        <select
+          value={track.presetId}
+          disabled={selectionUpdating || !selected}
+          aria-label={`OP-XY sound for ${track.name}`}
+          title={`Choose the OP-XY sound for GM ${track.programNumber + 1}: ${track.programName}`}
+          on:change={changePreset}
+        >
+          {#each presetGroups as group (group.category)}
+            <optgroup label={group.category}>
+              {#each group.presets as preset (preset.id)}
+                <option value={preset.id}>{preset.label}</option>
+              {/each}
+            </optgroup>
+          {/each}
+        </select>
+      </span>
     </span>
-    <span class="lane-bank">{track.bankCount}</span>
+    <span
+      class="lane-destination"
+      title={destinationTitle}
+      aria-label={destinationTitle}>{destinationLabel}</span
+    >
   </span>
   <span class="lane-roll" style={`width: ${laneWidth}px;`}>
     <span
@@ -141,7 +183,7 @@
   .lane-header {
     box-sizing: border-box;
     display: grid;
-    grid-template-columns: 28px minmax(0, 1fr) 34px;
+    grid-template-columns: 28px minmax(0, 1fr) 46px;
     align-items: center;
     gap: 10px;
     height: var(--track-height);
@@ -185,8 +227,10 @@
 
   .lane-title {
     display: grid;
+    grid-template-rows: 15px 19px;
+    align-content: center;
     min-width: 0;
-    gap: 4px;
+    gap: 0;
     overflow: hidden;
   }
 
@@ -194,42 +238,74 @@
     overflow: hidden;
     font-size: 13px;
     font-weight: 650;
+    line-height: 15px;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
 
+  .preset-select {
+    position: relative;
+    display: block;
+    min-width: 0;
+    height: 19px;
+  }
+
+  .preset-select::after {
+    content: "";
+    position: absolute;
+    top: 5px;
+    right: 3px;
+    width: 6px;
+    height: 6px;
+    border-right: 1px solid #858585;
+    border-bottom: 1px solid #858585;
+    pointer-events: none;
+    transform: rotate(45deg);
+  }
+
+  .preset-select:focus-within {
+    outline: 1px solid #f4f4f4;
+    outline-offset: -1px;
+  }
+
   .lane-title select {
+    display: block;
     min-width: 0;
     width: 100%;
-    height: 17px;
+    height: 19px;
     border: 0;
-    padding: 0 14px 0 0;
+    padding: 0 16px 0 0;
+    -webkit-appearance: none;
+    appearance: none;
     background: transparent;
     color: #9a9a9a;
     font-size: 10px;
+    line-height: 19px;
     text-transform: uppercase;
     text-overflow: ellipsis;
     cursor: pointer;
   }
 
   .lane-title select:focus-visible {
-    outline: 1px solid #f4f4f4;
-    outline-offset: 1px;
+    outline: 0;
   }
 
   .lane-title select:disabled {
     cursor: default;
   }
 
-  .lane-bank {
+  .lane-destination {
     display: grid;
-    min-width: 28px;
+    min-width: 40px;
     min-height: 24px;
     place-items: center;
     border: 1px solid #454545;
     background: #151515;
-    font-size: 11px;
+    color: #d4d4d4;
+    font-size: 10px;
+    font-weight: 650;
     font-variant-numeric: tabular-nums;
+    text-transform: uppercase;
   }
 
   .lane-roll {
@@ -273,7 +349,7 @@
   }
 
   .midi-lane.compact .lane-header {
-    grid-template-columns: 22px minmax(0, 1fr) 28px;
+    grid-template-columns: 22px minmax(0, 1fr) 40px;
     gap: 7px;
     padding: 3px 9px;
   }
@@ -284,6 +360,7 @@
   }
 
   .midi-lane.compact .lane-title {
+    grid-template-rows: 15px;
     gap: 0;
   }
 
@@ -291,12 +368,12 @@
     font-size: 12px;
   }
 
-  .midi-lane.compact .lane-title select {
+  .midi-lane.compact .preset-select {
     display: none;
   }
 
-  .midi-lane.compact .lane-bank {
-    min-width: 26px;
+  .midi-lane.compact .lane-destination {
+    min-width: 36px;
     min-height: 20px;
     font-size: 10px;
   }

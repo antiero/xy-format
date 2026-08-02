@@ -3,7 +3,6 @@
   import {
     isSafariBrowser,
     webMidiOutputService,
-    XYBUDDY_TESTFLIGHT_URL,
     type MidiOutputChoice,
   } from "../lib/webMidi";
 
@@ -15,7 +14,7 @@
   let outputs: MidiOutputChoice[] = [];
   let selectedOutputId = "";
   let connecting = false;
-  const showSafariHandoff = !isXYBuddyNativeEmbed() && isSafariBrowser();
+  const safariNeedsNativeApp = !isXYBuddyNativeEmbed() && isSafariBrowser();
 
   async function connectOpXy() {
     connecting = true;
@@ -45,16 +44,11 @@
 
 <button
   type="button"
-  class:active={target === "soundfont"}
-  title="Preview with the General MIDI SoundFont"
-  aria-label="Preview with the General MIDI SoundFont"
-  on:click={() => (target = "soundfont")}>gm</button
->
-<button
-  type="button"
   class:active={target === "opxy"}
-  disabled={disabled || connecting || showSafariHandoff}
-  title="Send notes to OP-XY tracks 1–8. Browse sounds on the device, then choose the matching lane sound here."
+  disabled={disabled || connecting || safariNeedsNativeApp}
+  title={safariNeedsNativeApp
+    ? "Safari MIDI output is available in the XYBuddy app."
+    : "Send notes to OP-XY tracks 1–8. Browse sounds on the device, then choose the matching lane sound here."}
   aria-label="Connect OP-XY MIDI output"
   on:click={connectOpXy}
   >{connecting ? "connect" : target === "opxy" ? "op-xy" : "midi out"}</button
@@ -79,19 +73,8 @@
     >T1–T8 · CH1–8</span
   >
 {/if}
-{#if showSafariHandoff}
-  <a
-    href={XYBUDDY_TESTFLIGHT_URL}
-    target="_blank"
-    rel="noreferrer"
-    aria-label="Safari cannot output Web MIDI. Download the XYBuddy app for native OP-XY preview."
-    title="Safari cannot send Web MIDI. Use XYBuddy for native OP-XY MIDI output."
-    >SAFARI MIDI → XYBUDDY APP</a
-  >
-{/if}
 
 <style>
-  a,
   .midi-output-select,
   .midi-route {
     border: 1px solid #313131;
@@ -101,16 +84,6 @@
     font-size: 10px;
     font-variant-numeric: tabular-nums;
     text-transform: uppercase;
-  }
-
-  a {
-    text-decoration: none;
-  }
-
-  a:hover,
-  a:focus-visible {
-    color: var(--xy-text);
-    border-color: #666;
   }
 
   .midi-output-select {

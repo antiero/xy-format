@@ -4,6 +4,7 @@
     MidiTrackSelectionOption,
     MidiTrackSelectionSummary,
   } from "../lib/xy/midiImporter";
+  import EditorToggle from "./EditorToggle.svelte";
   import MidiTrackLane from "./MidiTrackLane.svelte";
 
   export let selection: MidiTrackSelectionSummary;
@@ -37,6 +38,7 @@
   let cycleDragHandle: "start" | "end" | null = null;
   let draftCycleStart16ths = 0;
   let draftCycleEnd16ths = 0;
+  let showDisabledTracks = false;
 
   $: total16ths = Math.max(
     MIN_CYCLE_16THS,
@@ -92,7 +94,14 @@
   $: playheadLeft =
     laneHeaderWidth +
     (clamp(playheadPosition16ths, 0, total16ths) / total16ths) * laneWidth;
-  $: tracksHeight = selection.tracks.length * TRACK_HEIGHT;
+  $: visibleTracks = selection.tracks
+    .map((track, index) => ({ track, index }))
+    .filter(({ track }) => showDisabledTracks || selectedIds.has(track.id));
+  $: hasDisabledTracks = selection.tracks.some(
+    (track) => !selectedIds.has(track.id),
+  );
+  $: if (!hasDisabledTracks && showDisabledTracks) showDisabledTracks = false;
+  $: tracksHeight = visibleTracks.length * TRACK_HEIGHT;
 
   function clamp(value: number, min: number, max: number): number {
     return Math.max(min, Math.min(max, value));
@@ -160,6 +169,13 @@
     }
   }
 
+  function setDisabledTrackVisibility(checked: boolean) {
+    showDisabledTracks = checked;
+    requestAnimationFrame(() => {
+      if (lanesElement) lanesElement.scrollTop = 0;
+    });
+  }
+
   function quantizeCyclePosition(position16ths: number): number {
     return clamp(Math.round(position16ths / 4) * 4, 0, total16ths);
   }
@@ -225,7 +241,18 @@
   style={`--lane-header-width: ${laneHeaderWidth}px; --bar-width: ${barWidth}px;`}
 >
   <div class="timeline-row">
-    <div class="timeline-corner">tracks</div>
+    <div class="timeline-corner">
+      <span>tracks</span>
+      {#if hasDisabledTracks}
+        <EditorToggle
+          checked={showDisabledTracks}
+          disabled={selectionUpdating}
+          label="Show Disabled Tracks"
+          tooltip="Show disabled MIDI tracks alongside enabled tracks."
+          onChange={setDisabledTrackVisibility}
+        />
+      {/if}
+    </div>
     <div
       class="timeline-bars"
       role="slider"
@@ -283,11 +310,11 @@
     aria-hidden="true"
   ></div>
 
-  {#each selection.tracks as track, index (track.id)}
+  {#each visibleTracks as lane (lane.track.id)}
     <MidiTrackLane
-      {track}
-      {index}
-      selected={selectedIds.has(track.id)}
+      track={lane.track}
+      index={lane.index}
+      selected={selectedIds.has(lane.track.id)}
       {total16ths}
       {laneWidth}
       {barWidth}
@@ -355,7 +382,9 @@
   .timeline-corner {
     display: flex;
     align-items: center;
-    padding-left: 13px;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 0 7px 0 13px;
     border-right: 1px solid #333;
     background: #111;
   }

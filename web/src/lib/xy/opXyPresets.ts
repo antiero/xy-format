@@ -3,19 +3,42 @@ import { trackStructTemplateFromBytes } from "./image_writer";
 
 export type OpXyPresetCategory =
   | "bass"
-  | "bells"
-  | "brass"
   | "drum"
-  | "fx"
   | "keys"
   | "lead"
   | "organ"
   | "pad"
-  | "percussion"
   | "pluck"
-  | "strings"
-  | "synth"
-  | "wind";
+  | "strings";
+
+export const OP_XY_FACTORY_CATEGORIES: readonly OpXyPresetCategory[] = [
+  "bass",
+  "drum",
+  "keys",
+  "lead",
+  "organ",
+  "pad",
+  "pluck",
+  "strings",
+] as const;
+
+const OP_XY_FACTORY_TRACKS = [
+  { role: "Drums", preset: "boop" },
+  { role: "Drums / Bass", preset: "in phase" },
+  { role: "Bass / Pluck", preset: "shoulder" },
+  { role: "Pluck / Lead", preset: "beach bum" },
+  { role: "Lead / Soft Pluck", preset: "gaussian" },
+  { role: "Soft Pluck / Strings", preset: "dielectric" },
+  { role: "Strings / Pad", preset: "draemy" },
+  { role: "Pad", preset: "bandpasser" },
+] as const;
+
+export function opXyFactoryTrackDescription(trackNumber: number): string {
+  const track = OP_XY_FACTORY_TRACKS[trackNumber - 1];
+  return track
+    ? `OP-XY Track ${trackNumber}: ${track.role} (${track.preset})`
+    : `OP-XY Track ${trackNumber}`;
+}
 
 export type OpXyPresetChoice = {
   id: string;
@@ -112,7 +135,7 @@ export const OP_XY_PRESET_CHOICES: readonly OpXyPresetChoice[] = [
   captured("nt-bright-piano", "nt-bright piano", "keys", "pluck-beach-bum"),
   captured("nt-harpsicord", "nt-harpsicord", "pluck", "pluck-dielectric"),
   captured("nt-harpsi", "nt-harpsi", "pluck", "pluck-dielectric"),
-  captured("nt-glockenspiel", "nt-glockenspiel", "bells", "pluck-beach-bum"),
+  captured("nt-glockenspiel", "nt-glockenspiel", "keys", "pluck-beach-bum"),
   captured("nt-draw-organ", "nt-draw organ", "organ", "pad-bandpasser"),
   captured("nt-dry-lute", "nt-dry lute", "pluck", "pluck-beach-bum"),
   captured("nt-acoustic-bass", "nt-acoustic bass", "bass", "bass-shoulder"),
@@ -123,10 +146,10 @@ export const OP_XY_PRESET_CHOICES: readonly OpXyPresetChoice[] = [
     "strings",
     "strings-draemy",
   ),
-  captured("nt-broken-timpani", "nt-broken timpani", "percussion", "drum-boop"),
-  captured("nt-fat-brass", "nt-fat brass", "brass", "lead-gaussian"),
-  captured("nt-accord", "nt-accord", "wind", "lead-gaussian"),
-  captured("nt-digital-breath", "nt-digital breath", "wind", "lead-gaussian"),
+  captured("nt-broken-timpani", "nt-broken timpani", "drum", "drum-boop"),
+  captured("nt-fat-brass", "nt-fat brass", "lead", "lead-gaussian"),
+  captured("nt-accord", "nt-accord", "organ", "lead-gaussian"),
+  captured("nt-digital-breath", "nt-digital breath", "lead", "lead-gaussian"),
   captured("nt-broken-lead", "nt-broken lead", "lead", "lead-gaussian"),
   captured("nt-celestial", "nt-celestial", "pad", "pad-bandpasser"),
 ] as const;

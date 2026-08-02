@@ -1,7 +1,12 @@
 <script lang="ts">
   import { onDestroy } from "svelte";
   import { audioService } from "../lib/audio";
-  import { webMidiOutputService } from "../lib/webMidi";
+  import { isXYBuddyNativeEmbed } from "../lib/embedMode";
+  import {
+    isSafariBrowser,
+    webMidiOutputService,
+    XYBUDDY_TESTFLIGHT_URL,
+  } from "../lib/webMidi";
   import {
     collectSongPlaybackEvents,
     collectSongPlaybackSteps,
@@ -22,6 +27,7 @@
   import MidiDrumMapToggle from "./MidiDrumMapToggle.svelte";
   import MidiOutputControl from "./MidiOutputControl.svelte";
   import MidiTrackCanvas from "./MidiTrackCanvas.svelte";
+  import TransportControls from "./TransportControls.svelte";
 
   export let project: XYProjectViewModel;
   export let selection: MidiTrackSelectionSummary;
@@ -40,6 +46,7 @@
   let lastSelectionKey = "";
   let pendingFitTrackIds: string[] | null = null;
   let previewTarget: "soundfont" | "opxy" = "soundfont";
+  const showSafariMidiNote = !isXYBuddyNativeEmbed() && isSafariBrowser();
 
   $: selectedIds = new Set(selection.selectedTrackIds);
   $: song = project.songs[0];
@@ -237,12 +244,8 @@
     animationFrame = requestAnimationFrame(playbackFrame);
   }
 
-  async function togglePlayback() {
-    if ($isPlayingStore) {
-      stopPlayback();
-      announceDisplayMessage("STOP", "neutral");
-      return;
-    }
+  async function startPlayback() {
+    if ($isPlayingStore) return;
     if (songEvents.length === 0) return;
 
     playbackError = "";
@@ -288,6 +291,18 @@
     lastFrameMs = 0;
   }
 
+  function stopFromTransport() {
+    if (!$isPlayingStore) {
+      stopPlayback();
+      lastPlaybackPosition16ths = 0;
+      currentTickStore.set(0);
+      announceDisplayMessage("REWIND", "neutral");
+      return;
+    }
+    stopPlayback();
+    announceDisplayMessage("STOP", "neutral");
+  }
+
   function seekPlayback(position16ths: number) {
     const next = clampPlaybackPosition(position16ths);
     audioService.stopAll();
@@ -303,13 +318,6 @@
     }
   }
 
-  function rewindPlayback() {
-    stopPlayback();
-    lastPlaybackPosition16ths = 0;
-    currentTickStore.set(0);
-    announceDisplayMessage("REWIND", "neutral");
-  }
-
   onDestroy(() => {
     stopPlayback();
   });
@@ -318,32 +326,23 @@
 <section class="midi-track-selector" aria-label="MIDI track selection">
   <div class="selector-console">
     <div class="selector-transport">
-      <button
-        type="button"
-        class="transport-play"
-        class:active={$isPlayingStore}
-        disabled={selectionUpdating ||
-          transportState === "loading" ||
-          songEvents.length === 0}
-        on:click={togglePlayback}
-      >
-        {$isPlayingStore
-          ? "stop"
-          : transportState === "loading"
-            ? "load"
-            : "play"}
-      </button>
+      <TransportControls
+        isPlaying={$isPlayingStore}
+        loading={transportState === "loading"}
+        playDisabled={selectionUpdating || songEvents.length === 0}
+        stopDisabled={selectionUpdating ||
+          (!$isPlayingStore && $currentTickStore <= 0)}
+        playLabel="Play MIDI preview"
+        stopLabel="Stop MIDI preview"
+        onPlay={startPlayback}
+        onStop={stopFromTransport}
+      />
       <MidiOutputControl
         bind:target={previewTarget}
         disabled={selectionUpdating}
         onReady={midiOutputReady}
         onError={midiOutputFailed}
       />
-      <button
-        type="button"
-        disabled={selectionUpdating}
-        on:click={rewindPlayback}>rew</button
-      >
       <span>{selection.totalBars} bars</span>
       <span
         >{formatBarBeat(selection.rangeStart16ths)}-{formatBarBeat(
@@ -396,6 +395,14 @@
       onCycleChange={changeCycleRange}
     />
   </div>
+  {#if showSafariMidiNote}
+    <p class="safari-midi-note">
+      MIDI output in Safari requires the
+      <a href={XYBUDDY_TESTFLIGHT_URL} target="_blank" rel="noreferrer"
+        >XYBuddy app</a
+      >.
+    </p>
+  {/if}
 </section>
 
 <style>
@@ -435,6 +442,23 @@
     border-radius: 3px;
     background: #050505;
     box-shadow: 0 18px 42px rgba(0, 0, 0, 0.34);
+  }
+
+  .safari-midi-note {
+    margin: -4px 2px 0;
+    color: #777;
+    font-size: 10px;
+    line-height: 1.4;
+  }
+
+  .safari-midi-note a {
+    color: #999;
+    text-underline-offset: 2px;
+  }
+
+  .safari-midi-note a:hover,
+  .safari-midi-note a:focus-visible {
+    color: var(--xy-text);
   }
 
   .selector-transport {
