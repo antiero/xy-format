@@ -43,26 +43,27 @@ export function opXyFactoryTrackDescription(trackNumber: number): string {
 export type OpXyPresetChoice = {
   id: string;
   label: string;
-  presetPath: string;
   category: OpXyPresetCategory;
   source: "built-in" | "installed";
   templateTrack?: number;
   donorUrl?: string;
+  donorTrack?: number;
   fallbackPresetId?: string;
 };
 
-const captured = (
+const capturedFactoryPreset = (
   id: string,
   label: string,
   category: OpXyPresetCategory,
+  donorTrack: number,
   fallbackPresetId: string,
 ): OpXyPresetChoice => ({
   id,
   label,
   category,
-  presetPath: `${category}/${label}`,
-  source: "installed",
+  source: "built-in",
   donorUrl: `${import.meta.env.BASE_URL}opxy-presets/${id}.xy`,
+  donorTrack,
   fallbackPresetId,
 });
 
@@ -70,7 +71,6 @@ export const OP_XY_PRESET_CHOICES: readonly OpXyPresetChoice[] = [
   {
     id: "drum-boop",
     label: "boop",
-    presetPath: "drum/boop",
     category: "drum",
     source: "built-in",
     templateTrack: 1,
@@ -78,7 +78,6 @@ export const OP_XY_PRESET_CHOICES: readonly OpXyPresetChoice[] = [
   {
     id: "drum-in-phase",
     label: "in phase",
-    presetPath: "drum/in phase",
     category: "drum",
     source: "built-in",
     templateTrack: 2,
@@ -86,7 +85,6 @@ export const OP_XY_PRESET_CHOICES: readonly OpXyPresetChoice[] = [
   {
     id: "bass-shoulder",
     label: "shoulder",
-    presetPath: "bass/shoulder",
     category: "bass",
     source: "built-in",
     templateTrack: 3,
@@ -94,7 +92,6 @@ export const OP_XY_PRESET_CHOICES: readonly OpXyPresetChoice[] = [
   {
     id: "pluck-beach-bum",
     label: "beach bum",
-    presetPath: "pluck/beach bum",
     category: "pluck",
     source: "built-in",
     templateTrack: 4,
@@ -102,7 +99,6 @@ export const OP_XY_PRESET_CHOICES: readonly OpXyPresetChoice[] = [
   {
     id: "lead-gaussian",
     label: "gaussian",
-    presetPath: "lead/gaussian",
     category: "lead",
     source: "built-in",
     templateTrack: 5,
@@ -110,7 +106,6 @@ export const OP_XY_PRESET_CHOICES: readonly OpXyPresetChoice[] = [
   {
     id: "pluck-dielectric",
     label: "dielectric",
-    presetPath: "pluck/dielectric",
     category: "pluck",
     source: "built-in",
     templateTrack: 6,
@@ -118,102 +113,294 @@ export const OP_XY_PRESET_CHOICES: readonly OpXyPresetChoice[] = [
   {
     id: "strings-draemy",
     label: "draemy",
-    presetPath: "strings/draemy",
     category: "strings",
     source: "built-in",
     templateTrack: 7,
   },
+  capturedFactoryPreset(
+    "strings-ensemble",
+    "ensemble",
+    "strings",
+    8,
+    "strings-draemy",
+  ),
+  capturedFactoryPreset(
+    "strings-intimate-str",
+    "intimate str",
+    "strings",
+    8,
+    "strings-draemy",
+  ),
+  capturedFactoryPreset(
+    "strings-nachtmusik",
+    "nachtmusik",
+    "strings",
+    8,
+    "strings-draemy",
+  ),
+  capturedFactoryPreset(
+    "strings-pointe",
+    "pointe",
+    "strings",
+    8,
+    "strings-draemy",
+  ),
+  capturedFactoryPreset(
+    "strings-soutenu",
+    "soutenu",
+    "strings",
+    8,
+    "strings-draemy",
+  ),
+  capturedFactoryPreset(
+    "strings-whitness",
+    "whitness",
+    "strings",
+    8,
+    "strings-draemy",
+  ),
   {
     id: "pad-bandpasser",
     label: "bandpasser",
-    presetPath: "pad/bandpasser",
     category: "pad",
     source: "built-in",
     templateTrack: 8,
   },
-  captured("nt-grand-piano", "nt-grand piano", "keys", "pluck-beach-bum"),
-  captured("nt-bright-piano", "nt-bright piano", "keys", "pluck-beach-bum"),
-  captured("nt-harpsicord", "nt-harpsicord", "pluck", "pluck-dielectric"),
-  captured("nt-harpsi", "nt-harpsi", "pluck", "pluck-dielectric"),
-  captured("nt-glockenspiel", "nt-glockenspiel", "keys", "pluck-beach-bum"),
-  captured("nt-draw-organ", "nt-draw organ", "organ", "pad-bandpasser"),
-  captured("nt-dry-lute", "nt-dry lute", "pluck", "pluck-beach-bum"),
-  captured("nt-acoustic-bass", "nt-acoustic bass", "bass", "bass-shoulder"),
-  captured("nt-cello", "nt-cello", "strings", "strings-draemy"),
-  captured(
-    "nt-coffee-strings",
-    "nt-coffee strings",
-    "strings",
-    "strings-draemy",
-  ),
-  captured("nt-broken-timpani", "nt-broken timpani", "drum", "drum-boop"),
-  captured("nt-fat-brass", "nt-fat brass", "lead", "lead-gaussian"),
-  captured("nt-accord", "nt-accord", "organ", "lead-gaussian"),
-  captured("nt-digital-breath", "nt-digital breath", "lead", "lead-gaussian"),
-  captured("nt-broken-lead", "nt-broken lead", "lead", "lead-gaussian"),
-  captured("nt-celestial", "nt-celestial", "pad", "pad-bandpasser"),
 ] as const;
+
+/**
+ * OP-XY factory browser names, transcribed from firmware 1.1.21.
+ *
+ * A catalogue entry is not automatically safe to author into a project: the
+ * `.xy` track stores opaque engine state as well as the displayed preset name.
+ * `OP_XY_PRESET_CHOICES` remains the byte-validated subset that has a pristine
+ * device-authored track template available to the web importer.
+ */
+export const OP_XY_FACTORY_PRESET_NAMES = {
+  bass: [
+    "alloy",
+    "any time",
+    "bark",
+    "belch bass",
+    "big square",
+    "blank",
+    "corduroy",
+    "essex",
+    "flyby",
+    "guitar low",
+    "haymaker",
+    "iguana",
+    "jacket",
+    "line check",
+    "loney bass",
+    "mineral",
+    "not fm",
+    "off guard",
+    "pocket",
+    "pressure",
+    "rear 424",
+    "shark attack",
+    "shoulder",
+    "sonorous",
+    "trunk",
+    "under bron",
+    "valves",
+    "wobbler",
+  ],
+  drum: [
+    "boop",
+    "chamine",
+    "dead spot",
+    "fletcher",
+    "in phase",
+    "kerf",
+    "martini",
+    "mushroom",
+    "playwood",
+    "sugar",
+    "wood box",
+    "zebra",
+  ],
+  keys: [
+    "80s lover",
+    "ambi piano",
+    "corporate",
+    "dark",
+    "drodezzz",
+    "elect piano",
+    "electric",
+    "foal",
+    "jeans",
+    "key keys",
+    "man stage",
+    "medieval",
+    "missing you",
+    "needs tuning",
+    "newshour",
+    "piano 1",
+    "piano 2",
+    "refelt piano",
+    "shine",
+    "slush",
+    "spacious",
+    "swelvet",
+    "tonk 5",
+    "vintage",
+    "wakeup",
+    "whurl xy",
+  ],
+  lead: [
+    "asinine",
+    "azimith",
+    "beam",
+    "bowed",
+    "burbie",
+    "dustmite",
+    "far field",
+    "gaussian",
+    "gradient",
+    "insomniac",
+    "low ride",
+    "massage",
+    "millinery",
+    "modulus",
+    "open cell",
+    "runway",
+    "sad triangle",
+    "saw 101",
+    "sonar",
+    "spud mate",
+    "swell",
+    "top spin",
+    "uknowaxel",
+    "whirrs",
+    "wide saw",
+    "wool",
+    "wub",
+  ],
+  organ: [
+    "chorale",
+    "chunk",
+    "dusty org",
+    "fm organ",
+    "hammy xy3",
+    "harmonium",
+    "joker",
+    "manual",
+    "meat org",
+    "post order",
+    "vestigial",
+  ],
+  pad: [
+    "bandpasser",
+    "chambre",
+    "chuba",
+    "confucius",
+    "dark choir",
+    "dream choir",
+    "frontier",
+    "kowalski",
+    "murmel",
+    "night sky",
+    "op1 pad",
+    "padawan",
+    "qiviut",
+    "rich pad",
+    "separee",
+    "spectre",
+    "subsun",
+    "there is hope",
+    "ulysses",
+    "unravel",
+    "uranium",
+    "zafu",
+  ],
+  pluck: [
+    "avant garde",
+    "beach bum",
+    "bellissimo",
+    "bellonboards",
+    "coin",
+    "deep luck",
+    "dielectric",
+    "dingus",
+    "endless",
+    "guitar",
+    "kvarnofon",
+    "layered",
+    "leftovers",
+    "marimba",
+    "odorant",
+    "on tape",
+    "pale crepe",
+    "rally",
+    "resobubble",
+    "rift",
+    "soft tines",
+    "synth bell",
+    "whorl",
+  ],
+  strings: [
+    "draemy",
+    "ensemble",
+    "intimate str",
+    "nachtmusik",
+    "pointe",
+    "soutenu",
+    "whitness",
+  ],
+} as const satisfies Record<OpXyPresetCategory, readonly string[]>;
 
 const PRESET_BY_ID = new Map(
   OP_XY_PRESET_CHOICES.map((preset) => [preset.id, preset]),
 );
 
+export type OpXyFactoryPresetCatalogEntry = {
+  id: string;
+  label: string;
+  category: OpXyPresetCategory;
+  available: boolean;
+};
+
+function factoryPresetId(category: OpXyPresetCategory, label: string): string {
+  const slug = label
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "");
+  return `${category}-${slug}`;
+}
+
+export const OP_XY_FACTORY_PRESET_CATALOG: readonly OpXyFactoryPresetCatalogEntry[] =
+  OP_XY_FACTORY_CATEGORIES.flatMap((category) =>
+    OP_XY_FACTORY_PRESET_NAMES[category].map((label) => {
+      const id = factoryPresetId(category, label);
+      return { id, label, category, available: PRESET_BY_ID.has(id) };
+    }),
+  );
+
 export function opXyPresetById(id: string): OpXyPresetChoice | undefined {
   return PRESET_BY_ID.get(id);
 }
 
-function writeLatin1(
-  target: Uint8Array,
-  offset: number,
-  capacity: number,
-  value: string,
-): void {
-  const bytes = new TextEncoder().encode(value);
-  if (bytes.length >= capacity) {
-    throw new Error(`OP-XY preset path is too long: ${value}`);
-  }
-  target.fill(0, offset, offset + capacity);
-  target.set(bytes, offset);
-}
-
-function readLatin1(
-  source: Uint8Array,
-  offset: number,
-  capacity: number,
-): string {
-  const bytes = source.subarray(offset, offset + capacity);
-  const end = bytes.indexOf(0);
-  return new TextDecoder("latin1").decode(
-    end >= 0 ? bytes.subarray(0, end) : bytes,
-  );
-}
-
 /**
- * Rehome corpus donors from the capture folder (`1`) to the matching OP-XY
- * library group without altering the fixed-size device struct.
+ * Extract a captured preset's track state without changing its device paths.
+ * Installed sampler assets remain at their device-validated location, such as
+ * `/fat32/presets/1/...`; UI categories must never rewrite storage paths.
  */
+export function opXyTrackStructFromDonor(donorBytes: Uint8Array): Uint8Array;
 export function opXyTrackStructFromDonor(
   preset: OpXyPresetChoice,
   donorBytes: Uint8Array,
+): Uint8Array;
+export function opXyTrackStructFromDonor(
+  presetOrDonorBytes: OpXyPresetChoice | Uint8Array,
+  donorBytes?: Uint8Array,
 ): Uint8Array {
-  const trackStruct = trackStructTemplateFromBytes(donorBytes);
-  writeLatin1(trackStruct, 0x453f, 48, preset.presetPath);
-
-  const capturedPrefix = `/fat32/presets/1/${preset.label}.preset/`;
-  const devicePrefix = `/fat32/presets/${preset.category}/${preset.label}.preset/`;
-  for (let region = 0; region < 24; region++) {
-    const pathOffset = 0x395f + region * 0x80;
-    const path = readLatin1(trackStruct, pathOffset, 72);
-    if (path.startsWith(capturedPrefix)) {
-      writeLatin1(
-        trackStruct,
-        pathOffset,
-        72,
-        devicePrefix + path.slice(capturedPrefix.length),
-      );
-    }
+  if (!donorBytes) {
+    return trackStructTemplateFromBytes(presetOrDonorBytes as Uint8Array);
   }
-  return trackStruct;
+  const preset = presetOrDonorBytes as OpXyPresetChoice;
+  return trackStructTemplateFromBytes(donorBytes, preset.donorTrack ?? 1);
 }
 
 export function recommendedOpXyPresetId(
@@ -222,26 +409,18 @@ export function recommendedOpXyPresetId(
   isDrum: boolean,
 ): string {
   if (isDrum) return "drum-boop";
-  if (programNumber === 0) return "nt-grand-piano";
-  if (programNumber === 1) return "nt-bright-piano";
-  if (programNumber === 6) return "nt-harpsicord";
-  if (programNumber === 7) return "nt-harpsi";
-  if (programNumber <= 7) return "nt-grand-piano";
-  if (programNumber <= 15) return "nt-glockenspiel";
-  if (programNumber <= 23) return "nt-draw-organ";
-  if (programNumber <= 31) return "nt-dry-lute";
-  if (programNumber <= 39) return "nt-acoustic-bass";
+  if (programNumber <= 15) return "pluck-dielectric";
+  if (programNumber <= 23) return "pad-bandpasser";
+  if (programNumber <= 31) return "pluck-beach-bum";
+  if (programNumber <= 39) return "bass-shoulder";
   if (programNumber <= 47)
-    return programNumber === 47 ? "nt-broken-timpani" : "nt-cello";
-  if (programNumber <= 55) return "nt-coffee-strings";
-  if (programNumber <= 63) return "nt-fat-brass";
-  if (programNumber <= 79)
-    return programNumber >= 72 ? "nt-digital-breath" : "nt-accord";
-  if (programNumber <= 87) return "nt-broken-lead";
-  if (programNumber <= 95) return "nt-celestial";
+    return programNumber === 47 ? "drum-boop" : "strings-draemy";
+  if (programNumber <= 55) return "strings-draemy";
+  if (programNumber <= 87) return "lead-gaussian";
+  if (programNumber <= 95) return "pad-bandpasser";
   if (programNumber <= 103) return "lead-gaussian";
-  if (programNumber <= 111) return "nt-dry-lute";
-  if (programNumber <= 119) return "nt-glockenspiel";
+  if (programNumber <= 111) return "pluck-beach-bum";
+  if (programNumber <= 119) return "pluck-dielectric";
   if (role === "bass") return "bass-shoulder";
   if (role === "chord") return "pad-bandpasser";
   return "lead-gaussian";

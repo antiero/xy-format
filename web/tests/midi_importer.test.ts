@@ -422,17 +422,12 @@ function manyLongDistinctTracksMidi(
 }
 
 describe("MIDI new-project importer", () => {
-  it("uses Bank Select and Program Change to recommend and author a harpsichord sound", () => {
+  it("uses Bank Select and Program Change to recommend and author a factory pluck", () => {
     const baseline = new Uint8Array(readFileSync(BASELINE));
-    const donor = new Uint8Array(
-      readFileSync("../src/presets/presetprojs/nt-harpsicord.xy"),
-    );
     const result = buildMidiProjectFromBytes(
       programmedHarpsichordMidi(),
       "golden-brown.mid",
       baseline,
-      {},
-      { "nt-harpsicord": donor },
     );
     const track = result.summary.trackSelection?.tracks[0];
 
@@ -441,31 +436,40 @@ describe("MIDI new-project importer", () => {
       programName: "Harpsichord",
       bankMSB: 3,
       bankLSB: 5,
-      presetId: "nt-harpsicord",
+      presetId: "pluck-dielectric",
     });
     expect(track?.assignedOpXyTracks).toHaveLength(1);
     const opXyTrack = (track?.assignedOpXyTracks[0] ?? 0) + 1;
-    expect(trackString(result, opXyTrack, 0x453f, 48)).toBe(
-      "pluck/nt-harpsicord",
-    );
-    expect(trackString(result, opXyTrack, 0x395f, 72)).toContain(
-      "/fat32/presets/pluck/nt-harpsicord.preset/",
-    );
+    expect(trackString(result, opXyTrack, 0x453f, 48)).toBe("pluck/dielectric");
   });
 
-  it("falls back to a built-in pluck when an installed preset donor is unavailable", () => {
+  it("authors a selected factory Strings sound from its Track 8 donor", () => {
     const baseline = new Uint8Array(readFileSync(BASELINE));
+    const donor = new Uint8Array(
+      readFileSync(
+        "../src/factory-preset-captures/firmware-1.1.21/strings/ensemble.xy",
+      ),
+    );
+    const initial = buildMidiProjectFromBytes(
+      programmedHarpsichordMidi(),
+      "strings.mid",
+      baseline,
+    );
+    const trackId = initial.summary.trackSelection?.tracks[0]?.id;
+    expect(trackId).toBeDefined();
     const result = buildMidiProjectFromBytes(
       programmedHarpsichordMidi(),
-      "golden-brown.mid",
+      "strings.mid",
       baseline,
+      { presetIdsByTrack: { [trackId!]: "strings-ensemble" } },
+      { "strings-ensemble": donor },
     );
     const track = result.summary.trackSelection?.tracks[0];
 
-    expect(track?.presetId).toBe("nt-harpsicord");
+    expect(track?.presetId).toBe("strings-ensemble");
     expect(
       trackString(result, (track?.assignedOpXyTracks[0] ?? 0) + 1, 0x453f, 48),
-    ).toBe("pluck/dielectric");
+    ).toBe("strings/ensemble");
   });
 
   it("authors a one-bar MIDI as a 16-step pattern without trailing silence", () => {
