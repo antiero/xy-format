@@ -1,4 +1,4 @@
-import { copyFile, mkdir } from "node:fs/promises";
+import { copyFile, mkdir, rm } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 
@@ -8,30 +8,22 @@ const repoDirectory = path.resolve(webDirectory, "..");
 const sourceDirectory = path.join(
   repoDirectory,
   "src",
-  "presets",
-  "presetprojs",
+  "factory-preset-captures",
+  "firmware-1.1.21",
+  "strings",
 );
 const outputDirectory = path.join(webDirectory, "public", "opxy-presets");
 
 const presets = {
-  "nt-grand-piano": "nt-grand piano.xy",
-  "nt-bright-piano": "nt-bright piano.xy",
-  "nt-harpsicord": "nt-harpsicord.xy",
-  "nt-harpsi": "nt-harpsi.xy",
-  "nt-glockenspiel": "nt-glockenspiel.xy",
-  "nt-draw-organ": "nt-draw organ.xy",
-  "nt-dry-lute": "nt-dry lute.xy",
-  "nt-acoustic-bass": "nt-acoustic bass.xy",
-  "nt-cello": "nt-cello.xy",
-  "nt-coffee-strings": "nt-coffee strings.xy",
-  "nt-broken-timpani": "nt-broken timpani.xy",
-  "nt-fat-brass": "nt-fat brass.xy",
-  "nt-accord": "nt-accord.xy",
-  "nt-digital-breath": "nt-digital breath.xy",
-  "nt-broken-lead": "nt-broken lead.xy",
-  "nt-celestial": "nt-celestial.xy",
+  "strings-ensemble": "ensemble.xy",
+  "strings-intimate-str": "intimate str.xy",
+  "strings-nachtmusik": "nachtmusik.xy",
+  "strings-pointe": "pointe.xy",
+  "strings-soutenu": "soutenu.xy",
+  "strings-whitness": "whitness.xy",
 };
 
+await rm(outputDirectory, { recursive: true, force: true });
 await mkdir(outputDirectory, { recursive: true });
 await Promise.all(
   Object.entries(presets).map(([id, filename]) =>

@@ -3,11 +3,8 @@
     MidiPreviewNote,
     MidiTrackSelectionOption,
   } from "../lib/xy/midiImporter";
-  import {
-    OP_XY_FACTORY_CATEGORIES,
-    OP_XY_PRESET_CHOICES,
-    opXyFactoryTrackDescription,
-  } from "../lib/xy/opXyPresets";
+  import { opXyFactoryTrackDescription } from "../lib/xy/opXyPresets";
+  import OpXyPresetPicker from "./OpXyPresetPicker.svelte";
 
   export let track: MidiTrackSelectionOption;
   export let index: number;
@@ -34,13 +31,6 @@
         .map((trackNumber) => opXyFactoryTrackDescription(trackNumber))
         .join(" · ")
     : "Disabled — not assigned to an OP-XY track";
-
-  const presetGroups = OP_XY_FACTORY_CATEGORIES.map((category) => ({
-    category,
-    presets: OP_XY_PRESET_CHOICES.filter(
-      (preset) => preset.category === category,
-    ),
-  }));
 
   function formatDestinationLabel(trackNumbers: number[]): string {
     if (trackNumbers.length === 0) return "off";
@@ -89,10 +79,6 @@
       `top: ${top}%`,
     ].join("; ");
   }
-
-  function changePreset(event: Event) {
-    onPresetChange(track, (event.currentTarget as HTMLSelectElement).value);
-  }
 </script>
 
 <div
@@ -118,23 +104,12 @@
       title={`GM ${track.programNumber + 1}: ${track.programName} · MIDI channel ${track.channel}`}
     >
       <strong>{track.name}</strong>
-      <span class="preset-select">
-        <select
-          value={track.presetId}
-          disabled={selectionUpdating || !selected}
-          aria-label={`OP-XY sound for ${track.name}`}
-          title={`Choose the OP-XY sound for GM ${track.programNumber + 1}: ${track.programName}`}
-          on:change={changePreset}
-        >
-          {#each presetGroups as group (group.category)}
-            <optgroup label={group.category}>
-              {#each group.presets as preset (preset.id)}
-                <option value={preset.id}>{preset.label}</option>
-              {/each}
-            </optgroup>
-          {/each}
-        </select>
-      </span>
+      <OpXyPresetPicker
+        selectedId={track.presetId}
+        trackName={track.name}
+        disabled={selectionUpdating || !selected}
+        onChange={(presetId) => onPresetChange(track, presetId)}
+      />
     </span>
     <span
       class="lane-destination"
@@ -188,7 +163,7 @@
     gap: 10px;
     height: var(--track-height);
     min-height: var(--track-height);
-    padding: 6px 12px;
+    padding: 8px 12px;
     border-right: 1px solid #333;
     background: #242424;
   }
@@ -227,10 +202,10 @@
 
   .lane-title {
     display: grid;
-    grid-template-rows: 15px 19px;
+    grid-template-rows: 17px 20px;
     align-content: center;
     min-width: 0;
-    gap: 0;
+    gap: 3px;
     overflow: hidden;
   }
 
@@ -238,60 +213,9 @@
     overflow: hidden;
     font-size: 13px;
     font-weight: 650;
-    line-height: 15px;
+    line-height: 17px;
     text-overflow: ellipsis;
     white-space: nowrap;
-  }
-
-  .preset-select {
-    position: relative;
-    display: block;
-    min-width: 0;
-    height: 19px;
-  }
-
-  .preset-select::after {
-    content: "";
-    position: absolute;
-    top: 5px;
-    right: 3px;
-    width: 6px;
-    height: 6px;
-    border-right: 1px solid #858585;
-    border-bottom: 1px solid #858585;
-    pointer-events: none;
-    transform: rotate(45deg);
-  }
-
-  .preset-select:focus-within {
-    outline: 1px solid #f4f4f4;
-    outline-offset: -1px;
-  }
-
-  .lane-title select {
-    display: block;
-    min-width: 0;
-    width: 100%;
-    height: 19px;
-    border: 0;
-    padding: 0 16px 0 0;
-    -webkit-appearance: none;
-    appearance: none;
-    background: transparent;
-    color: #9a9a9a;
-    font-size: 10px;
-    line-height: 19px;
-    text-transform: uppercase;
-    text-overflow: ellipsis;
-    cursor: pointer;
-  }
-
-  .lane-title select:focus-visible {
-    outline: 0;
-  }
-
-  .lane-title select:disabled {
-    cursor: default;
   }
 
   .lane-destination {
@@ -360,16 +284,12 @@
   }
 
   .midi-lane.compact .lane-title {
-    grid-template-rows: 15px;
+    grid-template-rows: 17px;
     gap: 0;
   }
 
   .midi-lane.compact .lane-title strong {
     font-size: 12px;
-  }
-
-  .midi-lane.compact .preset-select {
-    display: none;
   }
 
   .midi-lane.compact .lane-destination {
