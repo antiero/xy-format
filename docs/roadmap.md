@@ -14,6 +14,8 @@
   full 1/2, 1, 2, 3, 4, 5, 6, 7, 8, 16 track-scale enum.
 - [x] Add coherent pattern rotation: triggers, p-lock rows, p-lock activation
   rows, and step-component rows move together in Python and XYBuddy.
+- [x] Preserve the complete track state when constructing pattern clones, so
+  OS 1.1.25's inherited player type and still-opaque player bytes are retained.
 - [x] Restore the Pattern workspace to XYBuddy's current project navigation so
   note editing, odd-scale selection, and coherent rotation are reachable.
 - [x] Add generated-project preflight for layout, note/pattern limits, engine

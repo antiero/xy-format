@@ -4,7 +4,10 @@ import {
   applyEdit,
   buildProjectViewModel,
 } from "../src/lib/xy/projectViewModel";
-import { ImageProject } from "../src/lib/xy/image_writer";
+import {
+  buildArrangementFromBytes,
+  ImageProject,
+} from "../src/lib/xy/image_writer";
 import { exportXYProjectBytes } from "../src/lib/xy/projectExporter";
 import { loadXYBytes } from "../src/lib/xy/projectLoader";
 
@@ -249,5 +252,24 @@ describe("project view model and edit bridge", () => {
     expect(
       imageProject.image.slice(base + 0x3057 + 4 * 16, base + 0x3057 + 5 * 16),
     ).toEqual(inactiveBefore);
+  });
+
+  it("preserves opaque player state when constructing pattern clones", () => {
+    const baseline = ImageProject.fromBytes(
+      new Uint8Array(readFileSync(BASELINE)),
+    );
+    const opaqueOffset = 0x0100;
+    baseline.image[baseline.trackPatternStart(1, 0) + opaqueOffset] = 0x5a;
+
+    const arranged = buildArrangementFromBytes(baseline.toBytes(), {
+      1: [[], []],
+    });
+    const reloaded = ImageProject.fromBytes(arranged);
+    expect(
+      reloaded.image[reloaded.trackPatternStart(1, 0) + opaqueOffset],
+    ).toBe(0x5a);
+    expect(
+      reloaded.image[reloaded.trackPatternStart(1, 1) + opaqueOffset],
+    ).toBe(0x5a);
   });
 });

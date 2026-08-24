@@ -188,6 +188,21 @@ def test_build_arrangement_accepts_explicit_pattern_steps():
     assert img[t3 + 0x01] == 24
 
 
+def test_cloned_patterns_preserve_opaque_track_state_for_player_inheritance(
+    tmp_path,
+):
+    baseline = ImageProject.from_file(BASE)
+    opaque_offset = 0x0100
+    baseline.image[baseline.pattern_start(1) + opaque_offset] = 0x5A
+    baseline_path = tmp_path / "player-state-baseline.xy"
+    baseline.save(str(baseline_path))
+
+    arranged = build_arrangement(str(baseline_path), {1: [[], []]})
+    reloaded = ImageProject.from_bytes(arranged)
+    assert reloaded.image[reloaded.pattern_start(1, 1) + opaque_offset] == 0x5A
+    assert reloaded.image[reloaded.pattern_start(1, 2) + opaque_offset] == 0x5A
+
+
 def test_set_preset_matches_device_kit_load():
     """u116's T4/T7/T8 = boop kit loaded + one C4: our donor-copy must match
     the device byte-for-byte except known UI-session fields."""

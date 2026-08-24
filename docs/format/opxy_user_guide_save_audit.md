@@ -15,6 +15,11 @@
 > state that should persist, but this repo has not actually pinned where it is
 > saved.
 
+OS 1.1.25 makes newly created patterns inherit the current player type. The
+decoded-image arrangement writers clone the complete source pattern struct and
+only replace explicitly authored fields, so that player state remains intact
+even before its individual offsets are labelled.
+
 ## Scope
 
 The guide's workflow chapter is the best persistence summary. On OS 1.1.15 and
