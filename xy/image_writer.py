@@ -19,6 +19,13 @@ from xy.rle import decode_project, encode_project
 SIG_RE = re.compile(rb"\x00\x00\x00[\x00-\x10]\xff\x00\xfc\x00", re.S)
 
 TRACK_BASE0 = 0x0D79
+TRACK_BASE_BY_FIRMWARE = {
+    0x0E: 3933,
+    0x0F: 3933,
+    0x10: 3433,
+    0x11: 3433,
+    0x13: 3449,
+}
 TRACK_STRIDE = 17876
 TRACK_COUNT = 16
 MAX_PATTERNS_PER_TRACK = 16
@@ -38,6 +45,14 @@ OFF_NOTE_COUNT = 0x456F
 NOTE_SIZE = 12
 
 STEP_TICKS = 480
+
+
+def track_base_from_header(header: bytes) -> int:
+    """Return the decoded Track 1 offset for a known firmware family."""
+
+    if len(header) < 6:
+        return TRACK_BASE0
+    return TRACK_BASE_BY_FIRMWARE.get(header[5], TRACK_BASE0)
 
 
 def _has_plausible_pattern_header(
@@ -71,22 +86,25 @@ def _scan_pattern_headers(image: bytes | bytearray, *, leader_only: bool) -> lis
     ]
 
 
-def pattern_starts_from_image(image: bytes | bytearray) -> list[int]:
+def pattern_starts_from_image(
+    image: bytes | bytearray, track_base: int = TRACK_BASE0
+) -> list[int]:
     """Return decoded-image starts for every physical pattern struct.
 
     Track discovery used to key off bytes inside the Bar region. Those bytes
     are legitimate user state, so authored Bar edits can erase the signature.
     The decoded image normally has a stable leader layout, but captures can
     shift the first track earlier/later with corresponding global rows. Prefer
-    validated pattern headers, then fall back to the canonical base/stride.
+    validated pattern headers, then fall back to the firmware-family base and
+    ordinary struct/vector layout.
     """
 
-    by_track = pattern_starts_by_track_from_image(image)
+    by_track = pattern_starts_by_track_from_image(image, track_base)
     if by_track:
         return [start for starts in by_track for start in starts]
 
     starts: list[int] = []
-    pos = TRACK_BASE0
+    pos = track_base
     for _ in range(TRACK_COUNT):
         if pos < 0 or pos + TRACK_STRIDE > len(image):
             return []
@@ -112,10 +130,12 @@ def pattern_starts_from_image(image: bytes | bytearray) -> list[int]:
     return starts
 
 
-def pattern_starts_by_track_from_image(image: bytes | bytearray) -> list[list[int]]:
+def pattern_starts_by_track_from_image(
+    image: bytes | bytearray, track_base: int = TRACK_BASE0
+) -> list[list[int]]:
     """Return decoded-image physical pattern starts grouped by logical track."""
 
-    leaders = leader_starts_from_image(image)
+    leaders = leader_starts_from_image(image, track_base)
     if len(leaders) == TRACK_COUNT:
         physical_starts = _scan_pattern_headers(image, leader_only=False)
         track_patterns: list[list[int]] = []
@@ -130,7 +150,7 @@ def pattern_starts_by_track_from_image(image: bytes | bytearray) -> list[list[in
         return track_patterns
 
     track_patterns: list[list[int]] = []
-    pos = TRACK_BASE0
+    pos = track_base
     for _ in range(TRACK_COUNT):
         pattern_starts: list[int] = []
         if pos < 0 or pos + TRACK_STRIDE > len(image):
@@ -158,7 +178,9 @@ def pattern_starts_by_track_from_image(image: bytes | bytearray) -> list[list[in
     return track_patterns
 
 
-def leader_starts_from_image(image: bytes | bytearray) -> list[int]:
+def leader_starts_from_image(
+    image: bytes | bytearray, track_base: int = TRACK_BASE0
+) -> list[int]:
     """Return the 16 decoded-image logical track leader starts."""
 
     scanned = _scan_pattern_headers(image, leader_only=True)
@@ -166,7 +188,7 @@ def leader_starts_from_image(image: bytes | bytearray) -> list[int]:
         return scanned
 
     leaders: list[int] = []
-    pos = TRACK_BASE0
+    pos = track_base
     for _ in range(TRACK_COUNT):
         if pos < 0 or pos + TRACK_STRIDE > len(image):
             return []
@@ -214,14 +236,18 @@ class ImageProject:
         return p
 
     def _rescan(self) -> None:
-        starts = leader_starts_from_image(self.image)
+        starts = leader_starts_from_image(
+            self.image, track_base_from_header(self.header)
+        )
         if starts:
             self._starts = starts
             self._scene_slot0 = max(0, starts[0] - TRACK_TO_SCENE_SLOT_DELTA)
         else:
             self._starts = [m.start() - 3 for m in SIG_RE.finditer(self.image)]
             self._scene_slot0 = SCENE_SLOT0
-        self._pattern_starts = pattern_starts_by_track_from_image(self.image)
+        self._pattern_starts = pattern_starts_by_track_from_image(
+            self.image, track_base_from_header(self.header)
+        )
 
     @property
     def scene_slot0(self) -> int:
@@ -239,7 +265,7 @@ class ImageProject:
         if not 1 <= pattern <= MAX_PATTERNS_PER_TRACK:
             raise ValueError(f"pattern must be 1..{MAX_PATTERNS_PER_TRACK}")
         starts_by_track = self._pattern_starts or pattern_starts_by_track_from_image(
-            self.image
+            self.image, track_base_from_header(self.header)
         )
         if not starts_by_track:
             raise ValueError("could not locate pattern structs")
@@ -343,7 +369,7 @@ class ImageProject:
         if count >= 120:
             raise ValueError("pattern note limit reached")
         rec = (
-            tick.to_bytes(4, "little")
+            tick.to_bytes(4, "little", signed=True)
             + gate.to_bytes(4, "little")
             + bytes([note & 0x7F, velocity & 0x7F, 0, 0])
         )
@@ -1601,8 +1627,10 @@ class ImageProject:
         """Copy instrument identity (engine, params, samples, preset string,
         trailer) from a donor file's track. Donor track must be a pristine
         17,876-byte leader struct (no events)."""
-        _, dimg = decode_project(open(donor_path, "rb").read())
-        dstarts = leader_starts_from_image(dimg)
+        donor_header, dimg = decode_project(open(donor_path, "rb").read())
+        dstarts = leader_starts_from_image(
+            dimg, track_base_from_header(donor_header)
+        )
         if not dstarts:
             dstarts = [m.start() - 3 for m in SIG_RE.finditer(dimg)]
         ds = dstarts[donor_track - 1]
@@ -1678,7 +1706,8 @@ def _pattern_struct(base_struct: bytes, pattern) -> bytes:
             raise ValueError("pattern note limit exceeded")
         tick = (n["step"] - 1) * STEP_TICKS + n.get("tick_offset", 0)
         gate = n.get("gate_ticks", 240)
-        recs += tick.to_bytes(4, "little") + gate.to_bytes(4, "little")
+        recs += tick.to_bytes(4, "little", signed=True)
+        recs += gate.to_bytes(4, "little")
         recs += bytes([n["note"] & 0x7F, n.get("velocity", 100) & 0x7F, 0, 0])
     st[cpos] = len(recs) // NOTE_SIZE
     st[cpos + 1 : cpos + 1] = recs
@@ -1714,7 +1743,7 @@ def build_arrangement(
         all-P1/unmuted row whose bytes are otherwise identical to a blank row.
     """
     header, base = decode_project(open(base_path, "rb").read())
-    starts = leader_starts_from_image(base)
+    starts = leader_starts_from_image(base, track_base_from_header(header))
     if not starts:
         starts = [m.start() - 3 for m in SIG_RE.finditer(base)]
     scene_slot0 = max(0, starts[0] - TRACK_TO_SCENE_SLOT_DELTA)

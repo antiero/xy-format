@@ -20,7 +20,7 @@ note==velocity "firmware bug" (an unescaped RLE pair — write `[n][n][00]`),
 record tail bytes (zero-fill ext of each struct's fixed trailing region),
 and the pre-track scene "tags" (trailing zero-run ext inside 33-byte
 records). The RAM-side note struct is 12 bytes
-(`u32 tick; u32 gate; u8 note; u8 vel; u8 ×2`).
+(`i32 tick; u32 gate; u8 note; u8 vel; u8 ×2`).
 
 Performance automation decodes under the same rule:
 `[first_lane u8]` then consecutive lanes
@@ -146,15 +146,25 @@ equal-pair shift the stream and crash the loader.
 
 ## 5. Song Table (file footer, after Track 16)
 
-The file ends with a **14-slot song table** (= the documented 14-song
-limit), located after the last `ff 00 00 … 9b` run at the end of Track
-16's content:
+On firmware `0x11`/`0x13`, the file ends with a **14-slot song table**
+(= the documented 14-song limit). Slots are variable-length and the table
+runs exactly to EOF:
 
 ```
 song_slot := [scene_count u8][scene_idx u8 × count (0-based)][loop u8][reserved 00]
 default      01 00 00 00      (1 entry: scene 1, loop on)
 loop := 00 = loop ON | 01 = loop OFF
+empty        00 00 00         (zero scenes, loop on, reserved zero)
 ```
+
+The last two bytes were previously described as a little-endian loop word.
+Device A/B captures isolate the first as the loop enum (`00` on, `01` off)
+and the second as a preserved zero byte. The baseline uses the one-scene
+`default` form; zero-scene slots are also structurally representable.
+
+Older firmware uses different fixed baselines (`0x10`: 2-byte slots,
+28 bytes total; `0x0E`: 5-byte slots, 50 bytes total). Do not locate the
+footer by subtracting 56 bytes unconditionally.
 
 Device-verified A/B: `unnamed 150 nl` (Song 1 loop off) = `01 00 01 00`;
 `unnamed 150 lp` (loop back on) = byte-identical to baseline.

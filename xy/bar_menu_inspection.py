@@ -130,6 +130,8 @@ def read_track_bar_menu(project: ImageProject, track: int) -> TrackBarMenu:
     if not 1 <= track <= 16:
         raise ValueError("track must be 1..16")
     image = project.image
+    # These fields overlap the former leader-signature window, so use the
+    # decoded-image locator rather than searching for signature bytes.
     base = project.track_start(track)
     return TrackBarMenu(
         track=track,

@@ -26,10 +26,10 @@ The project body is one RLE stream:
 The baseline decoded image layout is:
 
 ```text
-global header      3,449 bytes
+global header      firmware-dependent (3,433 / 3,449 / 3,933 bytes observed)
 track structs      16 logical tracks, 17,876 bytes each before vector growth
 clone structs      inserted for extra patterns
-footer             56-byte song table
+footer             firmware-dependent variable-length song table
 ```
 
 That reframes the old raw-byte model:

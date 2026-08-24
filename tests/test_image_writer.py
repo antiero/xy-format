@@ -12,7 +12,7 @@ from pathlib import Path
 import pytest
 
 from xy.image_writer import OFF_NOTE_COUNT, ImageProject, build_arrangement
-from xy.rle import decode_project
+from xy.rle import decode_project, encode_project
 
 BASE = "src/one-off-changes-from-default/unnamed 1.xy"
 SIG_RE = re.compile(rb"\x00\x00\x00[\x00-\x10]\xff\x00\xfc\x00", re.S)
@@ -72,6 +72,30 @@ def test_decoded_track_scanner_accounts_for_inserted_note_records():
     assert reloaded.track_start(2) == t2 + 12
 
 
+@pytest.mark.parametrize(
+    "firmware_byte,track_base",
+    [(0x0E, 3933), (0x0F, 3933), (0x10, 3433), (0x11, 3433), (0x13, 3449)],
+)
+def test_track_scanner_uses_firmware_dependent_global_header_size(
+    firmware_byte: int, track_base: int
+) -> None:
+    header, image = decode_project(real("unnamed 1.xy"))
+    original_base = 3449
+    resized = image[:track_base] + image[original_base:]
+    if track_base > original_base:
+        resized = (
+            image[:original_base]
+            + bytes(track_base - original_base)
+            + image[original_base:]
+        )
+    versioned_header = header[:5] + bytes([firmware_byte]) + header[6:]
+
+    project = ImageProject.from_bytes(encode_project(versioned_header, resized))
+
+    assert project.track_start(1) == track_base
+    assert project.track_start(2) == track_base + 17876
+
+
 def test_replicates_unnamed_81_single_note_step9():
     out = build(lambda p: p.add_note(1, step=9, note=60))
     assert out == real("unnamed 81.xy")
@@ -119,6 +143,16 @@ def test_note_limit_enforced():
         p.add_note(1, tick=i * 10, note=60)
     with pytest.raises(ValueError):
         p.add_note(1, tick=2000, note=61)
+
+
+def test_negative_pickup_tick_round_trips_as_signed_i32():
+    p = ImageProject.from_file(BASE)
+    p.add_note(9, tick=-129, note=60)
+    reloaded = ImageProject.from_bytes(p.to_bytes())
+    start = reloaded.track_start(9) + 0x456F + 1
+    assert int.from_bytes(
+        reloaded.image[start : start + 4], "little", signed=True
+    ) == -129
 
 
 def test_build_arrangement_replicates_j05():

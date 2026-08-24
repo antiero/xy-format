@@ -38,10 +38,10 @@ track pattern structs, scene rows, mute rows, and the Song 1 footer table.
 The baseline decoded image is:
 
 ```text
-global header      3,449 bytes
-track structs      16 logical tracks, 17,876 bytes each before note/vector growth
+global header      firmware-dependent: 3,433 / 3,449 / 3,933 bytes observed
+track structs      16 logical tracks, each with a 17,876-byte base
 clone structs      inserted after a leader when a track has extra patterns
-footer             song table
+footer             firmware-dependent song table running to EOF
 ```
 
 Important examples:
@@ -51,7 +51,10 @@ Important examples:
 - Each track struct has pattern length, engine state, sound-state blocks,
   step components, p-locks, drum/sample regions, and the note vector.
 - Notes are fixed 12-byte records:
-  `u32 tick; u32 gate; u8 note; u8 velocity; u8 flags[2]`.
+  `i32 tick; u32 gate; u8 note; u8 velocity; u8 flags[2]`. Negative ticks
+  represent pickup notes, and live takes may use arbitrary flag-byte values.
+- Live recording can append automation data after a pattern's ordinary base
+  and note vector. Do not walk real-world files with a fixed stride.
 - Step components are fixed decoded-image per-step slots.
 - P-locks are a decoded-image table, not variable raw-byte entries.
 - Scenes are 33-byte rows: pattern selections, mute values, and a present flag.

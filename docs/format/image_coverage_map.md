@@ -23,8 +23,10 @@ unless noted.
 | **ui** | Known to change with UI session — imitate from captures, don't derive |
 | **?** | No stable map — good probe target |
 
-**Track-relative** offsets below are `+` from each track struct base.
-Track `k` base = `0x0D79 + k × 0x45D4` (`k` = 0…15 → T1…T16).
+**Track-relative** offsets below are `+` from each pattern struct base.
+Track 1's base depends on container header byte 5 (`0x0E/0x0F`: 3,933;
+`0x10/0x11`: 3,433; `0x13`: 3,449). Later boundaries must account for
+note vectors and live-automation growth.
 
 ---
 
@@ -40,9 +42,9 @@ block-beta
   end
   block:image["Decoded RAM image — 289,521 B"]
     columns 1
-    g["Global 0x0000–0x0D78 (3,449 B)"]
-    t["Track structs ×16 @ 0x0D79 + k·0x45D4 (17,876 B each)"]
-    f["Footer last 56 B — song table"]
+    g["Firmware-dependent global header"]
+    t["Track/pattern structs (17,876 B base plus growth)"]
+    f["Firmware-dependent song table to EOF"]
   end
 ```
 
@@ -58,8 +60,9 @@ block-beta
 0x046AF0  └─────────────────────────────────────┘  (= 289,521)
 ```
 
-`unnamed 1.xy` measured: T1 @ `0x0D79`, stride `0x45D4`, footer **56** B
-(`0x46AEC`–`0x46AF0`). Older notes say 53 B — treat footer size as **[~]**.
+The diagram shows the `unnamed 1.xy` baseline. Its T1 is at `0x0D79`, its
+ordinary zero-note pattern base is `0x45D4`, and its footer occupies 56 bytes.
+Those numbers are not universal across firmware or live-recorded projects.
 
 ---
 
@@ -188,13 +191,13 @@ track unless noted.
 
 ---
 
-## 3. Footer (last 56 bytes in `unnamed 1.xy`)
+## 3. Footer (firmware-dependent; runs to EOF)
 
 | Region | Status | Field |
 | --- | --- | --- |
 | Song slots ×14 | **x** | `[scene_count][scene_ids…][loop][reserved 00]`; Python and XYBuddy read/write every slot |
 | Expanded multi-scene tail byte | **?** | Extra byte on some song edits — `record_structure.md` §5 |
-| Footer size | **~** | Baseline image has **56** B after T16; `record_structure.md` cites **53** B |
+| Footer size | **~** | `0x11`/`0x13` use variable slots; older firmware families use different layouts |
 
 ---
 
@@ -208,7 +211,7 @@ Counts are **order-of-magnitude** for planning, not exact byte percentages.
 | Global scene/pre-track | ~3.3 KB | **~** | Slot *structure* known; full flat layout open |
 | Per-track pinned | ~4 KB × 16 | **~** | Large preset blobs copied, not itemized |
 | Per-track unknown middle | ~10 KB × 16 | **?** | Between known anchors |
-| Footer | 56 B | **~** | Song chain partial; size vs older 53 B note |
+| Footer | variable | **~** | Depends on firmware family and scene counts |
 
 **Bottom line:** container + notes + plocks + stepcomps + drum table + static
 mixer + master EQ/sat + scene mutes are in good shape. The biggest dark areas
@@ -281,6 +284,6 @@ Audited 2026-06-12 against the format doc set. **Trust order** for offsets:
 | Static mixer / master | P2-A offsets | Same audit file mix rows — **updated** |
 | EQ / saturator | P2-F / P2-G | Audit saturator row — **updated** |
 | Master compressor | `global+0x90` P2-A | `parse_capability_checklist.md` §11 had duplicate “gap” line — **removed** |
-| Footer size | 56 B in baseline | `record_structure.md` / `decoded_image_map.md` say 53 B — reconcile on next song-table probe |
+| Footer size | Firmware-dependent, ending at EOF | Fixed 53/56-byte assumptions are obsolete |
 
-*Last updated: 2026-06-15 (aux probe sync + coverage status refresh).*
+*Last updated: 2026-07-09 (real-device corpus findings from issue #19).*

@@ -10,18 +10,20 @@ offsets. Track offsets are relative to the start of a detected track struct.
 
 ## Baseline Image Shape
 
-The baseline single-pattern project has this decoded shape:
+The firmware `0x13` baseline single-pattern project has this decoded shape:
 
 | Range | Length | Status | Contents |
 | --- | ---: | --- | --- |
 | `0x00000..0x00D78` | 3,449 | partial | Global project header, MIDI channels, EQ, scene records. |
 | `0x00D79 + n*0x45D4` | 17,876 each | partial | Sixteen track/pattern structs in the baseline image. |
-| `end-53..end-1` | 53 | decoded | Song table footer. |
+| final 56 bytes | 56 | partial | Baseline song table; footer layout is firmware-dependent. |
 
-Adding a pattern inserts another `0x45D4` track/pattern struct in decoded
-space. Adding notes grows the note vector in the relevant struct by 12 bytes per
-note. That means all spatial analysis must use decoded bytes and track
-boundaries, not raw RLE byte positions.
+Track 1 begins at 3,933 bytes for header byte `0x0E/0x0F`, 3,433 for
+`0x10/0x11`, and 3,449 for `0x13`. Adding an ordinary pattern inserts another
+`0x45D4`-byte base and adding notes grows its vector by 12 bytes per note.
+Live recording can append more automation data per pattern. Spatial analysis
+must therefore use decoded bytes and validated boundaries, not raw RLE
+positions or a universal fixed stride.
 
 ## Global Header
 
