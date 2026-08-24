@@ -52,8 +52,9 @@ Ordered by the amount of authoring capability each capture unlocks:
    and zone count. Retest global transpose because OS 1.1.25 changed its
    interaction with multisamples.
 3. **Instrument labels/enums** — complete LFO subfunctions, mod-routing target
-   IDs and signed scaling, play mode, portamento type, bend range, and preset
-   transpose/tuning/width labels.
+   IDs and signed scaling, play-mode/portamento/bend labels, plus preset
+   transpose and the 12-note user-tuning table. Tuning slot/root/width and the
+   raw modulation lanes are already readable and writable.
 4. **Auxiliary details** — finish External MIDI CC slot enable/number/value,
    Punch-in key map, FX schemas, and the remaining Brain/Tape/External Audio
    labels. Raw locations and safe setters already cover the confirmed fields.

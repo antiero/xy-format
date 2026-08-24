@@ -43,6 +43,7 @@ fields. Heuristic reads must say so and stay `[~]` until structural decode exist
 | `xy/sampler_sample_inspection.py` | `test_sampler_sample_inspection.py` | `2026-06-12_sampler_oneshot_inspection.md` | `2026-06-oneshot/` |
 | `xy/project_config_inspection.py` | `test_project_config_inspection.py` | `2026-06-13_project_config_inspection.md`, `2026-06-13_global_header_inspection.md` | `2026-06-project-config/`, `2026-06-global-header/` |
 | `xy/bar_menu_inspection.py` | `test_bar_menu_inspection.py` | `2026-06-13_bar_menu_inspection.md`, `2026-06-14_bar_length_inspection.md` | `2026-06-bar-menu/`, `2026-06-bar-length/` |
+| `xy/patch_sound_state.py` | `test_sampler_project_state.py`, `test_patch_json.py` | `2026-06-15_sampler_project_state.md`, `2026-06-16_preset_corpus_analysis.md` | `sampler-project-state/2026-06-15/`, `presets/` |
 
 Contributor workflow: `docs/workflows/contributor_inspection_workflow.md`.
 
@@ -171,13 +172,21 @@ Field offsets: `docs/format/decoded_image_map.md`.
   `tests/test_preset_path_structural.py`, `src/preset-probes/2026-06-preset-path/`
 - [x] Preset path **write** @ `+0x453F` — `ImageProject.set_preset_path`,
   fixed-field bounds/null-padding regression in `tests/test_image_writer.py`
-- [~] Play mode poly/mono/legato current value — partial
-- [~] Portamento amount/type, bend range — partial
-- [~] Preset volume / engine volume current value — partial
-- [~] LFO type and M4 subfunctions — partial, `+0x38B7`, mod matrix `+0x38FF`
+- [~] Play mode current value — raw lane at `+0x3887`; `poly`/`mono` patch.json
+  words confirmed, `legato` and UI scaling still need a focused capture
+- [~] Portamento amount/type and bend range — q16 read/write at
+  `+0x388B/+0x391B/+0x388F`; UI labels/scaling remain partial
+- [x] Preset volume / engine volume current value — q16 read/write at `+0x3893`
+- [~] LFO type and M4 subfunctions — four patch.json type bytes plus eight q16
+  params read/write; complete per-type UI labels remain partial
 - [x] Preset settings: high-pass, velocity sensitivity — decoded map
-- [ ] Preset settings: tuning, root, transpose, width — gap
-- [ ] Mod-routing destination enum + signed scaling — gap
+- [x] Preset settings: tuning slot, root, width — q16 read/write at
+  `+0x391F/+0x392B/+0x3923`; unique device-loaded sampler fixture plus
+  139-preset paired corpus
+- [ ] Preset transpose and 12-note user tuning table — transpose lane candidate
+  at `+0x3927`, encoding and tuning table unresolved
+- [~] Mod-routing target/amount lanes — q16 read/write at `+0x38FF..+0x3937`;
+  destination labels and signed UI scaling remain unresolved
 - [—] User `.preset` file format classified as a separate filesystem format,
   outside `.xy`; project files preserve/reference preset identity
 
@@ -524,8 +533,8 @@ filtering, and M4 LFO modulation.
 - [x] Spec → image compiler — `tools/spec_to_xy_image.py`, `tests/test_midi_to_xy_json_selection.py`
 - [x] Corpus index/lab — `tools/corpus_lab.py`
 - [x] Round-trip verify — `tools/roundtrip_xy.py`
-- [x] Inspector CLI — presets, paths, drums, sampler, mixer, scenes, all 14 song
-  footers, EQ, saturator, p-lock lanes, project config —
+- [x] Inspector CLI — presets, paths, patch sound state, drums, sampler, mixer,
+  scenes, all 14 song footers, EQ, saturator, p-lock lanes, project config —
   `tools/inspect_xy.py`, `docs/tools/inspect_xy.md`
 
 ## 15. Outside project `.xy`

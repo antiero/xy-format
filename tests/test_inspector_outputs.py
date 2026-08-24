@@ -19,6 +19,13 @@ MIXER_PROBES = ROOT / "src" / "mixer-probes" / "2026-06-static"
 SCENE_VOLUME_PROBES = ROOT / "src" / "scene-probes" / "2026-06-volumes"
 PROJECT_CONFIG_PROBES = ROOT / "src" / "project-config-probes" / "2026-06-project-config"
 SONG_FIXTURE = DATA_DIR / "unnamed 155.xy"
+PATCH_SOUND_FIXTURE = (
+    ROOT
+    / "src"
+    / "sampler-project-state"
+    / "2026-06-15"
+    / "smp07_t7_unique_sampler_preset_loaded.xy"
+)
 
 
 def _label_to_filename(label: str) -> Path:
@@ -106,6 +113,25 @@ def test_inspector_reports_all_song_footer_slots_and_nondefault_chain():
     assert len(song_lines) == 14
     assert "Song 02: scenes=1→2→3 loop=on raw=0x00 reserved=0x00" in output
     assert "Song 14: scenes=1 loop=on raw=0x00 reserved=0x00" in output
+
+
+def test_inspector_reports_confirmed_patch_sound_state_lanes():
+    code, output, err = _run_inspector(PATCH_SOUND_FIXTURE)
+
+    assert code == 0, err
+    assert "[Patch Sound State]" in output
+    assert (
+        "T07 engine=0x02 playmode_raw=0x15555555 "
+        "portamento=2560 bend=4096 volume=29696"
+    ) in output
+    assert (
+        "settings velocity=26624 portamento_type=30720 "
+        "tuning_scale=0 width=22528 tuning_root=0 highpass=29184"
+    ) in output
+    assert (
+        "modulation mw=4096/10240 aftertouch=2048/6144 "
+        "pitchbend=8192/14336 velocity=12288/18432"
+    ) in output
 
 
 @pytest.mark.parametrize("case", ALL_CASES, ids=lambda case: case["label"])

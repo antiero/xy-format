@@ -53,6 +53,7 @@ from xy.song_footer_inspection import inspect_song_footer  # noqa: E402
 from xy.preset_path_inspection import inspect_preset_paths_bytes  # noqa: E402
 from xy.project_config_inspection import inspect_project_config_bytes  # noqa: E402
 from xy.project_inspection import inspect_project_bytes  # noqa: E402
+from xy.patch_sound_state import read_patch_sound_state  # noqa: E402
 from xy.structs import (  # noqa: E402
     SENTINEL_BYTES,
     STEP_TICKS,
@@ -1948,6 +1949,36 @@ def generate_report(path: Path, data: bytes) -> str:
         lines.append(f"  voices {voice_s}")
         lines.append(f"  midi {midi_s}")
         lines.append("")
+
+    if scene_project is not None:
+        patch_states = []
+        for track in range(1, 9):
+            try:
+                patch_states.append(read_patch_sound_state(scene_project, track))
+            except (IndexError, ValueError):
+                continue
+        if patch_states:
+            lines.append("[Patch Sound State]")
+            for state in patch_states:
+                lines.append(
+                    f"  T{state.track:02d} engine=0x{state.engine_id:02X} "
+                    f"playmode_raw=0x{state.playmode_raw:08X} "
+                    f"portamento={state.portamento_amount} bend={state.bendrange} "
+                    f"volume={state.volume}"
+                )
+                lines.append(
+                    f"    settings velocity={state.velocity_sensitivity} "
+                    f"portamento_type={state.portamento_type} "
+                    f"tuning_scale={state.tuning_scale} width={state.width} "
+                    f"tuning_root={state.tuning_root} highpass={state.highpass}"
+                )
+                lines.append(
+                    f"    modulation mw={state.modwheel_target}/{state.modwheel_amount} "
+                    f"aftertouch={state.aftertouch_target}/{state.aftertouch_amount} "
+                    f"pitchbend={state.pitchbend_target}/{state.pitchbend_amount} "
+                    f"velocity={state.velocity_target}/{state.velocity_amount}"
+                )
+            lines.append("")
 
     try:
         bar_menu = inspect_bar_menu_bytes(data, tracks=1)

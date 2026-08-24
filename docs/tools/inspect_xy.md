@@ -23,6 +23,9 @@
 - Project config: transpose, scene length, time signature, groove type/amount,
   click volume, active scene/song, T1-T8 voice allocation, T1-T16 MIDI channels
   (`xy/project_config_inspection.py`).
+- Patch sound state for T1-T8: raw play mode, portamento, bend range, volume,
+  tuning slot/root/width, high-pass, velocity sensitivity, and modulation
+  target/amount lanes (`xy/patch_sound_state.py`).
 - Bar menu: pattern steps/bars/final bar, default step length, quant raw byte,
   track groove index/UI value, and p-lock shape raw byte (`xy/bar_menu_inspection.py`).
 - P-lock lane summary for standard and known T10 9-byte p-lock headers.

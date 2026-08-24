@@ -141,7 +141,7 @@ Guide refs: section 14.1 p.42; section 14.2 p.43; section 14.3 p.44; section 14.
 | Amp envelope | Attack/decay/sustain/release. | Decoded at track `+0x3877`, 16-byte ADSR block. |
 | Filter envelope | Attack/decay/sustain/release. | Decoded at track `+0x38D7`, 16-byte ADSR block. |
 | Play mode | Poly/mono/legato. | Partial. P-lock/current lane pinned at track `+0x3887` from `unnamed 122` CC28; exact enum labels still need a direct UI capture. |
-| Portamento amount/type | Glide amount and preset-settings type. | Partial. Current lane pinned at track `+0x388B` from `unnamed 122` CC29; portamento type remains unmapped. |
+| Portamento amount/type | Glide amount and preset-settings type. | Raw q16 read/write mapped at track `+0x388B/+0x391B`; UI labels/scaling remain partial. |
 | Bend range | Pitch-bend range. | Partial. Current lane pinned at track `+0x388F` from `unnamed 122` CC30; scaling/enum still needs UI confirmation. |
 | Preset volume / engine volume | Per-preset volume separate from track volume. | Partial. Current lane pinned at track `+0x3893` from `unnamed 122` CC31; scale follows the 0..0x7FFFFFFF fixed-point family. |
 | Filter type/on-off | SVF/ladder and filter enabled. | Decoded at track `+0x21` and `+0x25`; complete type enum still needs names beyond observed values. |
@@ -151,8 +151,8 @@ Guide refs: section 14.1 p.42; section 14.2 p.43; section 14.3 p.44; section 14.
 | LFO params | Source/rate, amount, destination, parameter, shape/envelope/subfunctions. | Partial. M4 values live at track `+0x38B7`; CC40/CC41 lanes are pinned at `+0x38B7/+0x38BB` from `unnamed 124`. Shape/type-specific state is likely near `+0x38D3..+0x38D6`, but enum labels remain incomplete. |
 | Preset settings: high pass | Basic high-pass. | Decoded at track `+0x392F`. |
 | Preset settings: velocity sensitivity | Velocity sensitivity. | Decoded at track `+0x3917`. |
-| Preset settings: tuning, tuning root, transpose, width | Microtonal/user tuning slot, root, transpose, stereo width. | Gap/partial. These settings are guide-visible but not mapped to stable fields. |
-| Preset modulation settings | Modwheel/aftertouch/pitchbend/velocity target and amount. | Partial. Region decoded at track `+0x38FF-0x393B`; exact destination IDs and scaling still in progress. |
+| Preset settings: tuning, tuning root, transpose, width | Microtonal/user tuning slot, root, transpose, stereo width. | Tuning slot/root/width are q16 read/write at `+0x391F/+0x392B/+0x3923`. Transpose has a candidate lane at `+0x3927`, but its encoding and the 12-note user tuning table remain unresolved. |
+| Preset modulation settings | Modwheel/aftertouch/pitchbend/velocity target and amount. | Raw target/amount q16 lanes are read/write at track `+0x38FF-0x3937`; exact destination labels and signed UI scaling remain partial. |
 | User preset rename/save/delete | `.preset`/preset library changes. | Outside the project `.xy` unless loaded/copied into a track. User preset file format is not decoded in this audit. |
 
 ### Auxiliary Tracks
