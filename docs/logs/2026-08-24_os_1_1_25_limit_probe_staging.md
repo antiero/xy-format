@@ -18,3 +18,12 @@ project. A new download of each MTP object matched its local SHA-256 exactly:
 This proves current-firmware MTP compatibility and transfer integrity only.
 The roadmap boxes remain open until an operator selects the last scene/song
 entry or pattern and observes the 120-note project load/play on the device.
+
+## Production XYBuddy check
+
+After commit `a358dcc` deployed successfully, a headed browser session loaded
+the device-authored `unnamed 155.xy` fixture from `https://xybuddy.xyz/`.
+Song Mode showed Song 1's one-scene chain; **Next Song** selected Song 2 and
+showed the captured `1 → 2 → 3` chain. The browser console reported zero errors
+and zero warnings. This covers the deployed reader and song navigation; the
+MTP hashes above cover the native helper/device boundary.
