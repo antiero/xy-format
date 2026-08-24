@@ -20,7 +20,7 @@
   note editing, odd-scale selection, and coherent rotation are reachable.
 - [x] Add generated-project preflight for layout, note/pattern limits, engine
   and preset identity, scene references, sample paths/windows, mapped drum
-  slots, known scale bytes, and metronome-off output.
+  slots, known scale bytes, all 14 song footers, and metronome-off output.
 - [x] Rebuild XYBuddy with the current web bundle, run its full Swift tests and
   universal Release build, then repeat a live MTP upload/download/delete test.
 - [x] Parse and rewrite all 14 serialized song slots in XYBuddy, with compact

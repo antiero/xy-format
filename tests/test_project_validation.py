@@ -67,3 +67,34 @@ def test_scene_cannot_select_a_pattern_that_is_not_present() -> None:
     report = validate_project(project)
     assert "scene-pattern-missing" in _codes(report)
     assert not report.ok
+
+
+def test_song_footer_rejects_invalid_scene_loop_and_slot_layout() -> None:
+    project = ImageProject.from_file(BASE)
+    song1 = project._song_slot_offset(1)
+    project.image[song1 + 1] = 99
+    project.image[song1 + 2] = 2
+    project.image[song1 + 3] = 0x7F
+
+    report = validate_project(project)
+    assert {
+        "song-scene-range",
+        "song-loop-invalid",
+        "song-reserved-nonzero",
+    } <= _codes(report)
+    assert not report.ok
+
+    project = ImageProject.from_file(BASE)
+    project.image[project._song_slot_offset(1)] = 97
+    report = validate_project(project)
+    assert "song-footer-invalid" in _codes(report)
+    assert not report.ok
+
+
+def test_song_footer_warns_when_nonfirst_scene_row_is_not_present() -> None:
+    project = ImageProject.from_file(BASE)
+    project.set_song_chain(1, [0, 1], loop=True)
+
+    report = validate_project(project)
+    assert report.ok
+    assert "song-scene-empty" in _codes(report)

@@ -16,6 +16,8 @@
 - Scene mix: present scene rows, active scene/song, master vol, T1-T8 volume bytes
   (`xy/scene_volume_inspection.py`).
 - Scene mutes: per-slot muted tracks when any mutes present (`read_scene_muted_tracks`).
+- Song footer: all 14 variable-length slots, scene chains, loop state/raw byte,
+  and reserved byte (`xy/song_footer_inspection.py`).
 - Master EQ bands (`xy/master_eq_inspection.py`).
 - Master saturator (`xy/master_saturator_inspection.py`).
 - Project config: transpose, scene length, time signature, groove type/amount,

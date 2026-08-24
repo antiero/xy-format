@@ -202,6 +202,7 @@ def validate_project(project: ImageProject, *, generated: bool = False) -> Proje
                 )
 
     _validate_scenes(project, patterns_by_track, issues)
+    _validate_songs(project, issues)
     return ProjectValidationReport(tuple(issues))
 
 
@@ -276,6 +277,67 @@ def _validate_scenes(
                         "scene-pattern-missing",
                         f"scene {scene + 1} selects unavailable pattern {selected + 1}",
                         track + 1,
+                    )
+                )
+
+
+def _validate_songs(
+    project: ImageProject,
+    issues: list[ProjectValidationIssue],
+) -> None:
+    for song in range(1, project.SONG_SLOT_COUNT + 1):
+        try:
+            offset = project._song_slot_offset(song)
+            scene_chain, _loop = project.get_song_chain(song)
+        except ValueError as error:
+            issues.append(
+                ProjectValidationIssue(
+                    "error",
+                    "song-footer-invalid",
+                    f"Song {song} cannot be parsed: {error}",
+                )
+            )
+            return
+
+        count = project.image[offset]
+        loop_offset = offset + 1 + count
+        loop_raw = project.image[loop_offset]
+        reserved = project.image[loop_offset + 1]
+        if loop_raw not in (0, 1):
+            issues.append(
+                ProjectValidationIssue(
+                    "error",
+                    "song-loop-invalid",
+                    f"Song {song} has loop byte {loop_raw}; expected 0 or 1",
+                )
+            )
+        if reserved != 0:
+            issues.append(
+                ProjectValidationIssue(
+                    "warning",
+                    "song-reserved-nonzero",
+                    f"Song {song} reserved byte is 0x{reserved:02X}",
+                )
+            )
+        for scene in scene_chain:
+            if scene >= 99:
+                issues.append(
+                    ProjectValidationIssue(
+                        "error",
+                        "song-scene-range",
+                        f"Song {song} references scene {scene + 1}; maximum is 99",
+                    )
+                )
+                continue
+            if scene == 0:
+                continue
+            slot = project.scene_slot0 + scene * 33
+            if project.image[slot + 32] == 0:
+                issues.append(
+                    ProjectValidationIssue(
+                        "warning",
+                        "song-scene-empty",
+                        f"Song {song} references Scene {scene + 1}, whose row is not marked present",
                     )
                 )
 

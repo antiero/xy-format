@@ -37,6 +37,7 @@ fields. Heuristic reads must say so and stay `[~]` until structural decode exist
 | `xy/mixer_static_inspection.py` | `test_mixer_static_inspection.py` | `2026-06-12_mixer_static_inspection.md` | `2026-06-static/` |
 | `xy/scene_volume_inspection.py` | `test_scene_volume_inspection.py` | `2026-06-12_scene_volume_inspection.md` | `2026-06-volumes/` |
 | scene mutes (same module) | `test_scene_track_mute_inspection.py` | `2026-06-12_scene_track_mute_inspection.md` | `2026-06-track-mutes/` |
+| `xy/song_footer_inspection.py` | `test_song_footer_inspection.py`, `test_inspector_outputs.py` | `2026-08-24_song_footer_loop_byte.md` | `one-off-changes-from-default/unnamed 155.xy` |
 | `xy/master_eq_inspection.py` | `test_master_eq_inspection.py` | `2026-06-12_master_eq_inspection.md` | `2026-06-eq/` |
 | `xy/master_saturator_inspection.py` | `test_master_saturator_inspection.py` | `2026-06-12_master_saturator_inspection.md` | `2026-06-saturator/` |
 | `xy/sampler_sample_inspection.py` | `test_sampler_sample_inspection.py` | `2026-06-12_sampler_oneshot_inspection.md` | `2026-06-oneshot/` |
@@ -60,6 +61,7 @@ Contributor workflow: `docs/workflows/contributor_inspection_workflow.md`.
 | Drum sample path | `xy/drum_sample_inspection.py` | `ImageProject.set_drum_voice(..., path=...)` |
 | Static mixer / master bus read | `xy/mixer_static_inspection.py` | `ImageProject.set_track_*_byte/raw`, `set_master_*_byte/raw` |
 | Scene volumes + mutes read | `xy/scene_volume_inspection.py` | partial write via `build_arrangement` |
+| Song footer | `xy/song_footer_inspection.py`, `ImageProject.get_song_chain` | `ImageProject.set_song_chain` (Songs 1–14) |
 | Master EQ / saturator read | `xy/master_eq_inspection.py`, `xy/master_saturator_inspection.py` | `set_master_eq`, `set_master_saturator_*_byte/raw` |
 | Sampler one-shot read | `xy/sampler_sample_inspection.py` | `set_sampler_sample_edit` |
 | Project config/global header read | `xy/project_config_inspection.py` | `set_groove`, `set_groove_amount`, `set_click_volume`, `set_scene_length_mode`, `set_project_transpose`, `set_time_signature`, `set_voice_allocation`, `set_midi_channel`, `set_active_scene`, `set_active_song` |
@@ -522,7 +524,8 @@ filtering, and M4 LFO modulation.
 - [x] Spec → image compiler — `tools/spec_to_xy_image.py`, `tests/test_midi_to_xy_json_selection.py`
 - [x] Corpus index/lab — `tools/corpus_lab.py`
 - [x] Round-trip verify — `tools/roundtrip_xy.py`
-- [x] Inspector CLI — presets, paths, drums, sampler, mixer, scenes, EQ, saturator, p-lock lanes, project config —
+- [x] Inspector CLI — presets, paths, drums, sampler, mixer, scenes, all 14 song
+  footers, EQ, saturator, p-lock lanes, project config —
   `tools/inspect_xy.py`, `docs/tools/inspect_xy.md`
 
 ## 15. Outside project `.xy`
