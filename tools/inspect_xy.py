@@ -461,7 +461,11 @@ TRACK_SCALE_LABELS = {
     0x01: "Track Scale 1/2",
     0x03: "Track Scale 1",
     0x05: "Track Scale 2",
+    0x06: "Track Scale 3",
     0x07: "Track Scale 4",
+    0x08: "Track Scale 5",
+    0x09: "Track Scale 6",
+    0x0A: "Track Scale 7",
     0x0B: "Track Scale 8",
     0x0E: "Track Scale 16",
 }

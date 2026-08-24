@@ -66,6 +66,10 @@ Contributor workflow: `docs/workflows/contributor_inspection_workflow.md`.
 | Confirmed aux fields | aux probe tests | ergonomic wrappers where discrete labels are proven; raw-word setters where bucket boundaries remain open |
 | Human report | `tools/inspect_xy.py` | — |
 
+Generated output is preflighted by `xy/project_validation.py`; direct MIDI/spec
+writers fail before writing on structural/sample/scene errors and emit concise
+warnings for preserved-but-unmapped fields.
+
 Detailed guide cross-reference: `docs/format/opxy_user_guide_save_audit.md`.
 Field offsets: `docs/format/decoded_image_map.md`.
 **Byte-region overview:** `docs/format/image_coverage_map.md`.
@@ -118,8 +122,10 @@ Field offsets: `docs/format/decoded_image_map.md`.
   decoded vector at track+`0x456F`, `ImageProject.add_note`
 - [x] 120-note pattern cap enforced on write — `ImageProject.add_note`
 - [x] Bars per pattern / active steps (full bars: `16`, `32`, `48`, `64` at track+`0x01`) — `set_bars`, `set_pattern_steps`
-- [x] Track scale byte (subset: 1/2, 1, 2, 16 observed) — `set_track_scale`
-- [~] Track scale full enum (3, 4, 6, 8) — partial — `opxy_user_guide_save_audit.md`
+- [x] Track scale byte (1/2, 1, 2, 4, 8, 16 corpus-pinned) — `set_track_scale`
+- [~] Firmware 1.1.25 full track-scale enum (3, 5, 6, 7 added as contiguous
+  `0x06/0x08/0x09/0x0A`) — Python + web read/write covered at E0; one
+  device-saved odd-scale capture remains for E2 — `opxy_user_guide_save_audit.md`
 - [x] Final-bar / partial-bar length — total active steps at track+`0x01`;
   `steps = (bars - 1) * 16 + final_bar_steps` — BAR-LEN fixtures
 - [x] Per-track quantization amount — raw byte at track+`0x07`;
@@ -130,6 +136,9 @@ Field offsets: `docs/format/decoded_image_map.md`.
   storage is `3 * index` into the displayed UI sequence, saturated at ±99 — BAR fixtures
 - [x] P-lock smoothing/shape — raw byte at track+`0x3056`;
   UI labels/icons still open — `xy/bar_menu_inspection.py`
+- [x] Pattern rotation moves note ticks, p-lock rows/activation rows, and
+  step-component rows together — Python + XYBuddy tests; inactive steps remain
+  byte-preserved
 
 ## 5. Step components (14 types)
 

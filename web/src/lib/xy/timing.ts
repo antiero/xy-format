@@ -35,18 +35,26 @@ export const TRACK_SCALE_TO_16THS_PER_STEP: Record<
   "2": 2,
   "3": 3,
   "4": 4,
+  "5": 5,
   "6": 6,
+  "7": 7,
   "8": 8,
   "16": 16,
 };
 
 export const WRITABLE_TRACK_SCALE_BYTES: Record<
-  Exclude<XYTrackScale, "unknown" | "3" | "4" | "6" | "8">,
+  Exclude<XYTrackScale, "unknown">,
   number
 > = {
   "1/2": 0x01,
   "1": 0x03,
   "2": 0x05,
+  "3": 0x06,
+  "4": 0x07,
+  "5": 0x08,
+  "6": 0x09,
+  "7": 0x0a,
+  "8": 0x0b,
   "16": 0x0e,
 };
 
@@ -54,7 +62,11 @@ const READ_SCALE_BYTES: Record<number, XYTrackScale> = {
   0x01: "1/2",
   0x03: "1",
   0x05: "2",
+  0x06: "3",
   0x07: "4",
+  0x08: "5",
+  0x09: "6",
+  0x0a: "7",
   0x0b: "8",
   0x0e: "16",
 };

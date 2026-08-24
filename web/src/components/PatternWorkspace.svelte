@@ -318,6 +318,15 @@
     });
   }
 
+  function rotatePattern(steps: number) {
+    dispatchProjectEdit({
+      type: "rotate-pattern",
+      trackIndex: track.index,
+      patternIndex: pattern.index,
+      steps,
+    });
+  }
+
   function handleGridClick(event: MouseEvent) {
     if (!gridEl) return;
     const rect = gridEl.getBoundingClientRect();
@@ -828,19 +837,30 @@
             >
           {/each}
         </div>
+        <div class="quick-row">
+          <button
+            type="button"
+            title="rotate triggers, parameter locks and components one step earlier"
+            aria-label="rotate pattern one step left"
+            on:click={() => rotatePattern(-1)}>← step</button
+          >
+          <button
+            type="button"
+            title="rotate triggers, parameter locks and components one step later"
+            aria-label="rotate pattern one step right"
+            on:click={() => rotatePattern(1)}>step →</button
+          >
+        </div>
       </div>
 
       <div class="rail-section">
         <span class="rail-label">scale</span>
         <div class="scale-grid">
-          {#each ["1/2", "1", "2", "3", "4", "6", "8", "16"] as scale}
+          {#each ["1/2", "1", "2", "3", "4", "5", "6", "7", "8", "16"] as scale}
             <button
               type="button"
               class:active={pattern.trackScale === scale}
-              disabled={!["1/2", "1", "2", "16"].includes(scale)}
-              title={["1/2", "1", "2", "16"].includes(scale)
-                ? `set scale ${scale}`
-                : `scale ${scale} is read-only until device write tests exist`}
+              title={`set scale ${scale}`}
               on:click={() => setScale(scale)}
             >
               {scale}

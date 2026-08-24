@@ -27,7 +27,9 @@ export type XYTrackScale =
   | "2"
   | "3"
   | "4"
+  | "5"
   | "6"
+  | "7"
   | "8"
   | "16"
   | "unknown";
@@ -193,6 +195,12 @@ export type XYEdit =
       trackIndex: number;
       patternIndex: number;
       scale: XYTrackScale;
+    }
+  | {
+      type: "rotate-pattern";
+      trackIndex: number;
+      patternIndex: number;
+      steps: number;
     }
   | {
       type: "set-scene-pattern";
@@ -644,6 +652,14 @@ export function applyEdit(
       modified = true;
       break;
     }
+    case "rotate-pattern":
+      imageProject.rotatePatternSteps(
+        edit.trackIndex + 1,
+        edit.steps,
+        edit.patternIndex,
+      );
+      modified = true;
+      break;
     case "set-scene-pattern":
       imageProject.setScenePattern(
         edit.sceneIndex,

@@ -24,6 +24,8 @@ User-facing:
 - JSON spec compiler: `docs/tools/spec_to_xy_image.md` (`tools/spec_to_xy_image.py`)
 - Corpus index/query: `docs/tools/corpus_lab.md` (`tools/corpus_lab.py`)
 - Spatial variance analyzer: `docs/tools/analyze_spatial_variance.md` (`tools/analyze_spatial_variance.py`)
+- Generated-project validator: `docs/tools/project_validation.md` (`xy/project_validation.py`)
+- Next ordered device captures: `docs/workflows/next_device_captures.md`
 - Header reader: `docs/tools/read_xy_header.md` (`tools/read_xy_header.py`)
 - MIDI → .xy conversion: `docs/tools/midi_to_xy.md` (`tools/midi_to_xy.py`)
 - P-lock extraction: `tools/extract_plocks.py`

@@ -10,7 +10,7 @@ Sources: [teenage.engineering/products/op-xy](https://teenage.engineering/produc
 | Bars per pattern | 4 | Community requests 8; TE points to 120-note cap |
 | Notes per pattern | 120 | Hard cap per pattern |
 | Sequencer resolution | 1920 PPQN | 480 ticks per 16th note |
-| Track scale options | x1/2, x1, x2, x3, x4, x6, x8, x16 | Max effective 64 bars |
+| Track scale options | x1/2, x1, x2, x3, x4, x5, x6, x7, x8, x16 | OS 1.1.25 names new quantization grids for x3/x5/x6/x7; max effective 64 bars |
 | Step component types | 14 | Stackable per step |
 | Variations per component | 10 | |
 

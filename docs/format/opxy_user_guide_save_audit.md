@@ -89,9 +89,10 @@ Guide refs: section 7.1 p.22-23; section 7.2 p.24; section 7.3 p.25; section 7.4
 | Nudge step | Off-grid tick value. | Decoded as non-grid `u32 tick`. |
 | Clear notes / clear all | Delete note vector rows, optionally p-locks. | Operation derived from decoded vectors/tables; no separate field. |
 | Copy step | Notes + locks + step components copied between step slots. | Operation over decoded note rows, p-lock row, and component slot; no separate field. |
+| Rotate pattern | Triggers, parameter locks, and step components rotate together. | Implemented by `ImageProject.rotate_pattern` and XYBuddy `rotatePatternSteps`; active rows rotate coherently and inactive rows are preserved. |
 | Change sequence octave/semitone | Mass note transposition. | Operation over note values, not a separate field unless project transpose is used. |
 | Parameter lock | Per-step parameter value. | Decoded: p-lock table at track `+0x2A0`, 64 rows x 84 bytes, 42 u16 columns. |
-| Track scale | One step duration: 1, 2, 3, 4, 6, 8, 16, 1/2 per guide. | Partial. Location decoded at track `+0x06`; observed values include 1, 2, 16, and 1/2. Missing confirmed enum bytes for 3, 4, 6, 8. |
+| Track scale | One step duration: 1/2, 1, 2, 3, 4, 5, 6, 7, 8, 16 (OS 1.1.25 explicitly names odd grids 3/5/6/7). | Read/write implemented at track `+0x06`: `01/03/05/06/07/08/09/0A/0B/0E`. Corpus pins 1/2, 1, 2, 4, 8, 16; the contiguous odd enum is E0 pending a device-saved odd-scale capture. |
 | Add/remove bars | 1-4 bars per pattern. | Decoded at track `+0x01` as total active steps. Full bars are `16`, `32`, `48`, `64`; partial final bars use `(bar_count - 1) * 16 + final_bar_steps`. |
 | Duplicate bar | Copy notes/locks/components between step ranges. | Operation over decoded structures; no separate field. |
 | Sequence length / final-bar length | Number of active steps when last bar is shortened. | Decoded (BAR-LEN). Track `+0x01` stores total active steps: `(bar_count - 1) * 16 + final_bar_steps`. |

@@ -11,7 +11,7 @@ from pathlib import Path
 
 import pytest
 
-from xy.image_writer import ImageProject
+from xy.image_writer import OFF_NOTE_COUNT, ImageProject, build_arrangement
 from xy.rle import decode_project
 
 BASE = "src/one-off-changes-from-default/unnamed 1.xy"
@@ -243,6 +243,80 @@ def test_convenience_methods_replicate_device_captures(target, edit):
     p = ImageProject.from_file(BASE)
     edit(p)
     assert p.to_bytes() == real(target)
+
+
+@_pytest.mark.parametrize(
+    "scale,raw",
+    [
+        (0.5, 0x01),
+        (1, 0x03),
+        (2, 0x05),
+        (3, 0x06),
+        (4, 0x07),
+        (5, 0x08),
+        (6, 0x09),
+        (7, 0x0A),
+        (8, 0x0B),
+        (16, 0x0E),
+    ],
+)
+def test_set_track_scale_uses_firmware_1_1_25_enum(scale, raw):
+    p = ImageProject.from_file(BASE)
+    p.set_track_scale(1, scale)
+    assert p.image[p.track_start(1) + p.TRK_SCALE] == raw
+
+
+def test_rotate_pattern_moves_notes_plocks_components_and_flags_together():
+    p = ImageProject.from_file(BASE)
+    p.set_pattern_steps(1, 4)
+    p.add_note(1, step=1, note=60, velocity=90, gate=120)
+    p.add_note(1, step=4, note=64, velocity=91, gate=240)
+    p.set_plock(1, 1, "param1", 0x1111)
+    p.set_plock(1, 4, "param1", 0x4444)
+    p.set_step_component(1, 1, "pulse", 7)
+    p.set_step_component(1, 4, "hold", 8)
+
+    base = p.pattern_start(1)
+    inactive_before = bytes(p.image[base + p.TRK_STEPCOMP + 4 * 16 : base + p.TRK_STEPCOMP + 5 * 16])
+    p.rotate_pattern(1, 1)
+
+    note_start = base + OFF_NOTE_COUNT + 1
+    notes = [bytes(p.image[note_start + i * 12 : note_start + (i + 1) * 12]) for i in range(2)]
+    assert [(int.from_bytes(note[:4], "little"), note[8]) for note in notes] == [
+        (0, 64),
+        (480, 60),
+    ]
+    assert int.from_bytes(
+        p.image[base + p.TRK_PLOCK + 2 : base + p.TRK_PLOCK + 4], "little"
+    ) == 0x4444
+    assert int.from_bytes(
+        p.image[base + p.TRK_PLOCK + 86 : base + p.TRK_PLOCK + 88], "little"
+    ) == 0x1111
+    assert p.image[base + p.PLOCK_STEP_FLAG] == 1
+    assert p.image[base + p.PLOCK_STEP_FLAG + 8] == 1
+    assert p.image[base + p.TRK_STEPCOMP : base + p.TRK_STEPCOMP + 2] == b"\x02\x00"
+    assert p.image[base + p.TRK_STEPCOMP + 3] == 8
+    assert p.image[base + p.TRK_STEPCOMP + 16 : base + p.TRK_STEPCOMP + 18] == b"\x01\x00"
+    assert p.image[base + p.TRK_STEPCOMP + 18] == 7
+    assert bytes(p.image[base + p.TRK_STEPCOMP + 4 * 16 : base + p.TRK_STEPCOMP + 5 * 16]) == inactive_before
+
+
+def test_rotate_pattern_supports_clones_and_negative_steps():
+    arranged = build_arrangement(
+        BASE,
+        {1: [[{"step": 1, "note": 60}], [{"step": 2, "note": 67}]]},
+    )
+    p = ImageProject.from_bytes(arranged)
+    p.set_plock(1, 2, "param2", 0x2222, pattern=2)
+    p.set_step_component(1, 2, "random", 9, pattern=2)
+    p.rotate_pattern(1, -1, pattern=2)
+
+    base = p.pattern_start(1, 2)
+    note = bytes(p.image[base + OFF_NOTE_COUNT + 1 : base + OFF_NOTE_COUNT + 13])
+    assert int.from_bytes(note[:4], "little") == 0
+    assert int.from_bytes(p.image[base + p.TRK_PLOCK : base + p.TRK_PLOCK + 2], "little") == 0
+    assert int.from_bytes(p.image[base + p.TRK_PLOCK + 4 : base + p.TRK_PLOCK + 6], "little") == 0x2222
+    assert p.image[base + p.TRK_STEPCOMP : base + p.TRK_STEPCOMP + 2] == b"\x40\x00"
 
 
 def test_m2_shift_current_lanes_match_cc_map_capture():

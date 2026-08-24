@@ -56,6 +56,8 @@ The current stack can:
 - Inspect fixture-backed project state for project config, preset paths, drum
   and sampler samples, static mixer state, scene volumes/mutes, master EQ, and
   master saturator.
+- Rotate patterns without separating triggers from their p-locks or step
+  components, and preflight generated projects before they reach hardware.
 
 The legacy raw-byte writer stack has been removed; current tests should cover
 decoded-image codec, inspection, and authoring paths.
@@ -82,13 +84,13 @@ work is field polish, productization, and edge-case validation:
 
 - `midi_to_xy` should keep expanding around the decoded-image writer rather
   than reintroducing raw-byte patching paths.
-- Some enums and user-facing labels remain partial: track-scale full enum, LFO
-  subfunctions, mod-routing destination IDs, aux-track parameter labels, and
-  player modes.
+- Some user-facing labels remain partial: LFO subfunctions, mod-routing
+  destination IDs, aux-track parameter labels, and player modes.
 - Scene-stored volume bytes are mapped, but playback semantics on firmware
   1.1.4 need a focused retest.
-- Multisampler zones/slicing and user `.preset` file format are not fully
-  decoded.
+- Multisampler zones, drum slicing/choke metadata, and the remaining user
+  `.preset` variants are not fully decoded. OS 1.1.25 also requires a fresh
+  multisampler/global-transpose capture pair.
 - Limits certification remains for max scenes, visible song slots, full
   16-pattern topology, and 120-note edge cases.
 

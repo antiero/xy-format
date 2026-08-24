@@ -139,7 +139,7 @@ describe("project view model and edit bridge", () => {
       trackScale: "4",
       trackScaleLabel: "4",
       trackScaleKnown: true,
-      trackScaleWriteSupported: false,
+      trackScaleWriteSupported: true,
       effectiveLength16ths: 64,
     });
     expect(
@@ -147,23 +147,62 @@ describe("project view model and edit bridge", () => {
     ).toBe(false);
   });
 
-  it("blocks track-scale writes whose raw bytes are not decoded", () => {
-    const project = loadBaseline();
-    expect(() =>
-      applyEdit(project, {
-        type: "set-track-scale",
-        trackIndex: 0,
-        patternIndex: 0,
-        scale: "4",
-      }),
-    ).toThrow(/read-only/);
-    expect(() =>
-      applyEdit(project, {
-        type: "set-track-scale",
-        trackIndex: 0,
-        patternIndex: 0,
-        scale: "3",
-      }),
-    ).toThrow(/read-only/);
+  it("writes firmware 1.1.25 odd track-scale bytes", () => {
+    const scale3 = applyEdit(loadBaseline(), {
+      type: "set-track-scale",
+      trackIndex: 0,
+      patternIndex: 0,
+      scale: "3",
+    });
+    const scale7 = applyEdit(scale3, {
+      type: "set-track-scale",
+      trackIndex: 0,
+      patternIndex: 0,
+      scale: "7",
+    });
+
+    expect(scale3.tracks[0].patterns[0].trackScaleRaw).toBe(0x06);
+    expect(scale7.tracks[0].patterns[0]).toMatchObject({
+      trackScale: "7",
+      trackScaleRaw: 0x0a,
+      trackScaleWriteSupported: true,
+    });
+  });
+
+  it("rotates triggers, p-lock rows and component rows together", () => {
+    const bytes = new Uint8Array(readFileSync(BASELINE));
+    const imageProject = ImageProject.fromBytes(bytes);
+    imageProject.setPatternSteps(1, 4, 0);
+    imageProject.addNote(1, { step: 1, note: 60, patternIndex: 0 });
+    imageProject.addNote(1, { step: 4, note: 64, patternIndex: 0 });
+    const base = imageProject.trackPatternStart(1, 0);
+    imageProject.image[base + 0x02a0] = 0x11;
+    imageProject.image[base + 0x02a0 + 3 * 84] = 0x44;
+    imageProject.image[base + 0x2c4e] = 1;
+    imageProject.image[base + 0x2c4e + 3 * 8] = 4;
+    imageProject.image[base + 0x3057] = 0xa1;
+    imageProject.image[base + 0x3057 + 3 * 16] = 0xd4;
+    const inactiveBefore = imageProject.image.slice(
+      base + 0x3057 + 4 * 16,
+      base + 0x3057 + 5 * 16,
+    );
+
+    imageProject.rotatePatternSteps(1, 1, 0);
+
+    expect(
+      imageProject.getNotes(1, 0).map((note) => [note.tick, note.note]),
+    ).toEqual([
+      [0, 64],
+      [480, 60],
+    ]);
+    expect(imageProject.image[base + 0x02a0]).toBe(0x44);
+    expect(imageProject.image[base + 0x02a0 + 84]).toBe(0x11);
+    expect(imageProject.image[base + 0x2c4e]).toBe(4);
+    expect(imageProject.image[base + 0x2c4e + 8]).toBe(1);
+    expect(imageProject.image[base + 0x3057]).toBe(0xd4);
+    expect(imageProject.image[base + 0x3057 + 16]).toBe(0xa1);
+    expect(
+      imageProject.image.slice(base + 0x3057 + 4 * 16, base + 0x3057 + 5 * 16),
+    ).toEqual(inactiveBefore);
   });
 });

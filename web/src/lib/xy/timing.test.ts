@@ -11,19 +11,23 @@ import {
 } from "./timing";
 
 describe("timing display positions", () => {
-  it("decodes OP-XY track scale byte 0x07 as scale 4", () => {
-    expect(decodeTrackScale(0x07)).toMatchObject({
-      scale: "4",
-      label: "4",
-      factor16ths: 4,
-    });
-  });
-
-  it("decodes OP-XY track scale byte 0x0b as scale 8", () => {
-    expect(decodeTrackScale(0x0b)).toMatchObject({
-      scale: "8",
-      label: "8",
-      factor16ths: 8,
+  it.each([
+    [0x01, "1/2", 0.5],
+    [0x03, "1", 1],
+    [0x05, "2", 2],
+    [0x06, "3", 3],
+    [0x07, "4", 4],
+    [0x08, "5", 5],
+    [0x09, "6", 6],
+    [0x0a, "7", 7],
+    [0x0b, "8", 8],
+    [0x0e, "16", 16],
+  ])("decodes OP-XY track scale byte 0x%s", (raw, scale, factor16ths) => {
+    expect(decodeTrackScale(raw as number)).toMatchObject({
+      scale,
+      label: scale,
+      factor16ths,
+      supportedForWrite: true,
     });
   });
 

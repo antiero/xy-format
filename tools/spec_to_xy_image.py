@@ -25,6 +25,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from xy.image_writer import ImageProject, build_arrangement  # noqa: E402
+from xy.project_validation import validate_project_bytes  # noqa: E402
 
 DEFAULT_BASELINE = "src/one-off-changes-from-default/unnamed 1.xy"
 
@@ -95,10 +96,16 @@ def main() -> int:
         template_tracks=template_tracks,
         force_scene_presence=bool(spec.get("force_scene_presence", False)),
     )
+    project = ImageProject.from_bytes(out)
     if "tempo_bpm" in spec:
-        project = ImageProject.from_bytes(out)
         project.set_tempo(float(spec["tempo_bpm"]))
-        out = project.to_bytes()
+    project.set_click_volume(0)
+    out = project.to_bytes()
+    report = validate_project_bytes(out, generated=True)
+    if report.errors:
+        raise SystemExit(f"generated project failed validation:\n{report.describe()}")
+    for issue in report.warnings:
+        print(issue.describe(), file=sys.stderr)
     open(args.output, "wb").write(out)
     total = sum(len(p) for ps in tracks.values() for p in ps)
     print(

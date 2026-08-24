@@ -51,7 +51,8 @@ p.set_master_eq(low=..., mid=..., high=...)
 p.set_bars(track, bars)                  # 1..4
 p.set_pattern_steps(track, steps)        # total active steps, incl. partial final bar
 p.add_note(track, step=9, note=60, velocity=100, gate=240)   # tick optional
-p.set_track_scale(track, 2)              # 0.5 / 1 / 2 / 16 (or raw byte)
+p.set_track_scale(track, 5)              # 0.5 / 1 / 2 / 3 / 4 / 5 / 6 / 7 / 8 / 16
+p.rotate_pattern(track, 1, pattern=1)    # notes + p-locks + components, one step later
 p.set_default_step_length_ticks(track, 240)
 p.set_track_quantization_ui(track, 99)
 p.set_track_quantization_raw(track, 0xFF)

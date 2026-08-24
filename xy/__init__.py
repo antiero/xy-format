@@ -132,6 +132,12 @@ from .project_config_inspection import (  # noqa: F401
     inspect_project_config_bytes,
     read_project_config,
 )
+from .project_validation import (  # noqa: F401
+    ProjectValidationIssue,
+    ProjectValidationReport,
+    validate_project,
+    validate_project_bytes,
+)
 from .bar_menu_inspection import (  # noqa: F401
     TRACK_DEFAULT_STEP_LENGTH_OFFSET,
     TRACK_GROOVE_OFFSET,

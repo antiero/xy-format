@@ -61,14 +61,14 @@ describe("timing model", () => {
     expect(decodeTrackScale(0x07)).toMatchObject({
       scale: "4",
       factor16ths: 4,
-      supportedForWrite: false,
+      supportedForWrite: true,
     });
     expect(decodeTrackScale(0x0e)).toMatchObject({
       scale: "16",
       factor16ths: 16,
       supportedForWrite: true,
     });
-    expect(decodeTrackScale(0x09)).toMatchObject({
+    expect(decodeTrackScale(0x02)).toMatchObject({
       scale: "unknown",
       factor16ths: null,
       supportedForWrite: false,

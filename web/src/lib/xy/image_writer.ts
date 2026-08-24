@@ -25,6 +25,12 @@ export const OFF_QUANTIZATION = 0x07;
 export const OFF_TRACK_GROOVE = 0x08;
 export const OFF_PRISTINE = 0x11;
 export const OFF_PLOCK_SHAPE = 0x3056;
+export const OFF_PLOCK_VALUES = 0x02a0;
+export const PLOCK_VALUE_ROW_SIZE = 84;
+export const OFF_PLOCK_STEP_FLAGS = 0x2c4e;
+export const PLOCK_STEP_FLAG_ROW_SIZE = 8;
+export const OFF_STEP_COMPONENTS = 0x3057;
+export const STEP_COMPONENT_ROW_SIZE = 16;
 export const OFF_NOTE_COUNT = 0x456f;
 export const NOTE_SIZE = 12;
 export const STEP_TICKS = 480;
@@ -758,6 +764,65 @@ export class ImageProject {
     this.image[cpos] = count - 1;
     this.markPatternEdited(track, patternIndex);
     this.rescan();
+  }
+
+  public rotatePatternSteps(
+    track: number,
+    steps: number,
+    patternIndex: number = 0,
+  ): void {
+    if (!Number.isInteger(steps)) {
+      throw new Error("rotation steps must be an integer");
+    }
+    const s = this.trackPatternStart(track, patternIndex);
+    const activeSteps = this.image[s + OFF_PATTERN_STEPS];
+    if (activeSteps < 1 || activeSteps > 64) {
+      throw new Error("pattern length must be 1..64 steps");
+    }
+    const shift = ((steps % activeSteps) + activeSteps) % activeSteps;
+    if (shift === 0) return;
+
+    const patternTicks = activeSteps * STEP_TICKS;
+    const notes = this.getNotes(track, patternIndex)
+      .map((note) => ({
+        ...note,
+        tick: (note.tick + steps * STEP_TICKS) % patternTicks,
+      }))
+      .map((note) => ({
+        ...note,
+        tick: note.tick < 0 ? note.tick + patternTicks : note.tick,
+      }))
+      .sort((a, b) => a.tick - b.tick);
+    const noteStart = s + OFF_NOTE_COUNT + 1;
+    const view = new DataView(this.image.buffer);
+    notes.forEach((note, index) => {
+      const offset = noteStart + index * NOTE_SIZE;
+      view.setUint32(offset, note.tick, true);
+      view.setUint32(offset + 4, note.gate, true);
+      this.image[offset + 8] = note.note;
+      this.image[offset + 9] = note.velocity;
+      this.image[offset + 10] = note.flags0;
+      this.image[offset + 11] = note.flags1;
+    });
+
+    const rotateRows = (relative: number, rowSize: number) => {
+      const begin = s + relative;
+      const rows = Array.from({ length: activeSteps }, (_, index) =>
+        this.image.slice(
+          begin + index * rowSize,
+          begin + (index + 1) * rowSize,
+        ),
+      );
+      const rotated = [...rows.slice(-shift), ...rows.slice(0, -shift)];
+      rotated.forEach((row, index) =>
+        this.image.set(row, begin + index * rowSize),
+      );
+    };
+
+    rotateRows(OFF_PLOCK_VALUES, PLOCK_VALUE_ROW_SIZE);
+    rotateRows(OFF_PLOCK_STEP_FLAGS, PLOCK_STEP_FLAG_ROW_SIZE);
+    rotateRows(OFF_STEP_COMPONENTS, STEP_COMPONENT_ROW_SIZE);
+    this.markPatternEdited(track, patternIndex);
   }
 
   // --- scenes (arrangement) ---

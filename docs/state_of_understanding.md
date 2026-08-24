@@ -351,6 +351,35 @@ semantics for scene-stored volumes remain open.
    after the legacy JSON compiler removal.
 3. `corpus_lab record` on representative probe per pack for traceability.
 
+---
+
+## 2026-08-24 — Firmware 1.1.25 compatibility pass
+
+### Settled in software
+
+- Track-scale enum read/write/timing support now covers 1/2, 1, 2, 3, 4, 5,
+  6, 7, 8, and 16. Existing corpus anchors remain byte-exact.
+- Pattern rotation is a coherent decoded-image operation: note ticks, p-lock
+  value rows, p-lock activation rows, and component rows rotate together;
+  inactive rows beyond the current pattern length remain preserved.
+- Generated MIDI/spec output now turns the metronome off and runs structural,
+  sample, engine/preset, scene-reference, and limit preflight before writing.
+- Live MTP discovery on the connected device reports OS 1.1.25.
+
+### Evidence boundary
+
+- The x3/x5/x6/x7 bytes (`06/08/09/0A`) follow the contiguous enum between
+  corpus-pinned x2/x4/x8 anchors and are implemented/tested at E0. Promote to
+  E2 only after a 1.1.25 device-saved odd-scale capture.
+- OS 1.1.25 changes multisample/global-transpose behavior, Hold player release,
+  and player-type inheritance. Those surfaces need fresh device A/B captures;
+  old firmware behavior is not treated as proof.
+
+### Next decisive test
+
+Run `docs/workflows/next_device_captures.md` in filename order, beginning with
+the fresh 1.1.25 baseline and four odd-scale saves.
+
 ### References
 
 - Checklist: `docs/parse_capability_checklist.md`

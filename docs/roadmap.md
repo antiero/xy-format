@@ -1,120 +1,103 @@
 # Roadmap
 
-> Rewritten 2026-06-09 after the serialization-model breakthrough
-> (`docs/state_of_understanding.md`). The format is understood
-> generatively: RLE codec round-trips the corpus, the image writer
-> replicates device captures byte-exactly, and image-authored files —
-> including the full Whitney arrangement (8×9 patterns, scenes, song
-> chain) — load and play on device. No structural mysteries remain on
-> the critical path; remaining work is field semantics and product.
+> Refreshed 2026-08-24 for OP-XY OS 1.1.25. Structural authoring is solved;
+> this roadmap now separates shipped software work from fields that still need
+> a device-authored A/B capture. The dated belief ledger remains
+> [`state_of_understanding.md`](state_of_understanding.md).
 
-## Tier 1 — Pure corpus lookups (no device needed)
+## Current release target — OS 1.1.25 + XYBuddy
 
-Field-semantics sweeps in decoded space (`tools/analysis/decoded_diff.py`
-× change log):
+- [x] Merge the antiero and kmorrill histories without losing 16-pattern and
+  96-scene long-song support.
+- [x] Verify the connected OP-XY reports firmware 1.1.25 over MTP.
+- [x] Add Python, inspector, browser-timing, editor, and UI coverage for the
+  full 1/2, 1, 2, 3, 4, 5, 6, 7, 8, 16 track-scale enum.
+- [x] Add coherent pattern rotation: triggers, p-lock rows, p-lock activation
+  rows, and step-component rows move together in Python and XYBuddy.
+- [x] Restore the Pattern workspace to XYBuddy's current project navigation so
+  note editing, odd-scale selection, and coherent rotation are reachable.
+- [x] Add generated-project preflight for layout, note/pattern limits, engine
+  and preset identity, scene references, sample paths/windows, mapped drum
+  slots, known scale bytes, and metronome-off output.
+- [ ] Rebuild XYBuddy with the current web bundle, run its full Swift tests and
+  universal Release build, then repeat a live MTP upload/download/delete test.
+- [ ] Add one device-saved odd-scale capture to promote the contiguous
+  0x06/0x08/0x09/0x0A mapping from E0 to E2.
 
-1. **P-locks**: map per-step parameter-lock storage from the CC capture
-   corpus (unnamed 95–100, 122) against `docs/format/plocks.md`.
-2. **Step-component slot byte order**: complete the 16-byte per-step
-   slot map (which byte = which of the 14 component types + values)
-   from unnamed 8/9 and 59–77.
-3. **Engine/preset region**: engine ID field, preset path string
-   location, param-block layout — from the engine-change one-offs
-   (34, 85, 91, 94, 113, 116, 117, 122).
-4. **Sample tables** (optional): per-drum-voice tune/level fields are
-   not in the corpus, but `set_preset` already copies the whole table,
-   so this is only for exposing per-voice tweaks — not a blocker.
+The last unchecked item cannot be manufactured by an off-device writer: it
+needs the OP-XY UI to select an odd scale and save the project. The exact
+ordered capture recipe is in
+[`workflows/next_device_captures.md`](workflows/next_device_captures.md).
 
-## Active File-Format TODOs
+## Format closure — device captures required
 
-These are the next best steps after promoting decoded sound state into
-editable JSON. Keep them ordered; device captures are the scarce resource.
+Ordered by the amount of authoring capability each capture unlocks:
 
-1. **Sampler / tonal sampler project-state captures**
-   - Starting point: one known sample that is audible after manual load.
-   - Capture variants: preset save only; project save after loading preset;
-     project save after changing start/end/loop/gain; one audible hand-fixed
-     control file.
-   - Goal: determine whether project track structs override preset sample
-     params and map tonal sampler start/end/loop/gain slot-tail bytes.
-2. **LFO enum and subfunction captures**
-   - Priority: LFO type enum at/near `track+0x1C`, then destination,
-     parameter, shape/sub-mode, rate/depth.
-   - Candidate hidden/subfunction region: `track+0x38C7..+0x38D6`,
-     especially `+0x38D3..+0x38D6`.
-   - Goal: convert raw `lfo_current.cc40/cc41` and hidden tails into
-     user-facing LFO labels and options.
-3. **Master mix cluster**
-   - Region: global `0x75..0x94`, likely Mix M3/M4 controls.
-   - Capture each master saturator/compressor/output/percussion/melodic
-     control at min/max from a fresh baseline.
-   - Goal: promote this cluster from candidate bytes into named
-     `sound_state.master_*` fields.
-4. **Reusable region-variance index tool**
-   - Build a CLI around the current ad hoc scripts, e.g.
-     `tools/analyze_region_variance.py --region track:+0x38A7:+0x38B6`.
-   - Output unique values, per-file deltas, track-relative maps, lane
-     grouping, and source/device vs generated provenance.
-5. **Visual spatial map artifacts**
-   - Generate a machine-readable map of decoded/partial/opaque ranges.
-   - Target formats: Markdown/CSV/JSON first; ImHex or Kaitai-style pattern
-     after the map stabilizes.
-6. **Generated-project validation**
-   - Add regression checks for generated songs/packs: preset path strings,
-     engine IDs, sample paths, nonzero audible sampler windows/gain,
-     metronome off, and mapped drum sample slots.
-   - Goal: catch the exact mapping regressions seen during generated-song
-     work before files reach the device.
-7. **Capture templates for device work**
-   - Maintain a short "next 10 captures" doc with starting file, exact knob
-     movement, expected filename, target byte region, and priority if only
-     two or three captures can be made.
-   - Goal: maximize learning per manual device save.
+1. **Player state** — locate enable/type and the arpeggio, maestro, and hold
+   parameter blocks. OS 1.1.25 changes hold-player note-off behavior and makes
+   new patterns inherit the current player type, so pre-1.1.25 assumptions must
+   not be promoted without fresh captures.
+2. **Multisampler zones** — map slot enable, low/high key, root key, window,
+   and zone count. Retest global transpose because OS 1.1.25 changed its
+   interaction with multisamples.
+3. **Instrument labels/enums** — complete LFO subfunctions, mod-routing target
+   IDs and signed scaling, play mode, portamento type, bend range, and preset
+   transpose/tuning/width labels.
+4. **Auxiliary details** — finish External MIDI CC slot enable/number/value,
+   Punch-in key map, FX schemas, and the remaining Brain/Tape/External Audio
+   labels. Raw locations and safe setters already cover the confirmed fields.
+5. **Sampling details** — drum slicing metadata/choke groups and sparse or
+   rotated kit placement. One-shot sampler and clean 24-pad kit authoring are
+   already implemented.
+6. **Scene-volume playback** — repeat the chained audible A/B on 1.1.25; bytes
+   are mapped, but the prior 1.1.4 listen test behaved globally.
 
-## Tier 2 — Enum-value probes (cheap device looks, only as needed)
+## Limits certification — device acceptance
 
-One tiny probe file + a glance at the device UI each:
+- [ ] 99 scene rows load and select correctly.
+- [ ] All 14 serialized song slots reconcile with the currently visible song
+  slots in the device UI.
+- [ ] Full 16-pattern topology passes on 1.1.25.
+- [ ] A 120-note pattern passes; note 121 is rejected off-device.
 
-1. Scene mute byte: value 2 = muted; is 1 solo? 3?
-2. The note struct's two trailing flag bytes (always 0 in corpus —
-   micro-timing? probability?).
-3. Scene-row flag byte semantics (0x01 vs 0x00 visible behavior).
-4. Limits certification pack: 99 scenes, 14 songs, 120-note patterns,
-   full 16-pattern topology — confirm writer bounds match device bounds.
+The writer already enforces the structural limits. These checks certify the UI
+and playback edges rather than discovering new byte layouts.
 
-## Tier 3 — Product (device = acceptance testing, not discovery)
+## Completed format/tooling work
 
-1. **Preset/instrument assignment from structs** (path string + param
-   block) — unlocks authoring beyond baseline's default instruments.
-2. **Custom sample kits** (after Tier 1 §4).
-3. **midi_to_xy polish** on the image writer: richer arrangement controls,
-   preset assignment, and generated-project validation.
+- [x] Byte-level RLE container; 245/246 corpus files round-trip byte-exact.
+- [x] Decoded global header, 16 track structs, clone patterns, scenes, song
+  footer, note vectors, p-lock table, step-component slots, and drum voices.
+- [x] P-lock parameter columns and all 14 component slot positions.
+- [x] Engine ID, preset path, sound-state blocks, direct preset-path writer,
+  drum sample-path writer, and one-shot sampler writer.
+- [x] Sampler project-state capture batch and patch.json adapter for tonal
+  sampler plus clean full drum kits.
+- [x] Static mixer, master EQ/saturator/mix cluster, project config, Bar menu,
+  and confirmed auxiliary raw fields.
+- [x] Reusable decoded-space variance index:
+  `tools/analyze_spatial_variance.py` with Markdown and JSON output.
+- [x] Machine-readable and human-readable spatial maps:
+  `docs/format/spatial_coverage_ledger.md` and
+  `docs/format/image_coverage_map.md`.
+- [x] `midi_to_xy` direct image authoring with 16-pattern banks, 96-scene song
+  routing, coherent sparse tracks, and generated-project validation.
+- [x] Short, sortable next-capture queue with exact comparisons and evidence
+  recording commands.
 
-## Done (highlights)
+## Exit criteria
 
-1. 2026-06-09: serialization model (byte-level RLE over C structs);
-   `xy/rle.py` round-trips 245/246 corpus files byte-exactly.
-2. Decoded image map (`docs/format/decoded_image_map.md`): global
-   header, 17,876-byte track structs, scene slots, song-table footer.
-3. Crash ledger fully explained (preamble/tails/scene-edit/note==vel/
-   event-types — all RLE artifacts or impossible-state writes).
-4. `xy/image_writer.py`: byte-exact replication of device captures;
-   device-verified probes incl. note==velocity; Whitney capstone plays
-   end-to-end with scenes + song chain.
-5. 2026-06: legacy raw-byte writer stack removed. The deleted surface
-   included scaffold/project builders, descriptor/profile JSON compiler,
-   event-type note encoders, and preamble/pointer issue docs.
+The project-format roadmap is complete when:
 
----
+1. Every unchecked device-capture item above has an E2 fixture and test, or is
+   explicitly classified as runtime/device-global and outside `.xy`.
+2. Every generated project passes `xy.project_validation` before being written.
+3. XYBuddy passes Swift tests, web tests/check/build, universal Release build,
+   code-sign verification, and a byte-identical live MTP round-trip on the
+   latest firmware.
+4. Device crashes, if any, follow `docs/workflows/crash_capture.md` and have a
+   passing follow-up artifact before an item is closed.
 
-## Field-level status (supplement — does not replace tiers above)
-
-Per-field read/write/inspect status with evidence links lives in
-[`parse_capability_checklist.md`](parse_capability_checklist.md).
-
-Contributor work merged in PR #3 (2026-06) adds read-only inspection
-modules, device probe fixtures, the capability checklist, and a contributor
-inspection workflow. That progress is tracked in the checklist and dated logs
-instead of by rewriting this tier list. See
-[`workflows/contributor_inspection_workflow.md`](workflows/contributor_inspection_workflow.md)
-for how future contributions map back to Tier 1–3 items.
+Per-field evidence remains in
+[`parse_capability_checklist.md`](parse_capability_checklist.md); this roadmap
+does not inflate partial device evidence into a completed field.

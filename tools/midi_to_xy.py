@@ -34,6 +34,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 import mido
 
 from xy.image_writer import ImageProject, build_arrangement
+from xy.project_validation import validate_project_bytes
 
 STEP_TICKS = 480
 Note = dict[str, int]
@@ -1201,7 +1202,13 @@ def convert_to_xy(
     )
     project = ImageProject.from_bytes(data)
     project.set_tempo(bpm)
+    project.set_click_volume(0)
     data = project.to_bytes()
+    report = validate_project_bytes(data, generated=True)
+    if report.errors:
+        raise ValueError(f"generated project failed validation:\n{report.describe()}")
+    for issue in report.warnings:
+        print(issue.describe(), file=sys.stderr)
     out = Path(output_path)
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_bytes(data)

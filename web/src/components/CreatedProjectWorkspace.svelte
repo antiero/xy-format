@@ -1,16 +1,24 @@
 <script lang="ts">
   import type { XYProjectViewModel } from "../lib/xy/projectViewModel";
   import ArrangeWorkspace from "./ArrangeWorkspace.svelte";
+  import PatternWorkspace from "./PatternWorkspace.svelte";
   import SongModeWorkspace from "./SongModeWorkspace.svelte";
 
   export let project: XYProjectViewModel;
   export let onTempoChange: (tempoBpm: number) => void = () => {};
 
-  let mode: "arrange" | "song" = "arrange";
+  let mode: "pattern" | "arrange" | "song" = "arrange";
 </script>
 
 <section class="created-workspace">
-  <nav class="view-toggle" aria-label="Playback view">
+  <nav class="view-toggle" aria-label="Project view">
+    <button
+      type="button"
+      class:active={mode === "pattern"}
+      aria-pressed={mode === "pattern"}
+      title="Edit notes, timing, track scale, and step data"
+      on:click={() => (mode = "pattern")}>Pattern</button
+    >
     <button
       type="button"
       class:active={mode === "arrange"}
@@ -25,7 +33,9 @@
     >
   </nav>
 
-  {#if mode === "arrange"}
+  {#if mode === "pattern"}
+    <PatternWorkspace {project} />
+  {:else if mode === "arrange"}
     <ArrangeWorkspace {project} {onTempoChange} />
   {:else}
     <SongModeWorkspace {project} {onTempoChange} />
