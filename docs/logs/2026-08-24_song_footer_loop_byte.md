@@ -17,3 +17,10 @@ The browser reader previously required `00 01` for loop-on, a raw/RLE-era
 interpretation that made real decoded projects display loop-off. Python and
 XYBuddy now share the decoded rule, emit canonical `[loop][00]`, and can parse
 or rewrite any of the 14 serialized song slots.
+
+## Production verification
+
+Commit `c6d5867` deployed successfully. A production browser session loaded
+`unnamed 155.xy`: Song 1 displayed **loop on**, Next Song displayed Song 2 with
+**loop on** and chain `1 → 2 → 3`, and the console reported zero errors and
+zero warnings.
