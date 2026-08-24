@@ -76,6 +76,24 @@ def test_aux_send_target_writers() -> None:
     assert _u32(image, project.track_start(4) + SEND_FX2_OFFSET) == 0x7FFFFFFF
 
 
+def test_aux_tracks_use_the_same_source_send_lanes() -> None:
+    project = ImageProject.from_file(str(BAR_BASE))
+    project.set_track_send_tape_byte(13, 0x7F)
+    project.set_track_send_fx1_byte(13, 0x40)
+    project.set_track_send_fx2_byte(13, 0)
+    project.set_track_send_fx1_byte(14, 0x7F)
+    project.set_track_send_fx2_byte(14, 0x40)
+    project.set_track_send_fx2_byte(15, 0x7F)
+
+    image = _decoded(project)
+    assert _u32(image, project.track_start(13) + SEND_TAPE_OFFSET) == 0x7FFFFFFF
+    assert _u32(image, project.track_start(13) + SEND_FX1_OFFSET) == 0x40000000
+    assert _u32(image, project.track_start(13) + SEND_FX2_OFFSET) == 0
+    assert _u32(image, project.track_start(14) + SEND_FX1_OFFSET) == 0x7FFFFFFF
+    assert _u32(image, project.track_start(14) + SEND_FX2_OFFSET) == 0x40000000
+    assert _u32(image, project.track_start(15) + SEND_FX2_OFFSET) == 0x7FFFFFFF
+
+
 def test_external_audio_and_tape_m1_raw_writers() -> None:
     project = ImageProject.from_file(str(BAR_BASE))
     project.set_external_audio_source("line")

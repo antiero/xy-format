@@ -248,8 +248,9 @@ Guide-visible semantics only; storage offsets remain gaps unless cited below.
 - [~] Generic auxiliary track struct, note sequencing, p-locks, step components —
   generic note vector confirmed on T9 Brain, T10 Punch-in FX, and T12 External
   CV; p-locks/step components still need aux-specific fixture coverage
-- [ ] Aux track identity / type enum for T9–T16 — verify whether fixed by slot
-  index only or persisted as engine/type byte
+- [~] Aux track identity is fixed by T9–T16 slot role in all current fixtures;
+  T15/T16 also persist the selected FX engine at `+0x14`; no independent
+  T9–T14 type enum has been observed
 - [ ] Aux M1/M2/M3/M4 module selector state persistence — gap
 - [ ] Aux-track keyboard note/event encoding differences vs instrument tracks —
   gap
@@ -351,8 +352,8 @@ speed, amount, destination, and parameter.
   detents confirmed; bucket boundaries unverified; AUX-LFO
 - [x] External MIDI LFO destination parameter enum — shared M4 word at T11
   `+0x38C3`; T13 generic param-target detents confirmed; AUX-LFO
-- [ ] External MIDI bank/program send timing on project load vs pattern start —
-  device-behavior gap
+- [—] External MIDI bank/program send timing classified as firmware/runtime
+  behavior; the persisted bank/program values are decoded above
 
 ### 12.4 T12 / aux 4 — External CV
 
@@ -363,10 +364,10 @@ ring/right. The keyboard and sequencer can play notes on a connected CV device.
   `+0x456F`; octave stored in the ordinary note byte; AUX-T12
 - [ ] External CV output enable / multi-out mode dependency — likely device-global
   plus project track data; gap
-- [ ] External CV pitch scaling / volts-per-octave assumptions — no project-file
-  field found in current T12 note probes; likely system/CV behavior, but gap
-- [ ] External CV gate polarity / level persistence — no project-file field
-  found in current T12 note probes; likely system/CV behavior, but gap
+- [—] External CV pitch scaling / volts-per-octave classified as system/CV
+  behavior; current T12 projects persist ordinary note pitches
+- [—] External CV gate polarity / level classified as device configuration;
+  no project-file field moved in current T12 note probes
 - [~] External CV note-to-voltage mapping and transpose behavior — note pitch
   persists as generic note byte; voltage calibration/transpose behavior gap
 - [ ] External CV pitchbend / glide / portamento support — gap
@@ -402,9 +403,12 @@ levels. M4 provides LFO speed, amount, destination, and parameter.
   `+0x38A7`; write via `set_track_send_ext_*`; AUX-T13
 - [x] External Audio high-pass cutoff — T13 `+0x3897`; AUX-FILTER
 - [x] External Audio low-pass cutoff — T13 `+0x38A3`; AUX-FILTER
-- [ ] External Audio Tape send level — Shift + mid gray encoder; gap
-- [ ] External Audio FX I send level — Shift + light gray encoder; gap
-- [ ] External Audio FX II send level — Shift + white encoder; gap
+- [~] External Audio Tape send level — generic T13 source-track lane
+  `+0x38AB`, writable with `set_track_send_tape_*`; aux-specific A/B pending
+- [~] External Audio FX I send level — generic T13 source-track lane
+  `+0x38AF`, writable with `set_track_send_fx1_*`; aux-specific A/B pending
+- [~] External Audio FX II send level — generic T13 source-track lane
+  `+0x38B3`, writable with `set_track_send_fx2_*`; aux-specific A/B pending
 - [x] External Audio LFO speed — T13 `+0x38B7`; AUX-LFO
 - [x] External Audio LFO amount — T13 `+0x38BB`; AUX-LFO
 - [x] External Audio LFO destination module enum — T13 `+0x38BF`,
@@ -435,8 +439,10 @@ amount, destination, and parameter.
   `set_track_send_tape_*`; AUX-T14
 - [x] Tape high-pass cutoff — shared aux M3 word at `+0x3897`; AUX-FILTER
 - [x] Tape low-pass cutoff — shared aux M3 word at `+0x38A3`; AUX-FILTER
-- [ ] Tape FX I send level — Shift + light gray encoder; gap
-- [ ] Tape FX II send level — Shift + white encoder; gap
+- [~] Tape FX I send level — generic T14 source-track lane `+0x38AF`, writable
+  with `set_track_send_fx1_*`; aux-specific A/B pending
+- [~] Tape FX II send level — generic T14 source-track lane `+0x38B3`, writable
+  with `set_track_send_fx2_*`; aux-specific A/B pending
 - [x] Tape LFO speed — shared aux M4 word at `+0x38B7`; AUX-LFO
 - [x] Tape LFO amount — shared aux M4 word at `+0x38BB`; AUX-LFO
 - [x] Tape LFO destination module enum — shared aux M4 word at `+0x38BF`;
@@ -467,8 +473,8 @@ and parameter.
   `set_track_send_fx1_*`; AUX-T15
 - [x] FX I high-pass cutoff — shared aux M3 word at `+0x3897`; AUX-FILTER
 - [x] FX I low-pass cutoff — shared aux M3 word at `+0x38A3`; AUX-FILTER
-- [ ] FX I → FX II send level — Shift + white encoder; not isolated from
-  ordinary source-track FX II send yet
+- [~] FX I → FX II send level — generic T15 source-track FX II lane `+0x38B3`,
+  writable with `set_track_send_fx2_*`; dedicated T15 A/B pending
 - [x] FX I LFO speed — shared aux M4 word at `+0x38B7`; AUX-LFO
 - [x] FX I LFO amount — shared aux M4 word at `+0x38BB`; AUX-LFO
 - [x] FX I LFO destination module enum — shared aux M4 word at `+0x38BF`;
