@@ -260,9 +260,10 @@ def _validate_scenes(
     patterns_by_track: list[list[int]],
     issues: list[ProjectValidationIssue],
 ) -> None:
+    track1_start = patterns_by_track[0][0]
     for scene in range(99):
         slot = project.scene_slot0 + scene * 33
-        if slot + 33 > project.track_start(1):
+        if slot + 33 > track1_start:
             break
         if project.image[slot + 32] == 0:
             continue

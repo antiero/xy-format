@@ -1,5 +1,6 @@
 from xy.image_writer import ImageProject
 from xy.project_validation import validate_project
+from xy.rle import decode_project
 
 
 BASE = "src/one-off-changes-from-default/unnamed 1.xy"
@@ -11,6 +12,16 @@ def _codes(report) -> set[str]:
 
 def test_device_baseline_has_no_structural_validation_errors() -> None:
     report = validate_project(ImageProject.from_file(BASE))
+    assert report.ok
+    assert not report.errors
+
+
+def test_validator_accepts_a_freshly_decoded_image_without_cached_indexes() -> None:
+    with open(BASE, "rb") as fixture:
+        header, image = decode_project(fixture.read())
+
+    report = validate_project(ImageProject(header, bytearray(image)))
+
     assert report.ok
     assert not report.errors
 
