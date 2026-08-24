@@ -16,6 +16,17 @@ The ignored `output/limit-probes/` directory will contain:
 The generator runs `xy.project_validation` on every file. Its regression test
 also proves that adding note 121 is rejected before export.
 
+After downloading the staged files from the OP-XY into a local directory,
+rebuild and compare every copy byte-for-byte before doing the front-panel test:
+
+```bash
+python tools/build_limit_probes.py --verify-dir /path/to/downloaded-probes
+```
+
+This proves generation, preflight, upload, and download integrity. It does not
+prove that the device UI exposes the last scene/song/pattern or that playback
+accepts the 120-note project.
+
 ## Device order
 
 Load the files alphabetically on the current firmware. Confirm scene 99 can be

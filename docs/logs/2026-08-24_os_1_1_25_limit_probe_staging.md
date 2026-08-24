@@ -2,7 +2,7 @@
 
 **Device:** OP-XY serial `XXYVP11X`  
 **Firmware:** 1.1.25  
-**Transport:** XYBuddy `tebuddy-mtp` helper on macOS
+**Transport:** XYBuddy `xybuddy-mtp` helper on macOS
 
 The ordered projects from `tools/build_limit_probes.py` were uploaded to
 `/projects/templates` without changing `/projects/workspace.xy` or any user
@@ -27,3 +27,20 @@ Song Mode showed Song 1's one-scene chain; **Next Song** selected Song 2 and
 showed the captured `1 → 2 → 3` chain. The browser console reported zero errors
 and zero warnings. This covers the deployed reader and song navigation; the
 MTP hashes above cover the native helper/device boundary.
+
+## Post-upstream-sync revalidation
+
+After merging `kmorrill/main` and adding the firmware-layout reader follow-up
+at `2b557ae`, the connected device still enumerated as VID `0x2367`, PID
+`0x0021`. A fresh `/projects/templates` listing returned the same four object
+IDs and sizes. Each object was downloaded again and checked with:
+
+```bash
+python tools/build_limit_probes.py --verify-dir /tmp/xybuddy-cert-WrTRx1
+```
+
+All four copies remained byte-identical to freshly generated output and passed
+generated-project preflight. Each retained one expected warning inherited from
+the baseline's T8 Multisampler: zone boundaries/root keys remain opaque and
+are preserved but cannot yet be preflighted. No front-panel acceptance claim
+is inferred from these MTP-only checks.

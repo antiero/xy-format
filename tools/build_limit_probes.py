@@ -96,6 +96,28 @@ def build_probe_bytes(baseline: Path = DEFAULT_BASELINE) -> dict[str, bytes]:
     return probes
 
 
+def verify_probe_directory(probes: dict[str, bytes], directory: Path) -> None:
+    """Require a downloaded/staged directory to match generated probes exactly."""
+
+    failures: list[str] = []
+    for name in PROBE_NAMES:
+        path = directory / name
+        if not path.is_file():
+            failures.append(f"{name}: missing")
+            continue
+        actual = path.read_bytes()
+        expected = probes[name]
+        if actual == expected:
+            continue
+        expected_hash = hashlib.sha256(expected).hexdigest()[:12]
+        actual_hash = hashlib.sha256(actual).hexdigest()[:12]
+        failures.append(
+            f"{name}: differs (expected {expected_hash}, got {actual_hash})"
+        )
+    if failures:
+        raise ValueError("probe directory verification failed:\n" + "\n".join(failures))
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--baseline", type=Path, default=DEFAULT_BASELINE)
@@ -103,6 +125,11 @@ def main() -> int:
         "--output-dir",
         type=Path,
         default=REPO_ROOT / "output/limit-probes",
+    )
+    parser.add_argument(
+        "--verify-dir",
+        type=Path,
+        help="compare a downloaded or staged directory byte-for-byte",
     )
     args = parser.parse_args()
 
@@ -114,6 +141,13 @@ def main() -> int:
         destination.write_bytes(data)
         digest = hashlib.sha256(data).hexdigest()[:12]
         print(f"{name}: {len(data):,} bytes sha256={digest}")
+    if args.verify_dir is not None:
+        try:
+            verify_probe_directory(probes, args.verify_dir)
+        except ValueError as error:
+            print(error, file=sys.stderr)
+            return 1
+        print(f"verified byte-identical copies in {args.verify_dir}")
     return 0
 
 

@@ -1,6 +1,10 @@
 import pytest
 
-from tools.build_limit_probes import PROBE_NAMES, build_probe_bytes
+from tools.build_limit_probes import (
+    PROBE_NAMES,
+    build_probe_bytes,
+    verify_probe_directory,
+)
 from xy.image_writer import (
     SCENE_SLOT_SIZE,
     ImageProject,
@@ -51,3 +55,23 @@ def test_patterns16_and_notes120_hit_the_writer_ceilings(
     assert notes.note_count(1) == 120
     with pytest.raises(ValueError, match="note limit"):
         notes.add_note(1, step=1, note=72)
+
+
+def test_verify_probe_directory_accepts_byte_identical_downloads(
+    probes: dict[str, bytes], tmp_path,
+) -> None:
+    for name, data in probes.items():
+        (tmp_path / name).write_bytes(data)
+
+    verify_probe_directory(probes, tmp_path)
+
+
+def test_verify_probe_directory_reports_missing_and_changed_files(
+    probes: dict[str, bytes], tmp_path,
+) -> None:
+    (tmp_path / PROBE_NAMES[0]).write_bytes(probes[PROBE_NAMES[0]] + b"changed")
+
+    with pytest.raises(ValueError) as error:
+        verify_probe_directory(probes, tmp_path)
+    assert "differs" in str(error.value)
+    assert "missing" in str(error.value)
