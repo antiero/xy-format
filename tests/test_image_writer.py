@@ -175,6 +175,22 @@ def test_build_arrangement_supports_sixteen_patterns_per_track():
     assert reloaded.pattern_start(1, 16) > reloaded.pattern_start(1, 15)
 
 
+def test_reads_device_song_loop_byte_and_rewrites_any_of_14_slots():
+    loop_on = ImageProject.from_file(
+        "src/one-off-changes-from-default/unnamed 155.xy"
+    )
+    loop_off = ImageProject.from_file(
+        "src/one-off-changes-from-default/unnamed 154.xy"
+    )
+    assert loop_on.get_song_chain(2) == ([0, 1, 2], True)
+    assert loop_off.get_song_chain(2) == ([0, 1], False)
+
+    loop_on.set_song_chain(14, [0, 1, 2], loop=True)
+    reloaded = ImageProject.from_bytes(loop_on.to_bytes())
+    assert reloaded.get_song_chain(2) == ([0, 1, 2], True)
+    assert reloaded.get_song_chain(14) == ([0, 1, 2], True)
+
+
 def test_build_arrangement_accepts_explicit_pattern_steps():
     from xy.image_writer import build_arrangement
     from xy.rle import decode_project
