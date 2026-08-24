@@ -1,6 +1,7 @@
 import {
   ImageProject,
   SCENE_COUNT,
+  SONG_FOOTER_SLOTS,
   SONG_MAX_CHAIN,
   STEP_TICKS,
   TRACK_COUNT,
@@ -423,7 +424,9 @@ export function buildProjectViewModel(
     validation: [],
     tracks,
     scenes: [],
-    songs: [imageProject.getSongChain(0)],
+    songs: Array.from({ length: SONG_FOOTER_SLOTS }, (_, songIndex) =>
+      imageProject.getSongChain(songIndex),
+    ),
     activeTrackIndex: previous?.activeTrackIndex ?? 0,
     activePatternIndex: previous?.activePatternIndex ?? 0,
     activeSceneIndex: previous?.activeSceneIndex ?? 0,

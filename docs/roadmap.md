@@ -21,6 +21,11 @@
   slots, known scale bytes, and metronome-off output.
 - [x] Rebuild XYBuddy with the current web bundle, run its full Swift tests and
   universal Release build, then repeat a live MTP upload/download/delete test.
+- [x] Parse and rewrite all 14 serialized song slots in XYBuddy, with compact
+  Song workspace navigation and device-authored Song 2 regression coverage.
+- [x] Correct generated Scene N storage to device-authored slot N−1 semantics.
+- [x] Add deterministic, preflighted limit probes for 99 scenes, a 96-entry
+  song chain, 16 patterns, and 120 notes; reject note 121 off-device.
 - [ ] Add one device-saved odd-scale capture to promote the contiguous
   0x06/0x08/0x09/0x0A mapping from E0 to E2.
 
@@ -61,7 +66,11 @@ Ordered by the amount of authoring capability each capture unlocks:
 - [ ] A 120-note pattern passes; note 121 is rejected off-device.
 
 The writer already enforces the structural limits. These checks certify the UI
-and playback edges rather than discovering new byte layouts.
+and playback edges rather than discovering new byte layouts. Generate the
+ordered artifacts with [`workflows/limit_certification.md`](workflows/limit_certification.md).
+The current set is staged byte-identically in the connected OS 1.1.25 device's
+Templates folder; see
+[`logs/2026-08-24_os_1_1_25_limit_probe_staging.md`](logs/2026-08-24_os_1_1_25_limit_probe_staging.md).
 
 ## Completed format/tooling work
 

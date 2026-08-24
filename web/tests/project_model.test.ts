@@ -9,6 +9,9 @@ import { exportXYProjectBytes } from "../src/lib/xy/projectExporter";
 import { loadXYBytes } from "../src/lib/xy/projectLoader";
 
 const BASELINE = "../src/one-off-changes-from-default/unnamed 1.xy";
+const TWO_SCENES =
+  "../src/scene-probes/2026-06-volumes/s0b-baseline-2scenes.xy";
+const SONG_TWO = "../src/one-off-changes-from-default/unnamed 155.xy";
 
 function loadBaseline() {
   const bytes = new Uint8Array(readFileSync(BASELINE));
@@ -28,11 +31,39 @@ describe("project view model and edit bridge", () => {
       trackScale: "1",
     });
     expect(project.scenes).toHaveLength(99);
+    expect(project.songs).toHaveLength(14);
     expect(project.songs[0]).toMatchObject({
       supported: true,
       sceneChain: [0],
       loop: false,
     });
+  });
+
+  it("reads and writes all 14 serialized song slots", () => {
+    const captured = loadXYBytes(
+      new Uint8Array(readFileSync(SONG_TWO)),
+      "song-two.xy",
+    );
+    expect(captured.songs[1]).toMatchObject({
+      index: 1,
+      sceneChain: [0, 1, 2],
+      supported: true,
+    });
+
+    const edited = applyEdit(loadBaseline(), {
+      type: "update-song-chain",
+      songIndex: 13,
+      sceneChain: [0, 1, 2],
+      loop: true,
+    });
+    const reloaded = loadXYBytes(exportXYProjectBytes(edited), "song-14.xy");
+    expect(reloaded.songs[13]).toMatchObject({
+      index: 13,
+      sceneChain: [0, 1, 2],
+      loop: true,
+      supported: true,
+    });
+    expect(reloaded.songs[0].sceneChain).toEqual([0]);
   });
 
   it("edits notes and pattern length, then exports and reloads the changes", () => {
@@ -114,6 +145,19 @@ describe("project view model and edit bridge", () => {
       loop: false,
       supported: true,
     });
+  });
+
+  it("maps device-authored Scene N directly to physical row N-1", () => {
+    const project = loadXYBytes(
+      new Uint8Array(readFileSync(TWO_SCENES)),
+      "two-scenes.xy",
+    );
+
+    expect(project.scenes[0].present).toBe(true);
+    expect(project.scenes[0].patternByTrack.slice(0, 4)).toEqual([0, 0, 0, 0]);
+    expect(project.scenes[1].present).toBe(true);
+    expect(project.scenes[1].patternByTrack.slice(0, 4)).toEqual([1, 0, 0, 0]);
+    expect(project.scenes[2].present).toBe(false);
   });
 
   it("validates scene references that exceed available patterns", () => {

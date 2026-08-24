@@ -91,8 +91,9 @@ work is field polish, productization, and edge-case validation:
 - Multisampler zones, drum slicing/choke metadata, and the remaining user
   `.preset` variants are not fully decoded. OS 1.1.25 also requires a fresh
   multisampler/global-transpose capture pair.
-- Limits certification remains for max scenes, visible song slots, full
-  16-pattern topology, and 120-note edge cases.
+- Deterministic maximum-scene, 96-entry song, 16-pattern, and 120-note files
+  are generated and preflighted; connected-device UI/playback certification
+  remains. XYBuddy now reads and rewrites all 14 serialized song slots.
 
 For the live status, use [the roadmap](docs/roadmap.md) and
 [the capability checklist](docs/parse_capability_checklist.md).

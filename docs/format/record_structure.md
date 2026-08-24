@@ -117,8 +117,9 @@ Mute is boolean: device probe 06 confirmed values 1, 2, and 3 **all
 display as muted** (no "solo" encoding here). The device writes 2; the
 writer emits 2 canonically.
 
-- Record 0 = live/current selection state (the old "descriptor").
-- Records 1…n−1 = scenes in order.
+- Record 0 = Scene 1 and the live/current selection state (the old
+  "descriptor").
+- Records 1…n−1 = Scene 2 onward in order.
 - The fixed header's end is anchored by `cd cc cc 00 0c 00 00 01 40`.
 
 Validation: **245/246 corpus files decode byte-exactly; the only

@@ -32,9 +32,14 @@
   let page = 0;
   let transportState: "idle" | "loading" | "playing" = "idle";
   let playbackError = "";
+  let selectedSongIndex = 0;
 
-  $: song = project.songs[0];
-  $: sequence = buildArrangerSequence(project);
+  $: selectedSongIndex = Math.min(
+    selectedSongIndex,
+    Math.max(0, project.songs.length - 1),
+  );
+  $: song = project.songs[selectedSongIndex];
+  $: sequence = buildArrangerSequence(project, selectedSongIndex);
   $: songSteps = collectSongPlaybackSteps(project, sequence.sceneIndexes);
   $: songEvents = collectSongPlaybackEvents(project, songSteps);
   $: songLength16ths = songSteps.reduce(
@@ -182,6 +187,16 @@
     announceDisplayMessage("REWIND", "neutral");
   }
 
+  function selectSong(index: number) {
+    stopPlayback();
+    selectedSongIndex = Math.max(0, Math.min(project.songs.length - 1, index));
+    selectedSongStep = 0;
+    activePlaybackStep = -1;
+    page = 0;
+    lastPlaybackPosition16ths = 0;
+    currentTickStore.set(0);
+  }
+
   function stopFromTransport() {
     if ($isPlayingStore) {
       stopPlayback();
@@ -221,7 +236,21 @@
   <div class="song-mode-display">
     <header class="song-mode-header">
       <span class="song-mode-mark" aria-hidden="true">⟲</span>
-      <h3>song {song ? song.index + 1 : 1}</h3>
+      <div class="song-mode-title">
+        <button
+          type="button"
+          aria-label="Previous song"
+          disabled={selectedSongIndex === 0}
+          on:click={() => selectSong(selectedSongIndex - 1)}>←</button
+        >
+        <h3>song {song ? song.index + 1 : 1}</h3>
+        <button
+          type="button"
+          aria-label="Next song"
+          disabled={selectedSongIndex >= project.songs.length - 1}
+          on:click={() => selectSong(selectedSongIndex + 1)}>→</button
+        >
+      </div>
       <div class="song-mode-count">
         <span>count</span>
         <strong>{String(currentSongStep + 1).padStart(2, "0")}</strong>
@@ -385,6 +414,28 @@
     font-size: 29px;
     font-weight: 700;
     line-height: 0;
+  }
+
+  .song-mode-title {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+  }
+
+  .song-mode-title button {
+    width: 30px;
+    min-height: 30px;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: #090909;
+    box-shadow: none;
+    font-size: 20px;
+  }
+
+  .song-mode-title button:disabled {
+    opacity: 0.2;
   }
 
   .song-mode-header h3 {

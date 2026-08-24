@@ -1576,8 +1576,9 @@ class ImageProject:
 # --- arrangement assembly (multi-pattern / scenes / songs) ----------------
 #
 # Decoded-image facts used here (docs/format/decoded_image_map.md):
-#   scenes array: 33-byte slots at GLOBAL+0x95 (slot 0 = live selection;
-#       sel[16] + mute[16] + flags); GLOBAL+0x06 = active scene slot
+#   scenes array: 33-byte slots at GLOBAL+0x95 (slot 0 = scene 1 and the
+#       current/live selection; sel[16] + mute[16] + flags);
+#       GLOBAL+0x06 = active scene slot
 #   clones: a track with N patterns serializes leader struct (17,876 B,
 #       count byte = N) followed by N-1 clone structs = pattern_struct[1:]
 #   footer: 14 song slots [scene_count][scene_ids...][loop_off][00],
@@ -1649,7 +1650,7 @@ def build_arrangement(
         gate_ticks?}, or {"notes": [...], "steps": N} / {"notes": [...],
         "bars": N} to set the explicit pattern length.
     scenes: optional scene rows; scene k maps 1-based track -> 0-based
-        pattern index (scene slots 1..n; slot 0 stays the live selection).
+        pattern index (scene 1 uses slot 0, scene 2 uses slot 1, and so on).
     scene_mutes: optional per-scene list of 1-based muted tracks (device
         mute value is 2; nonzero = muted, confirmed device-side).
     song_chain: optional list of 0-based scene ids for Song 1.
@@ -1666,24 +1667,27 @@ def build_arrangement(
     scene_slot0 = max(0, starts[0] - TRACK_TO_SCENE_SLOT_DELTA)
     g = bytearray(base[: starts[0]])
 
-    # live selection (slot 0): device sits on the last created pattern
-    sel_written = False
-    for t, pats in track_patterns.items():
-        if len(pats) > 1:
-            g[scene_slot0 + t - 1] = len(pats) - 1
-            sel_written = True
-    if sel_written:
-        g[scene_slot0 + 32] = 1  # flags
+    # With no explicit arrangement, slot 0 is the live selection and the
+    # device sits on the last created pattern. Explicit scenes below replace
+    # this row because device-authored files store scene N in slot N-1.
+    if not scenes:
+        sel_written = False
+        for t, pats in track_patterns.items():
+            if len(pats) > 1:
+                g[scene_slot0 + t - 1] = len(pats) - 1
+                sel_written = True
+        if sel_written:
+            g[scene_slot0 + 32] = 1  # flags
 
     if scenes:
         if len(scenes) > 99:
             raise ValueError("OP-XY supports at most 99 scenes")
-        # Legacy behavior: generated arrangements leave the active scene on the
-        # last supplied scene, matching the byte-exact j05/j06 fixtures.
+        # Leave the active selector on the last supplied scene, matching the
+        # device-authored active-scene field.
         g[GLOBAL_ACTIVE_SCENE] = len(scenes) - 1
-        for k, row in enumerate(scenes, start=1):
+        for k, row in enumerate(scenes):
             slot = scene_slot0 + k * SCENE_SLOT_SIZE
-            mutes = scene_mutes[k - 1] if scene_mutes and k - 1 < len(scene_mutes) else []
+            mutes = scene_mutes[k] if scene_mutes and k < len(scene_mutes) else []
             if force_scene_presence or any(row.values()) or mutes:
                 for t, pat in row.items():
                     if not 1 <= t <= 16 or not 0 <= pat < MAX_PATTERNS_PER_TRACK:

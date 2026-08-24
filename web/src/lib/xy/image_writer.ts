@@ -935,8 +935,20 @@ export class ImageProject {
     return 1 + count + 2;
   }
 
+  private songSlotOffset(songIndex: number): number | null {
+    if (songIndex < 0 || songIndex >= SONG_FOOTER_SLOTS) return null;
+    let offset = this.footerStart();
+    for (let index = 0; index < songIndex; index += 1) {
+      const length = this.songSlotLengthAt(offset);
+      if (offset + length > this.image.length) return null;
+      offset += length;
+    }
+    return offset < this.image.length ? offset : null;
+  }
+
   public getSongChain(songIndex: number = 0): SongChain {
-    if (songIndex !== 0) {
+    const start = this.songSlotOffset(songIndex);
+    if (start === null) {
       return {
         index: songIndex,
         sceneChain: [],
@@ -944,7 +956,6 @@ export class ImageProject {
         supported: false,
       };
     }
-    const start = this.footerStart();
     const count = this.image[start];
     if (count > SONG_MAX_CHAIN || start + 1 + count + 2 > this.image.length) {
       return {
@@ -972,8 +983,9 @@ export class ImageProject {
     sceneChain: number[],
     loop: boolean = true,
   ): void {
-    if (songIndex !== 0) {
-      throw new Error("only Song 1 write support is enabled in the web app");
+    const start = this.songSlotOffset(songIndex);
+    if (start === null) {
+      throw new Error(`song index must be 0..${SONG_FOOTER_SLOTS - 1}`);
     }
     if (sceneChain.length > SONG_MAX_CHAIN) {
       throw new Error(`song chain cannot exceed ${SONG_MAX_CHAIN} scenes`);
@@ -984,7 +996,6 @@ export class ImageProject {
       }
     }
 
-    const start = this.footerStart();
     const oldLength = this.songSlotLengthAt(start);
     const slot = new Uint8Array(1 + sceneChain.length + 2);
     slot[0] = sceneChain.length;

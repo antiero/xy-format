@@ -70,8 +70,9 @@ function sequenceLabel(source: ArrangerSequenceSource, index: number): string {
 
 export function buildArrangerSequence(
   project: XYProjectViewModel,
+  songIndex: number = 0,
 ): ArrangerSequence {
-  const song = project.songs[0];
+  const song = project.songs[songIndex];
   const songSceneIndexes =
     song?.supported && song.sceneChain.length > 0
       ? song.sceneChain.filter((sceneIndex) =>
