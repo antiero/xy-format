@@ -2,10 +2,7 @@ import pytest
 
 from tools.build_limit_probes import PROBE_NAMES, build_probe_bytes
 from xy.image_writer import (
-    NOTE_SIZE,
-    OFF_NOTE_COUNT,
     SCENE_SLOT_SIZE,
-    TRACK_STRIDE,
     ImageProject,
     pattern_starts_by_track_from_image,
 )
@@ -15,12 +12,6 @@ from xy.project_validation import validate_project_bytes
 @pytest.fixture(scope="module")
 def probes() -> dict[str, bytes]:
     return build_probe_bytes()
-
-
-def _footer_start(project: ImageProject) -> int:
-    patterns = pattern_starts_by_track_from_image(project.image)
-    last = patterns[-1][-1]
-    return last + TRACK_STRIDE + project.image[last + OFF_NOTE_COUNT] * NOTE_SIZE
 
 
 def test_probe_names_match_alphabetical_device_order() -> None:
@@ -48,9 +39,7 @@ def test_scenes99_populates_exactly_rows_zero_through_98(
 
 def test_song96_serializes_the_full_scene_chain(probes: dict[str, bytes]) -> None:
     project = ImageProject.from_bytes(probes["02_song96.xy"])
-    footer = _footer_start(project)
-    assert project.image[footer] == 96
-    assert list(project.image[footer + 1 : footer + 97]) == list(range(96))
+    assert project.get_song_chain(1) == (list(range(96)), True)
 
 
 def test_patterns16_and_notes120_hit_the_writer_ceilings(

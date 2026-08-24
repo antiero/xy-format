@@ -11,6 +11,7 @@ device-validated.
 | `[x]` | Implemented with tests or corpus/device validation |
 | `[~]` | Partial — location or heuristic known; enums/scaling/edge cases open |
 | `[ ]` | Not implemented or not pinned to stable offsets |
+| `[—]` | Classified outside `.xy` or runtime-only; no project field expected |
 
 **Evidence tiers** (use in logs and when marking `[~]`)
 
@@ -55,8 +56,8 @@ Contributor workflow: `docs/workflows/contributor_inspection_workflow.md`.
 | P-locks | `xy/plocks.py` | `ImageProject.set_plock` |
 | Step components | `xy/step_components.py` | `ImageProject.set_step_component` |
 | Preset reference inference | `xy/project_inspection.py` (heuristic) | `ImageProject.set_preset` (donor copy) |
-| Track preset path @ `+0x453F` | `xy/preset_path_inspection.py` | gap — donor `set_preset` only |
-| Drum sample path read | `xy/drum_sample_inspection.py` | indirect via `set_preset`; no per-slot path API |
+| Track preset path @ `+0x453F` | `xy/preset_path_inspection.py` | `ImageProject.set_preset_path` (48-byte bounded field) |
+| Drum sample path | `xy/drum_sample_inspection.py` | `ImageProject.set_drum_voice(..., path=...)` |
 | Static mixer / master bus read | `xy/mixer_static_inspection.py` | `ImageProject.set_track_*_byte/raw`, `set_master_*_byte/raw` |
 | Scene volumes + mutes read | `xy/scene_volume_inspection.py` | partial write via `build_arrangement` |
 | Master EQ / saturator read | `xy/master_eq_inspection.py`, `xy/master_saturator_inspection.py` | `set_master_eq`, `set_master_saturator_*_byte/raw` |
@@ -166,7 +167,8 @@ Field offsets: `docs/format/decoded_image_map.md`.
   `0xF7` preset-fragment region is structurally decoded
 - [x] Preset path structural **read** @ track `+0x453F` — `xy/preset_path_inspection.py`,
   `tests/test_preset_path_structural.py`, `src/preset-probes/2026-06-preset-path/`
-- [~] Preset path **write** @ `+0x453F` — no dedicated writer yet
+- [x] Preset path **write** @ `+0x453F` — `ImageProject.set_preset_path`,
+  fixed-field bounds/null-padding regression in `tests/test_image_writer.py`
 - [~] Play mode poly/mono/legato current value — partial
 - [~] Portamento amount/type, bend range — partial
 - [~] Preset volume / engine volume current value — partial
@@ -174,7 +176,8 @@ Field offsets: `docs/format/decoded_image_map.md`.
 - [x] Preset settings: high-pass, velocity sensitivity — decoded map
 - [ ] Preset settings: tuning, root, transpose, width — gap
 - [ ] Mod-routing destination enum + signed scaling — gap
-- [ ] User `.preset` file format (filesystem) — outside `.xy`
+- [—] User `.preset` file format classified as a separate filesystem format,
+  outside `.xy`; project files preserve/reference preset identity
 
 ## 8. Drum sampler (24 voices)
 
@@ -182,8 +185,9 @@ Field offsets: `docs/format/decoded_image_map.md`.
 - [x] Sample path **read** @ slot+`0x08` — `xy/drum_sample_inspection.py`, device fixtures
   `src/drum-sample-probes/2026-06-sample-paths/` + `archive-round0-nt-z-fx/`,
   `tests/test_drum_sample_inspection.py`, `tests/test_drum_sample_inspection_round0.py`
-- [~] Sample path **write** — only as part of donor `set_preset` region copy; no
-  `set_drum_voice_path()` yet — `docs/format/drum_sample_paths.md`
+- [x] Sample path **write** — `ImageProject.set_drum_voice(..., path=...)`,
+  fixed-field bounds/null-padding regression in `tests/test_image_writer.py`;
+  clean full-kit authoring is covered by the sampler project-state batch
 - [x] Tune, play mode, direction, start, loop-start candidate, end, gain — `set_drum_voice` (tune device-validated);
   **read** via `DrumVoiceSample` (`tune_semitones`, `direction`, `start`, `end`, `gain_u32`) —
   `tests/test_drum_voice_params_inspection.py` (`cap_drum_params.xy`)
@@ -206,7 +210,9 @@ Field offsets: `docs/format/decoded_image_map.md`.
 - [x] Scene slots: pattern sel[16] + mute[16] + row-present flag — `build_arrangement`,
   `read_scene_slot_flag`, `read_present_scene_slots`, `docs/format/scenes_songs.md`
 - [x] Scene mute (device value 2) — scenes 1–8, slot `N−1` — `tests/test_scene_track_mute_inspection.py`, `scene_mute_storage_slot`, `read_scene_muted_tracks`
-- [x] Song footer chain + loop word — `build_arrangement`
+- [x] Song footer chain + loop byte — `build_arrangement` plus
+  `ImageProject.get_song_chain` / `set_song_chain`; Python and XYBuddy parse
+  and rewrite all 14 serialized slots
 - [x] Multi-pattern clone assembly — `build_arrangement`
 - [~] 14 song slots vs guide “9 songs” — partial reconciliation — `docs/format/opxy_user_guide_save_audit.md`
 - [x] Track mix volume **read** @ track+`0x38FE` (u32 @ `+0x38FB`) —
@@ -453,8 +459,8 @@ and parameter.
   write via `set_fx_type` / `set_fx_type_name`; AUX-T15
 - [~] FX I engine parameter block — T15 `+0x3857..+0x3863`; delay anchors
   captured, per-engine schemas still partial; AUX-T15
-- [ ] FX I preview keyboard behavior: plays last selected instrument track —
-  runtime/UI behavior; persistence likely none
+- [—] FX I preview keyboard behavior classified as runtime/UI behavior; no
+  independent `.xy` persistence claim
 - [~] FX I routing mask / send sources from sound-producing tracks — M2 sends
   are source-track words at `+0x38AF`; explicit separate mask not found; AUX-T15
 - [x] FX I route amount per source track — source-track `+0x38AF`; write via
@@ -483,8 +489,8 @@ filtering, and M4 LFO modulation.
   write via `set_fx_type` / `set_fx_type_name`; AUX-T16
 - [~] FX II engine parameter block — T16 `+0x3857..+0x3863`; reverb baseline
   and delay anchors captured, per-engine schemas still partial; AUX-T16
-- [ ] FX II preview keyboard behavior: plays last selected instrument track —
-  runtime/UI behavior; persistence likely none
+- [—] FX II preview keyboard behavior classified as runtime/UI behavior; no
+  independent `.xy` persistence claim
 - [~] FX II routing mask / send sources from sound-producing tracks — M2 sends
   are source-track words at `+0x38B3`; explicit separate mask not found; AUX-T16
 - [x] FX II route amount per source track — source-track `+0x38B3`; write via
@@ -515,8 +521,10 @@ filtering, and M4 LFO modulation.
 
 ## 15. Outside project `.xy`
 
-- [ ] COM / system / Bluetooth / MTP settings — device-global, not in `.xy` — `docs/format/opxy_user_guide_save_audit.md` § COM
-- [ ] Sample folder WAV/AIFF on disk — filesystem; only paths referenced in project
+- [—] COM / system / Bluetooth / MTP settings classified as device-global, not
+  `.xy` — `docs/format/opxy_user_guide_save_audit.md` § COM
+- [—] Sample folder WAV/AIFF classified as filesystem content; `.xy` stores the
+  references and sample-edit state, while XYBuddy manages device files
 
 ---
 

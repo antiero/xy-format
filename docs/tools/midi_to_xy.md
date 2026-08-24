@@ -16,10 +16,10 @@ The tool starts from the known-good blank baseline, splits the MIDI into
 scene/song state, sets the MIDI tempo, and writes a decoded-image authored
 `.xy`.
 
-OP-XY has a hard limit of nine patterns per instrument track. The importer
+OP-XY OS 1.1.15 and later has a hard limit of 16 patterns per track. The importer
 therefore stores each distinct 4-bar window once, reuses it from later Song
 scenes, and uses a spare instrument track as a muted pattern bank when a
-source lane needs more than nine distinct windows. This preserves the full
+source lane needs more than 16 distinct windows. This preserves the full
 timeline for songs up to 96 four-bar scenes (384 bars). It stops with a clear
 error rather than silently truncating longer projects or arrangements that
 cannot fit into eight instrument pattern banks.

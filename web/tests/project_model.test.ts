@@ -35,7 +35,7 @@ describe("project view model and edit bridge", () => {
     expect(project.songs[0]).toMatchObject({
       supported: true,
       sceneChain: [0],
-      loop: false,
+      loop: true,
     });
   });
 
@@ -47,6 +47,7 @@ describe("project view model and edit bridge", () => {
     expect(captured.songs[1]).toMatchObject({
       index: 1,
       sceneChain: [0, 1, 2],
+      loop: true,
       supported: true,
     });
 

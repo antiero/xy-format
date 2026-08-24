@@ -23,7 +23,11 @@
   universal Release build, then repeat a live MTP upload/download/delete test.
 - [x] Parse and rewrite all 14 serialized song slots in XYBuddy, with compact
   Song workspace navigation and device-authored Song 2 regression coverage.
+- [x] Correct the decoded song loop field to one byte plus reserved zero;
+  expose all 14 slots through the Python image API as well as XYBuddy.
 - [x] Correct generated Scene N storage to device-authored slot N−1 semantics.
+- [x] Bound direct preset-path writes to the actual 48-byte field so long
+  identities cannot overwrite the note vector.
 - [x] Add deterministic, preflighted limit probes for 99 scenes, a 96-entry
   song chain, 16 patterns, and 120 notes; reject note 121 off-device.
 - [ ] Add one device-saved odd-scale capture to promote the contiguous

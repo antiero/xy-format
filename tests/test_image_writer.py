@@ -163,6 +163,22 @@ def test_build_arrangement_maps_scene_n_to_slot_n_minus_one():
     assert reloaded.image[reloaded.scene_slot0 + 3 * SCENE_SLOT_SIZE + 32] == 0
 
 
+def test_reads_device_song_loop_byte_and_rewrites_any_of_14_slots():
+    loop_on = ImageProject.from_file(
+        "src/one-off-changes-from-default/unnamed 155.xy"
+    )
+    loop_off = ImageProject.from_file(
+        "src/one-off-changes-from-default/unnamed 154.xy"
+    )
+    assert loop_on.get_song_chain(2) == ([0, 1, 2], True)
+    assert loop_off.get_song_chain(2) == ([0, 1], False)
+
+    loop_on.set_song_chain(14, [0, 1, 2], loop=True)
+    reloaded = ImageProject.from_bytes(loop_on.to_bytes())
+    assert reloaded.get_song_chain(2) == ([0, 1, 2], True)
+    assert reloaded.get_song_chain(14) == ([0, 1, 2], True)
+
+
 def test_build_arrangement_accepts_explicit_pattern_steps():
     from xy.image_writer import build_arrangement
     from xy.rle import decode_project
@@ -203,6 +219,26 @@ def test_set_preset_rejects_non_pristine_donor_track(tmp_path):
     target = ImageProject.from_file(BASE)
     with pytest.raises(ValueError, match="donor track must be pristine"):
         target.set_preset(2, str(donor_path), donor_track=2)
+
+
+def test_preset_and_drum_sample_paths_write_fixed_null_terminated_fields():
+    project = ImageProject.from_file(BASE)
+    project.set_preset_path(1, "presets/user/roadmap.preset")
+    project.set_drum_voice(1, 0, path="samples/user/roadmap-kick.wav")
+
+    start = project.pattern_start(1)
+    preset = project.image[
+        start + project.PRESET_PATH : start + project.PRESET_PATH + 48
+    ]
+    sample_start = start + project.DRUM_TABLE + project.DRUM_PATH
+    sample = project.image[sample_start : sample_start + 72]
+    assert preset.startswith(b"presets/user/roadmap.preset\x00")
+    assert sample.startswith(b"samples/user/roadmap-kick.wav\x00")
+
+    with pytest.raises(ValueError, match="shorter than 48 bytes"):
+        project.set_preset_path(1, "p" * 48)
+    with pytest.raises(ValueError, match="shorter than 72 bytes"):
+        project.set_drum_voice(1, 0, path="s" * 72)
 
 
 def test_spec_to_xy_image_reproduces_whitney_probe():

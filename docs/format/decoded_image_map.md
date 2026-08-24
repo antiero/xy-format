@@ -103,10 +103,10 @@ derived from scene row flags, not from `0x06`.
 same engine-param offsets (+0x3857…) of those structs (u36, u37).
 Engine swaps are size-preserving (param block fixed-size, u34).
 
-## Footer (last 56 bytes)
+## Footer (after Track 16; 56 bytes when all slots are default-length)
 
 The 14-slot song table (`record_structure.md` §5):
-`[scene_count][scene_ids...][loop_word]` per song; song 2/3 edits land at
+`[scene_count][scene_ids...][loop][reserved 00]` per song; song 2/3 edits land at
 FOOTER+0x2/+0xA (u149, u151–153).
 
 ## Method
@@ -229,7 +229,7 @@ matching the capture notes. The old raw-space "param_id" bytes and
 
 - **Engine ID at track+0x14** (u85: 0x12 Prism → 0x1F Wavetable;
   matches the known engine-id enum).
-- **Preset path string at track+0x453F** (null-padded, max 64 B; short
+- **Preset path string at track+0x453F** (null-padded, 48 B; short
   `category/preset-name` form). P1-B fixtures (`e0`…`e5`):
   `drum/boop` (new-project default), `drum/pp`, `drum/nt-aeroplane`,
   `bass/nt-106 bass`, `wind/nt-accord`; engine swap w/o preset → `/`.

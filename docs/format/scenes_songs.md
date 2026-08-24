@@ -57,9 +57,10 @@ song_chain=[scene_id, ...]
 song_loop=True
 ```
 
-The first byte is the chain length, followed by 0-based scene IDs and loop
-control bytes. The user guide advertises fewer visible songs than the footer
-capacity; visible-slot reconciliation remains a minor limit/documentation item.
+The first byte is the chain length, followed by 0-based scene IDs, a loop byte
+(`0` on, `1` off), and a reserved zero byte. The user guide advertises fewer
+visible songs than the footer capacity; visible-slot reconciliation remains a
+minor limit/documentation item.
 
 ## Validation
 

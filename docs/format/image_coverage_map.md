@@ -171,7 +171,7 @@ track unless noted.
 | slot `+0x68` / `+0x70` | **x** | Sample start / end u32 | — |
 | slot `+0x7C` | **x** | Gain / fade (fade on **preceding** slot for pad voices) | M3 |
 | `+0x3B3F` / `+0x3CBF` / `+0x3DBF` / `+0x423F` | **ui** | Last-touched / UI session families | ignore for decode |
-| `+0x453F` | **x** | Preset path string (64 B) | P1-B |
+| `+0x453F` | **x** | Preset path string (48 B; ends before note count at `+0x456F`) | P1-B |
 | `+0x456F` | **x** | Note count + 12-byte note records | `ImageProject.add_note` |
 | `+0x4570`–end | **~** | Trailing zero / record tail byte semantics | `record_structure.md` |
 
@@ -192,7 +192,7 @@ track unless noted.
 
 | Region | Status | Field |
 | --- | --- | --- |
-| Song slots ×14 | **~** | `[scene_count][scene_ids…][loop_word]` per song — `build_arrangement` |
+| Song slots ×14 | **x** | `[scene_count][scene_ids…][loop][reserved 00]`; Python and XYBuddy read/write every slot |
 | Expanded multi-scene tail byte | **?** | Extra byte on some song edits — `record_structure.md` §5 |
 | Footer size | **~** | Baseline image has **56** B after T16; `record_structure.md` cites **53** B |
 

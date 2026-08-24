@@ -968,12 +968,11 @@ export class ImageProject {
     const sceneChain = Array.from(
       this.image.subarray(start + 1, start + 1 + count),
     );
-    const loopA = this.image[start + 1 + count];
-    const loopB = this.image[start + 1 + count + 1];
+    const loopRaw = this.image[start + 1 + count];
     return {
       index: songIndex,
       sceneChain,
-      loop: loopA === 0 && loopB === 1,
+      loop: loopRaw === 0,
       supported: true,
     };
   }
@@ -1001,7 +1000,7 @@ export class ImageProject {
     slot[0] = sceneChain.length;
     slot.set(sceneChain, 1);
     slot[1 + sceneChain.length] = loop ? 0 : 1;
-    slot[1 + sceneChain.length + 1] = loop ? 1 : 0;
+    slot[1 + sceneChain.length + 1] = 0;
 
     const newImage = new Uint8Array(
       this.image.length - oldLength + slot.length,

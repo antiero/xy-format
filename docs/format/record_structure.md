@@ -151,9 +151,9 @@ limit), located after the last `ff 00 00 … 9b` run at the end of Track
 16's content:
 
 ```
-song_slot := [scene_count u8][scene_idx u8 × count (0-based)][loop_word 2B]
-default      01 00 00 01      (1 entry: scene 1, loop on)
-loop_word := 00 01 = loop ON | 01 00 = loop OFF
+song_slot := [scene_count u8][scene_idx u8 × count (0-based)][loop u8][reserved 00]
+default      01 00 00 00      (1 entry: scene 1, loop on)
+loop := 00 = loop ON | 01 = loop OFF
 ```
 
 Device-verified A/B: `unnamed 150 nl` (Song 1 loop off) = `01 00 01 00`;
@@ -162,8 +162,8 @@ Multi-scene example: `unnamed 155` Song 2 = `03 00 01 02 …` = scenes
 1,2,3 chained — matching its documented arrangement. Crash #5's "l01/l02
 Track16 structural transplants" were edits to these slots.
 
-Open: expanded (multi-scene) slots carry one extra trailing byte vs the
-plain `[list][loop_word]` model; exact field still unplaced.
+The final byte remains zero in the decoded device fixtures and is preserved as
+the slot's reserved byte.
 
 ### Pre-track selection bytes 0x0F–0x11 (partial)
 

@@ -17,8 +17,9 @@
 
 ## Scope
 
-The guide's workflow chapter is the best persistence summary: each track has
-up to nine patterns; each pattern holds notes/sounds, locks, components,
+The guide's workflow chapter is the best persistence summary. On OS 1.1.15 and
+later each track has up to 16 patterns (the reviewed guide described nine);
+each pattern holds notes/sounds, locks, components,
 bars, and preset/sound state; scenes store pattern choices plus track volumes
 and mutes; songs arrange scenes; projects hold those objects. This audit follows
 that model and then walks through every guide section that exposes editable
@@ -173,12 +174,12 @@ Guide refs: section 16.1 p.66; section 16.2 p.66; section 16.3 p.67; section 16.
 
 | Function | What should save | Current decode |
 |---|---|---|
-| Pattern switching/copy/create | Up to nine pattern structs per track. | Decoded: adding a pattern inserts a 17,876-byte pattern struct; leader count byte gives pattern count. |
+| Pattern switching/copy/create | Up to 16 pattern structs per track on OS 1.1.15+ (nine in the reviewed guide). | Decoded: adding a pattern inserts a 17,876-byte pattern struct; leader count byte gives pattern count. |
 | Scene pattern selections | Pattern choice for each track in each scene. | Decoded in current RLE-image model as 33-byte scene slots: `selected_pattern[16] + mute[16] + flags`. Legacy pretrack token docs are superseded for canonical writing. |
 | Scene mutes | Per-track mute state per scene. | Decoded: mute bytes in scene slot; device-confirmed nonzero boolean, writer uses value `2`. |
 | Scene volumes | Guide explicitly says scenes store track volumes. | **Partial (P2-D).** Bytes on track struct `+0x38FE` (and master `global+0x94`) differ per scene; storage routing `T+S−1` on two-scene captures. Playback on 1.1.4 heard global mix — semantics open. |
-| Song arrangement | Scene chain per song. | Decoded: footer song table slots `[scene_count][scene_ids...][loop_word]`. |
-| Song loop | Loop on/off per song. | Decoded: loop word in footer, device-validated. |
+| Song arrangement | Scene chain per song. | Decoded: footer song table slots `[scene_count][scene_ids...][loop][reserved 00]`. |
+| Song loop | Loop on/off per song. | Decoded: one loop byte (`0` on, `1` off), device-validated. |
 | Number of songs | Guide says 9 songs. | Partial/mismatch. Footer has 14 four-byte slots in decoded image; need reconcile which slots are user-visible vs reserved/other state. |
 | Active song/scene selection | Current selected song/scene. | Decoded (HDR). Global `0x06` is active scene slot, zero-based; global `0x07` is active song slot, with `0x10` as fresh/default Song 1 sentinel. |
 

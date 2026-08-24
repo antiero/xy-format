@@ -198,8 +198,8 @@ breakthrough, not yet a writing one.
    local; the cross-track rules were artifacts. 2,224 records, zero
    unexplained cells.
 5. **Song table.** File footer = 14 slots of
-   `[scene_count][scene_ids…][loop_word]`; loop word `00 01` = on,
-   `01 00` = off (unnamed 150 nl/lp device A/B). Pre-track byte 0x11 =
+   `[scene_count][scene_ids…][loop][reserved 00]`; loop byte `00` = on,
+   `01` = off (unnamed 150 nl/lp device A/B). Pre-track byte 0x11 =
    selected song − 1.
 6. **Performance automation lanes** (the 0x60/0x61 tails):
    `[first_lane][count][v0 u16][vmax u16]` + `(t u16, v u16)` keyframes;
