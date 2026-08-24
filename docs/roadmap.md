@@ -19,7 +19,7 @@
 - [x] Add generated-project preflight for layout, note/pattern limits, engine
   and preset identity, scene references, sample paths/windows, mapped drum
   slots, known scale bytes, and metronome-off output.
-- [ ] Rebuild XYBuddy with the current web bundle, run its full Swift tests and
+- [x] Rebuild XYBuddy with the current web bundle, run its full Swift tests and
   universal Release build, then repeat a live MTP upload/download/delete test.
 - [ ] Add one device-saved odd-scale capture to promote the contiguous
   0x06/0x08/0x09/0x0A mapping from E0 to E2.
