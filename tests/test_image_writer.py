@@ -95,6 +95,23 @@ def test_track_scanner_uses_firmware_dependent_global_header_size(
     assert project.track_start(1) == track_base
     assert project.track_start(2) == track_base + 17876
 
+    # Quantization is user state at the start of the historical scan marker.
+    # Once edited, every header-aware reader must use the firmware-family
+    # fallback instead of silently assuming the 1.1.25 Track 1 offset.
+    project.set_track_quantization_raw(1, 0x7B)
+    encoded = project.to_bytes()
+    reloaded = ImageProject.from_bytes(encoded)
+    assert reloaded.track_start(1) == track_base
+    assert reloaded.track_start(2) == track_base + 17876
+
+    from xy.project_inspection import inspect_project_bytes
+    from xy.project_validation import validate_project
+    from xy.scene_volume_inspection import inspect_scene_volumes_bytes
+
+    assert len(inspect_project_bytes(encoded).tracks) == 16
+    assert validate_project(reloaded).ok
+    assert len(inspect_scene_volumes_bytes(encoded).track_volumes) == 16
+
 
 def test_replicates_unnamed_81_single_note_step9():
     out = build(lambda p: p.add_note(1, step=9, note=60))

@@ -13,6 +13,7 @@ from .image_writer import (
     TRACK_COUNT,
     ImageProject,
     pattern_starts_by_track_from_image,
+    track_base_from_header,
 )
 
 KNOWN_INSTRUMENT_ENGINES = {0x02, 0x03, 0x06, 0x07, 0x12, 0x13, 0x14, 0x16, 0x1E, 0x1F, 0x20}
@@ -91,7 +92,9 @@ def validate_project(project: ImageProject, *, generated: bool = False) -> Proje
     output and populated sample paths. Unknown bytes remain untouched.
     """
     issues: list[ProjectValidationIssue] = []
-    patterns_by_track = pattern_starts_by_track_from_image(project.image)
+    patterns_by_track = pattern_starts_by_track_from_image(
+        project.image, track_base_from_header(project.header)
+    )
     if len(patterns_by_track) != TRACK_COUNT:
         issues.append(
             ProjectValidationIssue(

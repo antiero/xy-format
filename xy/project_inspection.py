@@ -5,7 +5,12 @@ from collections import Counter
 from dataclasses import dataclass
 from typing import Literal
 
-from .image_writer import TRACK_STRIDE, pattern_starts_by_track_from_image
+from .image_writer import (
+    TRACK_BASE0,
+    TRACK_STRIDE,
+    pattern_starts_by_track_from_image,
+    track_base_from_header,
+)
 from .rle import decode_project
 
 
@@ -83,12 +88,14 @@ class ProjectInspection:
 
 
 def inspect_project_bytes(data: bytes) -> ProjectInspection:
-    _header, image = decode_project(data)
-    return inspect_project_image(image)
+    header, image = decode_project(data)
+    return inspect_project_image(image, track_base=track_base_from_header(header))
 
 
-def inspect_project_image(image: bytes) -> ProjectInspection:
-    starts_by_track = pattern_starts_by_track_from_image(image)
+def inspect_project_image(
+    image: bytes, *, track_base: int = TRACK_BASE0
+) -> ProjectInspection:
+    starts_by_track = pattern_starts_by_track_from_image(image, track_base)
     tracks: list[TrackInspection] = []
 
     for track_number, track_starts in enumerate(starts_by_track[:16], start=1):

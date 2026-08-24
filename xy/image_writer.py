@@ -438,7 +438,7 @@ class ImageProject:
 
     def _footer_start(self) -> int:
         patterns = self._pattern_starts or pattern_starts_by_track_from_image(
-            self.image
+            self.image, track_base_from_header(self.header)
         )
         if len(patterns) != TRACK_COUNT or not patterns[-1]:
             raise ValueError("could not locate song footer after Track 16")
