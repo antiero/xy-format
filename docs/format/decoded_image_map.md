@@ -15,16 +15,27 @@
 ## Image Layout
 
 ```
-0x00000          global header            (3,449 bytes; ends before T1 @ 0x0D79)
-0x00D79 + k*0x45D4   track struct k=0..15 (17,876 bytes each)
-end − footer     song table               (53 B in older notes; **56 B** in `unnamed 1.xy`)
+0x00000          global header            (firmware-dependent; see below)
+track_base + …   track/pattern structs    (17,876-byte base plus vectors/growth)
+end − footer     song table               (firmware-dependent variable-length slots)
 ```
 
-`3,449 + 16×17,876 + 56 = 289,521` on baseline (`unnamed 1.xy`). Older
-docs used 53-byte footer — see [`image_coverage_map.md`](image_coverage_map.md) §3. Adding a pattern inserts one
+`3,449 + 16×17,876 + 56 = 289,521` on baseline (`unnamed 1.xy`), but this
+is one firmware family rather than a universal layout. Real-device corpus
+evidence reported in [issue #19](https://github.com/kmorrill/xy-format/issues/19)
+establishes this Track 1 base mapping from container header byte 5:
+
+| header[5] | Track 1 base |
+|---|---:|
+| `0x0E`, `0x0F` | 3,933 |
+| `0x10`, `0x11` | 3,433 |
+| `0x13` | 3,449 |
+
+Adding a pattern inserts one
 more 17,876-byte struct (clones in raw space were full copies because the
-struct *is* the pattern). Track structs grow only via count-prefixed
-vectors (notes: +12 bytes each).
+struct *is* the pattern). Programmed notes add 12 bytes each. Live recording
+can append additional per-pattern automation data, so 17,876 plus note-vector
+bytes is not a universal stride.
 
 ## Global Header Fields
 
@@ -96,14 +107,14 @@ derived from scene row flags, not from `0x06`.
 | +0x3917 / +0x392F | velocity sensitivity / track high-pass filter | u82, u40 |
 | +0x38F2 / +0x38F6 | T9–T16 project-config save side-effect (`0x00`→`0x40` in every PCFG variant; not the edited setting) | PCFG |
 | +0x3CBF | 2-byte UI-state (last-touched?) — co-changes with edits | u40, u66, u82 |
-| ~+0x456F | **note event area**: `[count u8]` + 12-byte note records `{u32 tick; u32 gate; u8 note; u8 vel; u8 flags[2]}` (tick 480/16th, gate 240 = default). Micro-timing lives in `tick` (non-grid values, u79/u87), not the flags. `flags[1]` always 0 in corpus; `flags[0]` 0 for programmed notes, 2 on some MIDI-recorded drum notes (n110); firmware **does** read them (device probe 07: `flags[0]=127` caused a note retrigger), but out-of-range values misbehave — writer emits 0,0 (device default). Confirmed on T9 Brain, T10 Punch-in FX, and T12 External CV probes. | u81 decode; corpus scan; probe 07; AUX-BRAIN; AUX-T10; AUX-T12 |
+| ~+0x456F | **note event area**: `[count u8]` + 12-byte note records `{i32 tick; u32 gate; u8 note; u8 vel; u8 flags[2]}` (tick 480/16th, gate 240 = default). Negative ticks encode pickup notes before the bar. Live-recording flag bytes are not constrained to zero; preserve arbitrary values when reading/round-tripping. The writer emits 0,0 for newly programmed notes. | u81 decode; corpus scan; issue #19; probe 07; AUX-BRAIN; AUX-T10; AUX-T12 |
 | end | trailing zero region (raw-space "tail byte" = its run extension) | — |
 
 **Aux tracks**: T15 = FX1, T16 = FX2 — FX type changes substitute in the
 same engine-param offsets (+0x3857…) of those structs (u36, u37).
 Engine swaps are size-preserving (param block fixed-size, u34).
 
-## Footer (last 56 bytes)
+## Footer (firmware-dependent, ends at EOF)
 
 The 14-slot song table (`record_structure.md` §5):
 `[scene_count][scene_ids...][loop_word]` per song; song 2/3 edits land at
@@ -113,8 +124,9 @@ FOOTER+0x2/+0xA (u149, u151–153).
 
 `tools/analysis/decoded_diff.py` against the baseline, joined with
 `src/one-off-changes-from-default/op-xy_project_change_log.md`. Most
-one-off files are pure substitutions of 1–16 bytes at the offsets above;
-files that add notes/patterns grow by exactly 12 / 17,876 bytes.
+one-off files are pure substitutions of 1–16 bytes at the offsets above.
+Programmed notes add 12 bytes and ordinary clones add a 17,876-byte base;
+live-recorded automation can add further per-pattern growth.
 
 ## The "Event Type" Byte: RESOLVED — it never existed
 
@@ -229,7 +241,7 @@ matching the capture notes. The old raw-space "param_id" bytes and
 
 - **Engine ID at track+0x14** (u85: 0x12 Prism → 0x1F Wavetable;
   matches the known engine-id enum).
-- **Preset path string at track+0x453F** (null-padded, max 64 B; short
+- **Preset path string at track+0x453F** (48-byte field, null-padded; short
   `category/preset-name` form). P1-B fixtures (`e0`…`e5`):
   `drum/boop` (new-project default), `drum/pp`, `drum/nt-aeroplane`,
   `bass/nt-106 bass`, `wind/nt-accord`; engine swap w/o preset → `/`.

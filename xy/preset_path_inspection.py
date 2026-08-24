@@ -14,7 +14,7 @@ from .image_writer import ImageProject
 from .rle import decode_project
 
 PRESET_PATH_OFFSET = 0x453F
-PRESET_PATH_MAX = 64
+PRESET_PATH_MAX = 48
 ENGINE_ID_OFFSET = 0x14
 
 
