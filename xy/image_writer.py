@@ -1118,19 +1118,27 @@ class ImageProject:
         self.image[s : s + len(data)] = data
         self.mark_edited(track)
 
-    def set_step_component(self, track: int, step: int, component: str, value: int) -> None:
+    def set_step_component(
+        self,
+        track: int,
+        step: int,
+        component: str,
+        value: int,
+        *,
+        pattern: int = 1,
+    ) -> None:
         """Enable a step component (1-based step) and set its value byte."""
         bit = self.STEP_COMPONENTS[component]
-        s = self.track_start(track) + self.TRK_STEPCOMP + (step - 1) * 16
+        s = self.pattern_start(track, pattern) + self.TRK_STEPCOMP + (step - 1) * 16
         mask = int.from_bytes(self.image[s : s + 2], "little") | (1 << bit)
         self.image[s : s + 2] = mask.to_bytes(2, "little")
         self.image[s + 2 + bit] = value & 0xFF
-        self.mark_edited(track)
+        self.mark_pattern_edited(track, pattern)
 
-    def clear_step_components(self, track: int, step: int) -> None:
-        s = self.track_start(track) + self.TRK_STEPCOMP + (step - 1) * 16
+    def clear_step_components(self, track: int, step: int, *, pattern: int = 1) -> None:
+        s = self.pattern_start(track, pattern) + self.TRK_STEPCOMP + (step - 1) * 16
         self.image[s : s + 16] = b"\x00" * 16
-        self.mark_edited(track)
+        self.mark_pattern_edited(track, pattern)
 
     # Automation requires more than the value cell: the firmware reads a
     # per-step "this step has automation" flag (GLOBAL per step, not per
@@ -1139,24 +1147,88 @@ class ImageProject:
     PLOCK_STEP_FLAG = 0x2C4E   # +8*(step-1), value 0x01
     PLOCK_MASTER = 0x304E      # 0x01 once per automated track
 
-    def set_plock(self, track: int, step: int, param: str, value: int) -> None:
+    def set_plock(
+        self,
+        track: int,
+        step: int,
+        param: str,
+        value: int,
+        *,
+        pattern: int = 1,
+    ) -> None:
         """Lock `param` to `value` (u16) on `step` (1-based). Also arms the
         per-step + master automation flags so the lock actually plays."""
-        s = self.track_start(track)
+        s = self.pattern_start(track, pattern)
         off = self.PLOCK_PARAMS[param]
         cell = s + self.TRK_PLOCK + (step - 1) * 84 + off
         self.image[cell : cell + 2] = (value & 0xFFFF).to_bytes(2, "little")
         self.image[s + self.PLOCK_STEP_FLAG + (step - 1) * 8] = 0x01
         self.image[s + self.PLOCK_MASTER] = 0x01
-        self.mark_edited(track)
+        self.mark_pattern_edited(track, pattern)
 
-    def automate_param(self, track: int, param: str, step_values: dict[int, int]) -> None:
+    def automate_param(
+        self,
+        track: int,
+        param: str,
+        step_values: dict[int, int],
+        *,
+        pattern: int = 1,
+    ) -> None:
         """Automate `param` across steps. `step_values` maps 1-based step ->
         u16 value. Writes the value lane + per-step flags + master flag —
         the device automation structure (matches unnamed 35 / plock_drum_t2).
         Values are the device's internal fixed-point (e.g. 0..0x7FFF)."""
         for step, v in step_values.items():
-            self.set_plock(track, step, param, v)
+            self.set_plock(track, step, param, v, pattern=pattern)
+
+    def rotate_pattern(self, track: int, steps: int, *, pattern: int = 1) -> None:
+        """Rotate triggers, p-locks, and components as one coherent pattern.
+
+        Positive values rotate right/later; negative values rotate left/earlier.
+        Only active steps participate, so inactive rows beyond a shortened
+        pattern keep their preserved device state.
+        """
+        if not isinstance(steps, int) or isinstance(steps, bool):
+            raise TypeError("rotation steps must be an integer")
+        s = self.pattern_start(track, pattern)
+        active_steps = self.image[s + OFF_PATTERN_STEPS]
+        if not 1 <= active_steps <= 64:
+            raise ValueError("pattern length must be 1..64 steps")
+        shift = steps % active_steps
+        if shift == 0:
+            return
+
+        pattern_ticks = active_steps * STEP_TICKS
+        count = self.image[s + OFF_NOTE_COUNT]
+        note_start = s + OFF_NOTE_COUNT + 1
+        records: list[bytes] = []
+        for index in range(count):
+            offset = note_start + index * NOTE_SIZE
+            record = bytearray(self.image[offset : offset + NOTE_SIZE])
+            tick = int.from_bytes(record[0:4], "little", signed=True)
+            rotated_tick = (tick + steps * STEP_TICKS) % pattern_ticks
+            record[0:4] = rotated_tick.to_bytes(4, "little")
+            records.append(bytes(record))
+        records.sort(key=lambda record: int.from_bytes(record[0:4], "little"))
+        self.image[note_start : note_start + count * NOTE_SIZE] = b"".join(records)
+
+        def rotate_rows(relative: int, row_size: int) -> None:
+            begin = s + relative
+            rows = [
+                bytes(
+                    self.image[
+                        begin + index * row_size : begin + (index + 1) * row_size
+                    ]
+                )
+                for index in range(active_steps)
+            ]
+            rotated = rows[-shift:] + rows[:-shift]
+            self.image[begin : begin + active_steps * row_size] = b"".join(rotated)
+
+        rotate_rows(self.TRK_PLOCK, 84)
+        rotate_rows(self.PLOCK_STEP_FLAG, 8)
+        rotate_rows(self.TRK_STEPCOMP, 16)
+        self.mark_pattern_edited(track, pattern)
 
     # --- drum-voice parameters (decoded from device capture + manual) -----
     # 24 voice slots, 128 B each, at track+0x3957 (the drum sampler table).

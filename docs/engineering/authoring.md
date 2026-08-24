@@ -73,6 +73,7 @@ p.set_track_block(track, offset, data)   # envelopes/filter/mod-routing blocks
 # per-step modifiers
 p.set_step_component(track, step, "pulse", value)   # 14 component names
 p.set_plock(track, step, "cutoff", value)           # ~30 param names
+p.rotate_pattern(track, 1, pattern=1)    # notes + p-locks + components together
 
 # drum voices (24)
 p.set_drum_voice(track, voice, path="/fat32/presets/drum/kit.preset/kick.wav",
