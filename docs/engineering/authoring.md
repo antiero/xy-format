@@ -104,7 +104,9 @@ Component names: `STEP_COMPONENTS`; p-lock param names: `PLOCK_PARAMS`.
 The M2 shift, send, LFO-current, and mix helpers write static/current u32
 lanes. They do not create automation. To create step automation, use
 `set_plock`/`automate_param`, which also writes the firmware's per-step and
-master automation flags.
+master automation flags and seeds the sparse predecessor carry cell used by
+firmware sequence shifts. `rotate_pattern` preserves that carry/cache curve
+while moving the lock activation and step-component rows with the notes.
 
 ### `build_arrangement` (multi-pattern / scenes / songs)
 

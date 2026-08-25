@@ -1306,6 +1306,7 @@ class ImageProject:
     # per-step "this step has automation" flag (GLOBAL per step, not per
     # param — confirmed across unnamed 35 param1 and plock_drum_t2 param2)
     # and a per-track master flag, or the value lane is inert.
+    PLOCK_CURRENT = 0x024C     # +2*column, UI current-value cache
     PLOCK_STEP_FLAG = 0x2C4E   # +8*(step-1), value 0x01
     PLOCK_MASTER = 0x304E      # 0x01 once per automated track
 
@@ -1323,6 +1324,25 @@ class ImageProject:
         s = self.pattern_start(track, pattern)
         off = self.PLOCK_PARAMS[param]
         cell = s + self.TRK_PLOCK + (step - 1) * 84 + off
+        active_steps = self.image[s + OFF_PATTERN_STEPS]
+        if not 1 <= step <= active_steps:
+            raise ValueError(f"p-lock step must be in 1..{active_steps}")
+
+        # A grid-entered lock also leaves a carry value on the preceding
+        # unarmed step.  The firmware consults this sparse value curve when
+        # displaying/playing the armed destination; writing only the armed
+        # cell works accidentally on step 1 but resolves to the parameter
+        # minimum after a sequence shift.  Firmware 1.1.25 capture:
+        # step 7 = 0x7000, preceding step 6 = 0x6FFF.
+        previous_step = active_steps if step == 1 else step - 1
+        previous_cell = s + self.TRK_PLOCK + (previous_step - 1) * 84 + off
+        previous_flag = self.image[
+            s + self.PLOCK_STEP_FLAG + (previous_step - 1) * 8
+        ]
+        previous_value = self.image[previous_cell : previous_cell + 2]
+        if previous_flag == 0 and previous_value == b"\x00\x00":
+            carry = max(0, (value & 0xFFFF) - 1)
+            self.image[previous_cell : previous_cell + 2] = carry.to_bytes(2, "little")
         self.image[cell : cell + 2] = (value & 0xFFFF).to_bytes(2, "little")
         self.image[s + self.PLOCK_STEP_FLAG + (step - 1) * 8] = 0x01
         self.image[s + self.PLOCK_MASTER] = 0x01
@@ -1384,7 +1404,40 @@ class ImageProject:
             rotated = rows[-shift:] + rows[:-shift]
             self.image[begin : begin + active_steps * row_size] = b"".join(rotated)
 
-        rotate_rows(self.TRK_PLOCK, 84)
+        # P-lock values form a sparse carry/cache curve rather than ordinary
+        # step rows.  A native OP-XY sequence shift copies each non-zero cell
+        # to its shifted destination but does not clear the source cell.  The
+        # separately rotated activation rows decide which step is actually
+        # locked.  Circularly rotating zero rows erases the carry value and
+        # makes a valid lock display/play as the parameter minimum.
+        plock_begin = s + self.TRK_PLOCK
+        plock_rows = [
+            bytes(
+                self.image[
+                    plock_begin + index * 84 : plock_begin + (index + 1) * 84
+                ]
+            )
+            for index in range(active_steps)
+        ]
+        active_columns: set[int] = set()
+        for index, row in enumerate(plock_rows):
+            destination = (index + shift) % active_steps
+            destination_start = plock_begin + destination * 84
+            armed = self.image[s + self.PLOCK_STEP_FLAG + index * 8] != 0
+            for column in range(42):
+                value = row[column * 2 : column * 2 + 2]
+                if value != b"\x00\x00":
+                    target = destination_start + column * 2
+                    self.image[target : target + 2] = value
+                    if armed:
+                        active_columns.add(column)
+
+        # Native sequence shift clears the per-lane UI current-value cache;
+        # the shifted sparse curve remains authoritative.
+        for column in active_columns:
+            current = s + self.PLOCK_CURRENT + column * 2
+            self.image[current : current + 2] = b"\x00\x00"
+
         rotate_rows(self.PLOCK_STEP_FLAG, 8)
         rotate_rows(self.TRK_STEPCOMP, 16)
         self.mark_pattern_edited(track, pattern)
