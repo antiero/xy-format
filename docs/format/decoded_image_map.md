@@ -214,6 +214,17 @@ firmware also reads:
 (A UI current-value header at `track+0x24C + 2·col` and the resting
 engine value mirror the lane but are cosmetic, not needed for playback.)
 
+Firmware 1.1.25 native sequence-shift captures establish that the 64×84
+value table behaves as a sparse carry/cache curve, not as 64 ordinary rows
+that can be rotated destructively. Entering a Step 7 value of `0x7000` also
+wrote `0x6FFF` into the unarmed Step 6 cell. Shifting the sequence left copied
+those values into Steps 5 and 6 while retaining Step 7's `0x7000`; only the
+activation flag moved from Step 7 to Step 6. The firmware also cleared the
+lane's UI current-value cache. Accordingly, `set_plock()` seeds the predecessor
+carry cell and `rotate_pattern()` copies non-zero curve cells to their shifted
+destinations without clearing their sources, while rotating activation and
+step-component rows normally.
+
 Verified with the device-passed `plock_drum_t2.xy` (alternating
 256/32767 on known steps, uniform 84 stride) and the cc_map captures.
 The column index is the device's master per-track parameter

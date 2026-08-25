@@ -316,6 +316,35 @@ def test_rotate_pattern_moves_notes_plocks_components_and_flags_together():
     assert bytes(p.image[inactive_start : inactive_start + 16]) == inactive_before
 
 
+def test_plock_carry_curve_matches_firmware_sequence_shift() -> None:
+    """Firmware 1.1.25 keeps sparse p-lock carry cells during rotation."""
+    arranged = build_arrangement(
+        BASE,
+        {1: [[], {"steps": 8, "notes": [{"step": 7, "note": 69}]}]},
+    )
+    p = ImageProject.from_bytes(arranged)
+    p.set_plock(1, 7, "param1", 0x7000, pattern=2)
+
+    base = p.pattern_start(1, 2)
+
+    def param1(step: int) -> int:
+        cell = base + p.TRK_PLOCK + (step - 1) * 84 + 2
+        return int.from_bytes(p.image[cell : cell + 2], "little")
+
+    assert param1(6) == 0x6FFF
+    assert param1(7) == 0x7000
+
+    p.rotate_pattern(1, -1, pattern=2)
+
+    assert param1(5) == 0x6FFF
+    assert param1(6) == 0x7000
+    assert param1(7) == 0x7000
+    assert p.image[base + p.PLOCK_STEP_FLAG + 5 * 8] == 1
+    assert p.image[base + p.PLOCK_STEP_FLAG + 6 * 8] == 0
+    current = base + p.PLOCK_CURRENT + 2
+    assert p.image[current : current + 2] == b"\x00\x00"
+
+
 def test_rotate_pattern_supports_clones_and_negative_steps():
     arranged = build_arrangement(
         BASE,
