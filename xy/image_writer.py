@@ -1328,22 +1328,30 @@ class ImageProject:
         if not 1 <= step <= active_steps:
             raise ValueError(f"p-lock step must be in 1..{active_steps}")
 
-        # A grid-entered lock also leaves a carry value on the preceding
-        # unarmed step.  The firmware consults this sparse value curve when
-        # displaying/playing the armed destination; writing only the armed
-        # cell works accidentally on step 1 but resolves to the parameter
-        # minimum after a sequence shift.  Firmware 1.1.25 capture:
-        # step 7 = 0x7000, preceding step 6 = 0x6FFF.
-        previous_step = active_steps if step == 1 else step - 1
-        previous_cell = s + self.TRK_PLOCK + (previous_step - 1) * 84 + off
-        previous_flag = self.image[
-            s + self.PLOCK_STEP_FLAG + (previous_step - 1) * 8
-        ]
-        previous_value = self.image[previous_cell : previous_cell + 2]
-        if previous_flag == 0 and previous_value == b"\x00\x00":
-            carry = max(0, (value & 0xFFFF) - 1)
-            self.image[previous_cell : previous_cell + 2] = carry.to_bytes(2, "little")
-        self.image[cell : cell + 2] = (value & 0xFFFF).to_bytes(2, "little")
+        raw_value = value & 0xFFFF
+
+        # A grid-entered lock after step 1 also leaves a carry value on the
+        # preceding unarmed step.  The firmware consults this sparse curve
+        # when displaying/playing the armed destination.  Step 1 is the
+        # non-circular boundary: it uses the lane's current-value cache and
+        # does not wrap a carry into the pattern's last step.  Firmware 1.1.25
+        # capture: step 7 = 0x7000, preceding step 6 = 0x6FFF.
+        if step > 1:
+            previous_step = step - 1
+            previous_cell = s + self.TRK_PLOCK + (previous_step - 1) * 84 + off
+            previous_flag = self.image[
+                s + self.PLOCK_STEP_FLAG + (previous_step - 1) * 8
+            ]
+            previous_value = self.image[previous_cell : previous_cell + 2]
+            if previous_flag == 0 and previous_value == b"\x00\x00":
+                carry = max(0, raw_value - 1)
+                self.image[previous_cell : previous_cell + 2] = carry.to_bytes(
+                    2, "little"
+                )
+
+        self.image[cell : cell + 2] = raw_value.to_bytes(2, "little")
+        current = s + self.PLOCK_CURRENT + off
+        self.image[current : current + 2] = raw_value.to_bytes(2, "little")
         self.image[s + self.PLOCK_STEP_FLAG + (step - 1) * 8] = 0x01
         self.image[s + self.PLOCK_MASTER] = 0x01
         self.mark_pattern_edited(track, pattern)

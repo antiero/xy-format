@@ -450,6 +450,36 @@ def test_plock_carry_curve_matches_firmware_sequence_shift() -> None:
     assert p.image[current : current + 2] == b"\x00\x00"
 
 
+def test_step_one_plock_uses_current_boundary_without_wrap_carry() -> None:
+    """A Step 1 lock starts at the UI boundary, not the pattern's last row."""
+    arranged = build_arrangement(
+        BASE,
+        {3: [{"steps": 8, "notes": [{"step": 1, "note": 48}]}] * 2},
+    )
+    p = ImageProject.from_bytes(arranged)
+    for pattern in (1, 2):
+        p.set_plock(3, 1, "param1", 0x1000, pattern=pattern)
+
+    source = p.pattern_start(3, 1)
+    source_current = source + p.PLOCK_CURRENT + 2
+    source_last = source + p.TRK_PLOCK + 7 * 84 + 2
+    assert p.image[source_current : source_current + 2] == b"\x00\x10"
+    assert p.image[source_last : source_last + 2] == b"\x00\x00"
+
+    p.rotate_pattern(3, 1, pattern=2)
+    shifted = p.pattern_start(3, 2)
+    shifted_current = shifted + p.PLOCK_CURRENT + 2
+
+    def param1(step: int) -> int:
+        cell = shifted + p.TRK_PLOCK + (step - 1) * 84 + 2
+        return int.from_bytes(p.image[cell : cell + 2], "little")
+
+    assert param1(1) == 0x1000
+    assert param1(2) == 0x1000
+    assert param1(8) == 0
+    assert p.image[shifted_current : shifted_current + 2] == b"\x00\x00"
+
+
 def test_rotate_pattern_supports_clones_and_negative_steps():
     arranged = build_arrangement(
         BASE,
