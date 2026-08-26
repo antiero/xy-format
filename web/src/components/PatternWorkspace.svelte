@@ -22,12 +22,15 @@
     type PlaybackScope,
   } from "../lib/xy/playback";
   import { display16thsAsBars, scaleTo16thsPerStep } from "../lib/xy/timing";
+  import { pointerDeltaTo16ths } from "../lib/xy/patternNoteDrag";
   import {
     projectTracksWithStepData,
     type XYNoteViewModel,
     type XYPatternViewModel,
     type XYProjectViewModel,
   } from "../lib/xy/projectViewModel";
+  import EditorIconButton from "./EditorIconButton.svelte";
+  import TransportControls from "./TransportControls.svelte";
 
   export let project: XYProjectViewModel;
 
@@ -95,6 +98,7 @@
 
   $: track = project.tracks[project.activeTrackIndex];
   $: pattern = track.patterns[project.activePatternIndex] ?? track.patterns[0];
+  $: scene = project.scenes[project.activeSceneIndex];
   $: selectionContextKey = `${track.index}:${pattern.index}`;
   $: if (selectionContext !== selectionContextKey) {
     selectionContext = selectionContextKey;
@@ -274,18 +278,6 @@
     );
   }
 
-  function renderNote(note: XYNoteViewModel): NoteDraft {
-    return (
-      dragDrafts[note.id] ?? {
-        tick: note.tick,
-        gateTicks: note.gateTicks,
-        note: note.note,
-        start16ths: note.start16ths,
-        duration16ths: note.duration16ths,
-      }
-    );
-  }
-
   function noteAtStep(step: number): XYNoteViewModel | undefined {
     return pattern.notes.find((note) => note.displayStep === step);
   }
@@ -293,11 +285,43 @@
   function selectTrack(trackIndex: number) {
     stopPlayback();
     dispatchProjectEdit({ type: "set-active-track", trackIndex });
+    const scenePattern = scene.patternByTrack[trackIndex] ?? 0;
+    const lastPattern = Math.max(
+      0,
+      (project.tracks[trackIndex]?.patterns.length ?? 1) - 1,
+    );
+    dispatchProjectEdit({
+      type: "set-active-pattern",
+      patternIndex: Math.min(scenePattern, lastPattern),
+    });
   }
 
   function selectPattern(patternIndex: number) {
     stopPlayback();
     dispatchProjectEdit({ type: "set-active-pattern", patternIndex });
+  }
+
+  function selectScene(sceneIndex: number) {
+    const nextScene = project.scenes[sceneIndex];
+    if (!nextScene) return;
+    stopPlayback();
+    currentTickStore.set(0);
+    dispatchProjectEdit({ type: "set-active-scene", sceneIndex });
+    const scenePattern = nextScene.patternByTrack[track.index] ?? 0;
+    dispatchProjectEdit({
+      type: "set-active-pattern",
+      patternIndex: Math.min(
+        scenePattern,
+        Math.max(0, track.patterns.length - 1),
+      ),
+    });
+    announceDisplayMessage(`SCENE ${sceneIndex + 1}`, "neutral");
+  }
+
+  function moveScene(delta: number) {
+    selectScene(
+      clamp(project.activeSceneIndex + delta, 0, project.scenes.length - 1),
+    );
   }
 
   function setSteps(steps: number) {
@@ -550,8 +574,9 @@
     if (!dragState) return;
     event.preventDefault();
 
-    const delta16ths = Math.round(
-      (event.clientX - dragState.startClientX) / pxPer16th,
+    const delta16ths = pointerDeltaTo16ths(
+      event.clientX - dragState.startClientX,
+      pxPer16th,
     );
     const deltaRows = Math.round(
       (event.clientY - dragState.startClientY) / ROW_HEIGHT,
@@ -708,13 +733,8 @@
     animationFrame = requestAnimationFrame(playbackFrame);
   }
 
-  async function togglePlayback() {
-    if ($isPlayingStore) {
-      stopPlayback();
-      announceDisplayMessage("STOP", "neutral");
-      return;
-    }
-
+  async function startPlayback() {
+    if ($isPlayingStore) return;
     playbackError = "";
     transportState = "loading";
     try {
@@ -756,6 +776,15 @@
     announceDisplayMessage("REWIND");
   }
 
+  function stopFromTransport() {
+    if ($isPlayingStore) {
+      stopPlayback();
+      announceDisplayMessage("STOP", "neutral");
+      return;
+    }
+    rewindPlayback();
+  }
+
   function setPlaybackScope(scope: PlaybackScope) {
     playbackScope = scope;
     rewindPlayback();
@@ -774,6 +803,7 @@
       <h2>{track.label} · P{pattern.index + 1}</h2>
     </div>
     <div class="status-strip">
+      <span>scene {scene.index + 1}</span>
       <span>{pattern.totalSteps} steps</span>
       <span>scale {pattern.trackScaleLabel}</span>
       <span>{display16thsAsBars(pattern.effectiveLength16ths)}</span>
@@ -782,6 +812,39 @@
 
   <div class="editor-layout">
     <aside class="side-rail">
+      <div class="rail-section">
+        <span class="rail-label">scene</span>
+        <div class="pattern-scene-select">
+          <EditorIconButton
+            icon="previous"
+            label="Previous scene"
+            disabled={scene.index === 0}
+            onClick={() => moveScene(-1)}
+          />
+          <select
+            aria-label="Active scene"
+            title="Active scene"
+            value={scene.index}
+            on:change={(event) =>
+              selectScene(Number((event.target as HTMLSelectElement).value))}
+          >
+            {#each project.scenes as candidate}
+              <option value={candidate.index}
+                >scene {candidate.index + 1}{candidate.present
+                  ? ""
+                  : " · empty"}</option
+              >
+            {/each}
+          </select>
+          <EditorIconButton
+            icon="next"
+            label="Next scene"
+            disabled={scene.index >= project.scenes.length - 1}
+            onClick={() => moveScene(1)}
+          />
+        </div>
+      </div>
+
       <div class="rail-section">
         <span class="rail-label">tracks</span>
         <div class="track-pad-grid">
@@ -913,22 +976,17 @@
       </div>
 
       <div class="transport-panel">
-        <div class="transport-controls">
-          <button
-            type="button"
-            class="transport-play"
-            class:active={$isPlayingStore}
-            disabled={transportState === "loading" ||
-              playbackEvents.length === 0}
-            on:click={togglePlayback}
-          >
-            {$isPlayingStore
-              ? "stop"
-              : transportState === "loading"
-                ? "load"
-                : "play"}
-          </button>
-          <button type="button" on:click={rewindPlayback}>rew</button>
+        <div class="pattern-transport-actions">
+          <TransportControls
+            isPlaying={$isPlayingStore}
+            loading={transportState === "loading"}
+            playDisabled={playbackEvents.length === 0}
+            stopDisabled={!$isPlayingStore && $currentTickStore <= 0}
+            playLabel={`Play ${playbackScope}`}
+            stopLabel={`Stop ${playbackScope} playback`}
+            onPlay={startPlayback}
+            onStop={stopFromTransport}
+          />
           <div class="segmented tight">
             <button
               type="button"
@@ -973,34 +1031,44 @@
           >
         </div>
         <div class="roll-edit-actions">
-          <button
-            type="button"
-            on:click={undoProjectEdit}
-            disabled={!$editHistoryStore.canUndo}>undo</button
-          >
-          <button
-            type="button"
-            on:click={redoProjectEdit}
-            disabled={!$editHistoryStore.canRedo}>redo</button
-          >
-          <button
-            type="button"
-            on:click={copySelectedNotes}
-            disabled={selectedCount === 0}>copy</button
-          >
-          <button
-            type="button"
-            on:click={cutSelectedNotes}
-            disabled={selectedCount === 0}>cut</button
-          >
-          <button type="button" on:click={pasteNotes} disabled={!noteClipboard}
-            >paste</button
-          >
-          <button
-            type="button"
-            on:click={() => deleteSelectedNotes()}
-            disabled={selectedCount === 0}>delete</button
-          >
+          <EditorIconButton
+            icon="undo"
+            label="Undo"
+            disabled={!$editHistoryStore.canUndo}
+            onClick={undoProjectEdit}
+          />
+          <EditorIconButton
+            icon="redo"
+            label="Redo"
+            disabled={!$editHistoryStore.canRedo}
+            onClick={redoProjectEdit}
+          />
+          <span class="roll-action-divider" aria-hidden="true"></span>
+          <EditorIconButton
+            icon="copy"
+            label="Copy selected notes"
+            disabled={selectedCount === 0}
+            onClick={() => void copySelectedNotes()}
+          />
+          <EditorIconButton
+            icon="cut"
+            label="Cut selected notes"
+            disabled={selectedCount === 0}
+            onClick={cutSelectedNotes}
+          />
+          <EditorIconButton
+            icon="paste"
+            label="Paste notes"
+            disabled={!noteClipboard}
+            onClick={pasteNotes}
+          />
+          <EditorIconButton
+            icon="delete"
+            label="Delete selected notes"
+            danger
+            disabled={selectedCount === 0}
+            onClick={() => deleteSelectedNotes()}
+          />
         </div>
         <label class="inline-range">
           zoom
@@ -1047,7 +1115,13 @@
             style={`left: ${playheadLeft}px; height: ${visibleNotes.length * ROW_HEIGHT}px;`}
           ></div>
           {#each pattern.notes as note}
-            {@const rendered = renderNote(note)}
+            {@const rendered = dragDrafts[note.id] ?? {
+              tick: note.tick,
+              gateTicks: note.gateTicks,
+              note: note.note,
+              start16ths: note.start16ths,
+              duration16ths: note.duration16ths,
+            }}
             {@const row = visibleNotes.indexOf(rendered.note)}
             {#if row >= 0}
               <button

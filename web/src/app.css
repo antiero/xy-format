@@ -753,8 +753,33 @@ button.primary {
 }
 
 .roll-edit-actions button {
-  min-width: 56px;
-  padding: 0 9px;
+  min-width: 31px;
+  padding: 0;
+}
+
+.roll-action-divider {
+  width: 1px;
+  height: 22px;
+  margin: 0 2px;
+  background: var(--xy-line);
+}
+
+.pattern-scene-select {
+  display: grid;
+  grid-template-columns: 31px minmax(0, 1fr) 31px;
+  align-items: center;
+  gap: 6px;
+}
+
+.pattern-scene-select select {
+  width: 100%;
+  min-width: 0;
+}
+
+.pattern-transport-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .inline-range {
