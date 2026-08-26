@@ -41,3 +41,28 @@ The generated verification pair `e_rot_fixed_src.xy` and
 and checked from the front panel. The source locks displayed `-9.00` and
 `+9.00`; after rotation both retained those values at the expected destination
 steps, with Multiply ×3 and Hold ×2 moving alongside their notes.
+
+## Track 3 boundary control
+
+A later four-pattern control on Track 3's `bass/shoulder` synth engine isolated
+the start-of-pattern boundary:
+
+- P1 Step 1, raw Param 1 `0x1000`, displayed `0`
+- P2 Step 2 after a right shift, the same raw value displayed `12`
+- P3 Step 7 and P4 Step 6 after a left shift both displayed `87`
+- Multiply ×3 and Hold ×2 moved correctly in both cases
+
+The failing low pair had a synthetic `0x0FFF` carry wrapped into Step 8 and an
+empty current-value cache. The earlier device-native right-shift capture had
+no Step 8 carry: it retained `0x1000` in Step 1, copied it into Step 2, and
+cleared the current-value cache. This establishes Step 1 as a non-circular
+boundary. New locks write the lane current-value cache; predecessor carry
+cells are created only for Steps 2–64.
+
+The corrected `h_rot_t3_fixed.xy` was uploaded and downloaded byte-identically
+(SHA-256 `fa0ab817aef9f1bba211db106dd86c1407d89bf0948db5c9442caa323b5d23dc`).
+All four front-panel checks then passed:
+
+- P1 Step 1 and shifted P2 Step 2 both displayed Param 1 `12` with Multiply ×3
+- P3 Step 7 and shifted P4 Step 6 both displayed Param 1 `87` with Hold ×2
+- the notes moved to Steps 2 and 6 with their respective components

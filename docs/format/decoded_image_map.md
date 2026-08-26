@@ -225,6 +225,17 @@ carry cell and `rotate_pattern()` copies non-zero curve cells to their shifted
 destinations without clearing their sources, while rotating activation and
 step-component rows normally.
 
+The curve has a non-circular boundary at Step 1. A firmware 1.1.25 Track 3
+synth-engine control showed that Step 1 reads the lane current-value cache;
+wrapping a synthetic predecessor into the pattern's final step made the source
+display `0` while the shifted Step 2 destination displayed `12`. Device-native
+right-shift bytes likewise retain `0x1000` in Steps 1 and 2 with no final-step
+carry. `set_plock()` therefore writes the current-value cache for every newly
+authored lock, but only seeds a predecessor row for Steps 2–64. A corrected
+four-pattern project then passed all Track 3 front-panel checks: `12` at the
+Step 1 source and shifted Step 2 destination, and `87` at the Step 7 source
+and shifted Step 6 destination.
+
 Verified with the device-passed `plock_drum_t2.xy` (alternating
 256/32767 on known steps, uniform 84 stride) and the cc_map captures.
 The column index is the device's master per-track parameter
