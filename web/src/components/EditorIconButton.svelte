@@ -1,0 +1,84 @@
+<script lang="ts">
+  type EditorIconName =
+    | "undo"
+    | "redo"
+    | "copy"
+    | "cut"
+    | "paste"
+    | "delete"
+    | "previous"
+    | "next";
+
+  export let icon: EditorIconName;
+  export let label: string;
+  export let disabled = false;
+  export let danger = false;
+  export let onClick: () => void = () => {};
+</script>
+
+<button
+  type="button"
+  class="editor-icon-button"
+  class:danger
+  {disabled}
+  aria-label={label}
+  title={label}
+  on:click={onClick}
+>
+  <svg viewBox="0 0 20 20" aria-hidden="true">
+    {#if icon === "undo"}
+      <path d="M8 5 4 8.5 8 12"></path>
+      <path d="M4.5 8.5h6.25a4.25 4.25 0 0 1 4.25 4.25V15"></path>
+    {:else if icon === "redo"}
+      <path d="m12 5 4 3.5-4 3.5"></path>
+      <path d="M15.5 8.5H9.25A4.25 4.25 0 0 0 5 12.75V15"></path>
+    {:else if icon === "copy"}
+      <rect x="7" y="6" width="8" height="9" rx="1"></rect>
+      <path
+        d="M12.5 6V4.5A1.5 1.5 0 0 0 11 3H5a1.5 1.5 0 0 0-1.5 1.5v7A1.5 1.5 0 0 0 5 13h2"
+      ></path>
+    {:else if icon === "cut"}
+      <circle cx="5" cy="5" r="2"></circle>
+      <circle cx="5" cy="15" r="2"></circle>
+      <path d="m6.7 6.1 8.8 7.4M6.7 13.9 15.5 6.5M10 10l-1.2 1"></path>
+    {:else if icon === "paste"}
+      <path
+        d="M7 5H5.5A1.5 1.5 0 0 0 4 6.5v9A1.5 1.5 0 0 0 5.5 17h7a1.5 1.5 0 0 0 1.5-1.5V14"
+      ></path>
+      <rect x="7" y="3" width="6" height="4" rx="1"></rect>
+      <path d="M11 11h5m0 0-2-2m2 2-2 2"></path>
+    {:else if icon === "delete"}
+      <path d="M4 6h12M8 3h4l1 3H7l1-3Zm-2 3 1 11h6l1-11M9 9v5m2-5v5"></path>
+    {:else if icon === "previous"}
+      <path d="m12.5 4-6 6 6 6"></path>
+    {:else}
+      <path d="m7.5 4 6 6-6 6"></path>
+    {/if}
+  </svg>
+</button>
+
+<style>
+  .editor-icon-button {
+    display: grid;
+    width: 31px;
+    min-width: 31px;
+    height: 31px;
+    min-height: 31px;
+    padding: 0;
+    place-items: center;
+  }
+
+  svg {
+    width: 16px;
+    height: 16px;
+    fill: none;
+    stroke: currentColor;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    stroke-width: 1.5;
+  }
+
+  .danger:not(:disabled) {
+    color: var(--xy-red-led);
+  }
+</style>
