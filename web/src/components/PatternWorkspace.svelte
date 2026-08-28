@@ -30,6 +30,7 @@
     type XYProjectViewModel,
   } from "../lib/xy/projectViewModel";
   import EditorIconButton from "./EditorIconButton.svelte";
+  import PatternTimingControls from "./PatternTimingControls.svelte";
   import TransportControls from "./TransportControls.svelte";
 
   export let project: XYProjectViewModel;
@@ -877,60 +878,6 @@
           {/each}
         </div>
       </div>
-
-      <div class="rail-section">
-        <span class="rail-label">length</span>
-        <label class="field-label">
-          steps
-          <input
-            type="number"
-            min="1"
-            max="64"
-            value={pattern.totalSteps}
-            on:change={(event) =>
-              setSteps(Number((event.target as HTMLInputElement).value))}
-          />
-        </label>
-        <div class="quick-row">
-          {#each [16, 32, 48, 64] as steps}
-            <button
-              type="button"
-              class:active={pattern.totalSteps === steps}
-              on:click={() => setSteps(steps)}>{steps / 16}b</button
-            >
-          {/each}
-        </div>
-        <div class="quick-row">
-          <button
-            type="button"
-            title="rotate triggers, parameter locks and components one step earlier"
-            aria-label="rotate pattern one step left"
-            on:click={() => rotatePattern(-1)}>← step</button
-          >
-          <button
-            type="button"
-            title="rotate triggers, parameter locks and components one step later"
-            aria-label="rotate pattern one step right"
-            on:click={() => rotatePattern(1)}>step →</button
-          >
-        </div>
-      </div>
-
-      <div class="rail-section">
-        <span class="rail-label">scale</span>
-        <div class="scale-grid">
-          {#each ["1/2", "1", "2", "3", "4", "5", "6", "7", "8", "16"] as scale}
-            <button
-              type="button"
-              class:active={pattern.trackScale === scale}
-              title={`set scale ${scale}`}
-              on:click={() => setScale(scale)}
-            >
-              {scale}
-            </button>
-          {/each}
-        </div>
-      </div>
     </aside>
 
     <div class="pattern-main">
@@ -987,17 +934,19 @@
             onPlay={startPlayback}
             onStop={stopFromTransport}
           />
-          <div class="segmented tight">
-            <button
-              type="button"
-              class:active={playbackScope === "track"}
-              on:click={() => setPlaybackScope("track")}>track</button
-            >
-            <button
-              type="button"
-              class:active={playbackScope === "scene"}
-              on:click={() => setPlaybackScope("scene")}>scene</button
-            >
+          <div class="pattern-icon-group" aria-label="Playback scope">
+            <EditorIconButton
+              icon="track"
+              label="Use track playback scope"
+              active={playbackScope === "track"}
+              onClick={() => setPlaybackScope("track")}
+            />
+            <EditorIconButton
+              icon="scene"
+              label="Use scene playback scope"
+              active={playbackScope === "scene"}
+              onClick={() => setPlaybackScope("scene")}
+            />
           </div>
         </div>
         <div class="transport-readout">
@@ -1018,17 +967,19 @@
       </div>
 
       <div class="roll-toolbar">
-        <div class="segmented">
-          <button
-            type="button"
-            class:active={timelineMode === "fit"}
-            on:click={() => (timelineMode = "fit")}>fit pattern</button
-          >
-          <button
-            type="button"
-            class:active={timelineMode === "global"}
-            on:click={() => (timelineMode = "global")}>global time</button
-          >
+        <div class="pattern-icon-group" aria-label="Timeline scale">
+          <EditorIconButton
+            icon="fit"
+            label="Fit pattern"
+            active={timelineMode === "fit"}
+            onClick={() => (timelineMode = "fit")}
+          />
+          <EditorIconButton
+            icon="global"
+            label="Global time"
+            active={timelineMode === "global"}
+            onClick={() => (timelineMode = "global")}
+          />
         </div>
         <div class="roll-edit-actions">
           <EditorIconButton
@@ -1158,84 +1109,97 @@
       </div>
     </div>
 
-    <aside class="inspector">
+    <aside class="inspector pattern-right-rail">
+      <PatternTimingControls
+        totalSteps={pattern.totalSteps}
+        trackScale={pattern.trackScale}
+        onSetSteps={setSteps}
+        onSetScale={setScale}
+        onRotate={rotatePattern}
+      />
       <div class="section-title">
         <span>note</span>
         <span>{selectedSummary}</span>
       </div>
       {#if selectedNote}
-        <label class="field-label">
-          pitch
-          <input
-            type="number"
-            min="0"
-            max="127"
-            value={selectedNote.note}
-            on:change={(event) =>
-              updateSelected({
-                note: Number((event.target as HTMLInputElement).value),
-              })}
+        <div class="note-field-grid">
+          <label class="field-label">
+            pitch
+            <input
+              type="number"
+              min="0"
+              max="127"
+              value={selectedNote.note}
+              on:change={(event) =>
+                updateSelected({
+                  note: Number((event.target as HTMLInputElement).value),
+                })}
+            />
+          </label>
+          <label class="field-label">
+            step
+            <input
+              type="number"
+              min="1"
+              max={pattern.totalSteps}
+              value={selectedNote.displayStep + 1}
+              on:change={(event) =>
+                updateSelected({
+                  tick:
+                    (Number((event.target as HTMLInputElement).value) - 1) *
+                    STEP_TICKS,
+                })}
+            />
+          </label>
+          <label class="field-label">
+            gate
+            <input
+              type="number"
+              min="1"
+              max="64"
+              step="0.25"
+              value={selectedNote.gateTicks / STEP_TICKS}
+              on:change={(event) =>
+                updateSelected({
+                  gateTicks:
+                    Number((event.target as HTMLInputElement).value) *
+                    STEP_TICKS,
+                })}
+            />
+          </label>
+          <label class="field-label">
+            velocity
+            <input
+              type="number"
+              min="1"
+              max="127"
+              value={selectedNote.velocity}
+              on:change={(event) =>
+                updateSelected({
+                  velocity: Number((event.target as HTMLInputElement).value),
+                })}
+            />
+          </label>
+        </div>
+        <div class="note-actions">
+          <EditorIconButton
+            icon="audition"
+            label="Audition selected note"
+            onClick={() =>
+              previewMidiNote(
+                track.index,
+                selectedNote.note,
+                selectedNote.velocity,
+                selectedNote.gateTicks,
+              )}
           />
-        </label>
-        <label class="field-label">
-          step
-          <input
-            type="number"
-            min="1"
-            max={pattern.totalSteps}
-            value={selectedNote.displayStep + 1}
-            on:change={(event) =>
-              updateSelected({
-                tick:
-                  (Number((event.target as HTMLInputElement).value) - 1) *
-                  STEP_TICKS,
-              })}
+          <EditorIconButton
+            icon="delete"
+            label="Delete selected notes"
+            danger
+            onClick={() => deleteSelectedNotes()}
           />
-        </label>
-        <label class="field-label">
-          gate
-          <input
-            type="number"
-            min="1"
-            max="64"
-            step="0.25"
-            value={selectedNote.gateTicks / STEP_TICKS}
-            on:change={(event) =>
-              updateSelected({
-                gateTicks:
-                  Number((event.target as HTMLInputElement).value) * STEP_TICKS,
-              })}
-          />
-        </label>
-        <label class="field-label">
-          velocity
-          <input
-            type="number"
-            min="1"
-            max="127"
-            value={selectedNote.velocity}
-            on:change={(event) =>
-              updateSelected({
-                velocity: Number((event.target as HTMLInputElement).value),
-              })}
-          />
-        </label>
-        <button
-          class="secondary-button"
-          type="button"
-          on:click={() =>
-            previewMidiNote(
-              track.index,
-              selectedNote.note,
-              selectedNote.velocity,
-              selectedNote.gateTicks,
-            )}>audition</button
-        >
-        <button
-          class="danger-button"
-          type="button"
-          on:click={() => deleteSelectedNotes()}>delete selected</button
-        >
+        </div>
       {:else}
         <p class="empty-line">
           Click the roll to add a note, or select existing notes.

@@ -10,7 +10,7 @@
   let mode: "pattern" | "arrange" | "song" = "arrange";
 </script>
 
-<section class="created-workspace">
+<section class="created-workspace" class:pattern-mode={mode === "pattern"}>
   <nav class="view-toggle" aria-label="Project view">
     <button
       type="button"
@@ -44,11 +44,20 @@
 
 <style>
   .created-workspace {
+    display: flex;
+    flex: 1;
     min-width: 0;
+    min-height: 0;
+    flex-direction: column;
+  }
+
+  .created-workspace.pattern-mode {
+    overflow: hidden;
   }
 
   .view-toggle {
     display: flex;
+    flex: none;
     justify-content: center;
     gap: 6px;
     padding: 14px 18px 0;

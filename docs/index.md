@@ -58,6 +58,7 @@ Research (under `tools/analysis/`):
 ## Engineering
 - **Authoring `.xy` files (canonical writer guide)**: `docs/engineering/authoring.md`
 - Architecture notes: `docs/engineering/architecture.md`
+- Web UI product requirements: `docs/engineering/web_ui.md`
 - Complete project JSON target: `docs/engineering/json_project_spec_complete.md`
 
 ## Debug and Issues
