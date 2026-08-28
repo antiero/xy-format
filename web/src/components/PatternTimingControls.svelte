@@ -1,6 +1,4 @@
 <script lang="ts">
-  import barGlyph from "../assets/bar.svg";
-
   export let totalSteps: number;
   export let trackScale: string;
   export let onSetSteps: (steps: number) => void = () => {};
@@ -12,14 +10,6 @@
 </script>
 
 <section class="timing-controls" aria-label="Pattern length and scale">
-  <div class="timing-heading">
-    <div>
-      <span class="rail-label">bar</span>
-      <strong>length + scale</strong>
-    </div>
-    <img src={barGlyph} alt="" aria-hidden="true" />
-  </div>
-
   <div class="timing-section">
     <label class="field-label">
       length · steps
@@ -88,36 +78,6 @@
     padding-bottom: 14px;
     margin-bottom: 14px;
     border-bottom: 1px solid var(--xy-line);
-  }
-
-  .timing-heading {
-    display: flex;
-    min-height: 54px;
-    align-items: center;
-    justify-content: space-between;
-    gap: 12px;
-    margin-bottom: 12px;
-  }
-
-  .timing-heading div {
-    display: grid;
-    gap: 4px;
-  }
-
-  .timing-heading .rail-label {
-    margin: 0;
-  }
-
-  .timing-heading strong {
-    color: var(--xy-text-muted);
-    font-size: 10px;
-    font-weight: 600;
-    text-transform: uppercase;
-  }
-
-  .timing-heading img {
-    width: 54px;
-    height: 54px;
   }
 
   .timing-section + .timing-section {

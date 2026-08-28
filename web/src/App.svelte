@@ -61,6 +61,7 @@
   let midiImportOptions: MidiImportOptions = {};
   let midiSelectionUpdating = false;
   let launchImportState: LaunchImportState = "idle";
+  let projectViewMode: "pattern" | "arrange" | "song" = "arrange";
   const isNativeEmbed = isXYBuddyNativeEmbed();
   const canShowMacCompanion = !isNativeEmbed && isAppleClient();
 
@@ -393,6 +394,7 @@
     <WorkflowTopbar
       project={$projectStore}
       {projectCreated}
+      {projectViewMode}
       bind:projectFileName
       {importSummary}
       {counts}
@@ -405,11 +407,13 @@
         : null}
       onReplaceMidi={() => midiFileInput.click()}
       onBurnMidiToSong={burnMidiToSong}
+      onProjectViewModeChange={(mode) => (projectViewMode = mode)}
     />
 
     {#if projectCreated}
       <CreatedProjectWorkspace
         project={$projectStore}
+        mode={projectViewMode}
         onTempoChange={rememberTempoOverride}
       />
     {:else}

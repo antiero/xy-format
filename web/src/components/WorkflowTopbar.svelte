@@ -20,12 +20,16 @@
   export let importSummary: MidiImportSummary | null = null;
   export let counts: ValidationCounts = { errors: 0, warnings: 0, info: 0 };
   export let midiSelectionUpdating = false;
+  export let projectViewMode: "pattern" | "arrange" | "song" = "arrange";
   export let onProjectNameCommit: () => void = () => {};
   export let onDownloadProject: () => void | Promise<void> = () => {};
   export let onTempoChange: (tempoBpm: number) => void = () => {};
   export let onRefineMidi: (() => void) | null = null;
   export let onReplaceMidi: () => void = () => {};
   export let onBurnMidiToSong: () => void | Promise<void> = () => {};
+  export let onProjectViewModeChange: (
+    mode: "pattern" | "arrange" | "song",
+  ) => void = () => {};
 
   $: trackSelection = importSummary?.trackSelection ?? null;
   $: selectedTrackCount = trackSelection
@@ -95,6 +99,30 @@
     {/if}
   </div>
 
+  {#if projectCreated}
+    <nav class="project-view-toggle" aria-label="Project view">
+      <button
+        type="button"
+        class:active={projectViewMode === "pattern"}
+        aria-pressed={projectViewMode === "pattern"}
+        title="Edit notes, timing, track scale, and step data"
+        on:click={() => onProjectViewModeChange("pattern")}>Pattern</button
+      >
+      <button
+        type="button"
+        class:active={projectViewMode === "arrange"}
+        aria-pressed={projectViewMode === "arrange"}
+        on:click={() => onProjectViewModeChange("arrange")}>Arrange</button
+      >
+      <button
+        type="button"
+        class:active={projectViewMode === "song"}
+        aria-pressed={projectViewMode === "song"}
+        on:click={() => onProjectViewModeChange("song")}>Song</button
+      >
+    </nav>
+  {/if}
+
   <div class="workflow-actions">
     {#if projectCreated}
       <button
@@ -161,6 +189,29 @@
     white-space: nowrap;
   }
 
+  .project-view-toggle {
+    position: absolute;
+    left: 50%;
+    display: flex;
+    gap: 6px;
+    transform: translateX(-50%);
+  }
+
+  .project-view-toggle button {
+    min-width: 92px;
+    min-height: 34px;
+    border-color: #33343a;
+    background: #101010;
+    color: #aeb0b6;
+    box-shadow: none;
+  }
+
+  .project-view-toggle button.active {
+    border-color: #f3f1ef;
+    background: #f3f1ef;
+    color: #050505;
+  }
+
   .workflow-context,
   .workflow-actions,
   .workflow-summary {
@@ -212,13 +263,22 @@
     width: min(250px, 24vw);
   }
 
-  @media (max-width: 980px) {
+  @media (max-width: 1180px) {
     .workflow-topbar {
       grid-template-columns: auto minmax(0, 1fr);
     }
 
+    .project-view-toggle {
+      position: static;
+      grid-column: 1 / -1;
+      grid-row: 2;
+      justify-self: center;
+      transform: none;
+    }
+
     .workflow-actions {
       grid-column: 1 / -1;
+      grid-row: 3;
       justify-content: flex-start;
     }
 
@@ -244,6 +304,15 @@
     .workflow-actions {
       align-items: stretch;
       flex-wrap: wrap;
+    }
+
+    .project-view-toggle {
+      width: 100%;
+    }
+
+    .project-view-toggle button {
+      flex: 1;
+      min-width: 0;
     }
 
     .workflow-actions button {

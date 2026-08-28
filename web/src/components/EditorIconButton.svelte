@@ -9,6 +9,8 @@
     | "audition"
     | "fit"
     | "global"
+    | "compress"
+    | "expand"
     | "track"
     | "scene"
     | "previous"
@@ -19,6 +21,7 @@
   export let disabled = false;
   export let danger = false;
   export let active = false;
+  export let pressed: boolean | undefined = undefined;
   export let onClick: () => void = () => {};
 </script>
 
@@ -29,6 +32,7 @@
   class:active
   {disabled}
   aria-label={label}
+  aria-pressed={pressed}
   title={label}
   on:click={onClick}
 >
@@ -66,6 +70,12 @@
     {:else if icon === "global"}
       <circle cx="10" cy="10" r="7"></circle>
       <path d="M3 10h14M10 3a11 11 0 0 1 0 14M10 3a11 11 0 0 0 0 14"></path>
+    {:else if icon === "compress"}
+      <path d="M4 3v4h4M16 3v4h-4M4 17v-4h4M16 17v-4h-4"></path>
+      <path d="m4 7 4-4m8 4-4-4M4 13l4 4m8-4-4 4"></path>
+    {:else if icon === "expand"}
+      <path d="M8 7H4V3M12 7h4V3M8 13H4v4M12 13h4v4"></path>
+      <path d="M8 7 4 3m8 4 4-4m-8 10-4 4m8-4 4 4"></path>
     {:else if icon === "track"}
       <path d="M4 5h12M4 10h8M4 15h10"></path>
       <circle cx="15" cy="10" r="1.5"></circle>

@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onDestroy } from "svelte";
+  import { onDestroy, tick } from "svelte";
   import {
     announceDisplayMessage,
     currentTickStore,
@@ -21,12 +21,24 @@
     type PlaybackEvent,
     type PlaybackScope,
   } from "../lib/xy/playback";
-  import { display16thsAsBars, scaleTo16thsPerStep } from "../lib/xy/timing";
+  import {
+    display16thsAsBars,
+    scaleTo16thsPerStep,
+    tickToDisplayStep,
+  } from "../lib/xy/timing";
   import { pointerDeltaTo16ths } from "../lib/xy/patternNoteDrag";
+  import { groupNotesByDisplayStep } from "../lib/xy/patternStepState";
+  import {
+    collapsedRowIndex,
+    expandedPianoRollPitches,
+    movePitchByVisibleRows,
+    type PianoRollPitchMode,
+    usedPianoRollPitches,
+    visiblePianoRollPitches,
+  } from "../lib/xy/pianoRollPitch";
   import {
     projectTracksWithStepData,
     type XYNoteViewModel,
-    type XYPatternViewModel,
     type XYProjectViewModel,
   } from "../lib/xy/projectViewModel";
   import EditorIconButton from "./EditorIconButton.svelte";
@@ -77,6 +89,7 @@
   };
 
   let timelineMode: "fit" | "global" = "fit";
+  let pitchMode: PianoRollPitchMode = "used";
   let playbackScope: PlaybackScope = "track";
   let pxPer16th = 34;
   let gridEl: HTMLDivElement;
@@ -96,6 +109,8 @@
   } | null = null;
   let dragDrafts: Record<string, NoteDraft> = {};
   let dragMoved = false;
+  let rollAnimating = false;
+  let rollTransitionTimer: ReturnType<typeof setTimeout> | undefined;
 
   $: track = project.tracks[project.activeTrackIndex];
   $: pattern = track.patterns[project.activePatternIndex] ?? track.patterns[0];
@@ -119,6 +134,11 @@
   $: selectedNotes = pattern.notes.filter((note) =>
     selectedNoteIds.includes(note.id),
   );
+  $: notesByStep = groupNotesByDisplayStep(
+    pattern.notes,
+    pattern.totalSteps,
+    dragDrafts,
+  );
   $: selectedNote = selectedNotes[0];
   $: selectedCount = selectedNotes.length;
   $: selectedSummary =
@@ -134,7 +154,12 @@
       : tracksWithStepData.some((candidate) => candidate.index === track.index)
         ? tracksWithStepData
         : [...tracksWithStepData, track].sort((a, b) => a.index - b.index);
-  $: visibleNotes = makeVisibleNotes(pattern);
+  $: patternPitches = pattern.notes.map((note) => note.note);
+  $: expandedNotes = expandedPianoRollPitches(patternPitches);
+  $: usedNotes = usedPianoRollPitches(patternPitches);
+  $: compactActive = pitchMode === "used" && usedNotes.length > 0;
+  $: visibleNotes = visiblePianoRollPitches(patternPitches, pitchMode);
+  $: rollHeight = visibleNotes.length * ROW_HEIGHT;
   $: playbackEvents = collectPlaybackEvents(
     project,
     playbackScope,
@@ -166,16 +191,6 @@
   $: playheadLeft =
     KEY_COLUMN_WIDTH + Math.min(timelineLength, $currentTickStore) * pxPer16th;
 
-  function makeVisibleNotes(current: XYPatternViewModel): number[] {
-    if (current.notes.length === 0) {
-      return Array.from({ length: 49 }, (_, i) => 84 - i);
-    }
-    const pitches = current.notes.map((note) => note.note);
-    const max = Math.min(108, Math.max(...pitches) + 5);
-    const min = Math.max(24, Math.min(...pitches) - 5);
-    return Array.from({ length: max - min + 1 }, (_, i) => max - i);
-  }
-
   function noteName(note: number): string {
     const names = [
       "C",
@@ -198,6 +213,35 @@
     return Math.max(min, Math.min(max, value));
   }
 
+  function rowTop(
+    pitch: number,
+    compact: boolean,
+    visiblePitches: number[],
+    expandedPitches: number[],
+  ): number {
+    const row = compact
+      ? collapsedRowIndex(pitch, visiblePitches)
+      : expandedPitches.indexOf(pitch);
+    return row * ROW_HEIGHT;
+  }
+
+  function togglePitchMode() {
+    if (pattern.notes.length === 0) return;
+    pitchMode = compactActive ? "expanded" : "used";
+    rollAnimating = true;
+    if (rollTransitionTimer) clearTimeout(rollTransitionTimer);
+    const transitionMs = window.matchMedia("(prefers-reduced-motion: reduce)")
+      .matches
+      ? 0
+      : 300;
+    rollTransitionTimer = setTimeout(() => {
+      rollAnimating = false;
+    }, transitionMs);
+    void tick().then(() => {
+      gridEl?.scrollTo({ top: 0 });
+    });
+  }
+
   function uniqueIds(ids: string[]): string[] {
     return [...new Set(ids)];
   }
@@ -214,10 +258,6 @@
   function clearSelectedNotes() {
     selectedNoteIds = [];
     dispatchProjectEdit({ type: "select-note", noteId: undefined });
-  }
-
-  function selectNoteById(noteId: string) {
-    setSelectedNotes([noteId], noteId);
   }
 
   function nextSelectionForGesture(
@@ -279,8 +319,17 @@
     );
   }
 
-  function noteAtStep(step: number): XYNoteViewModel | undefined {
-    return pattern.notes.find((note) => note.displayStep === step);
+  function selectNotesAtStep(notes: XYNoteViewModel[]) {
+    if (notes.length === 0) return;
+    setSelectedNotes(
+      notes.map((note) => note.id),
+      notes[0].id,
+    );
+  }
+
+  function stepToneForTick(tick: number): string {
+    const stepInBar = tickToDisplayStep(tick, pattern.totalSteps) % 16;
+    return `${20 + stepInBar * 3.6}%`;
   }
 
   function selectTrack(trackIndex: number) {
@@ -582,8 +631,6 @@
     const deltaRows = Math.round(
       (event.clientY - dragState.startClientY) / ROW_HEIGHT,
     );
-    const minVisiblePitch = Math.min(...visibleNotes);
-    const maxVisiblePitch = Math.max(...visibleNotes);
     const nextDrafts: Record<string, NoteDraft> = {};
 
     for (const note of dragState.notes) {
@@ -598,7 +645,7 @@
           0,
           Math.max(0, patternEnd16ths() - MIN_DURATION_16THS),
         );
-        pitch = clamp(note.note - deltaRows, minVisiblePitch, maxVisiblePitch);
+        pitch = movePitchByVisibleRows(note.note, deltaRows, visibleNotes);
       } else if (dragState.mode === "resize-start") {
         start16ths = clamp(
           note.start16ths + delta16ths,
@@ -792,24 +839,22 @@
   }
 
   onDestroy(() => {
+    if (rollTransitionTimer) clearTimeout(rollTransitionTimer);
     cleanupNotePointerDrag();
     stopPlayback();
   });
 </script>
 
 <section class="workspace pattern-workspace">
-  <div class="workspace-head">
-    <div>
-      <p class="eyebrow">Pattern</p>
-      <h2>{track.label} · P{pattern.index + 1}</h2>
-    </div>
-    <div class="status-strip">
-      <span>scene {scene.index + 1}</span>
-      <span>{pattern.totalSteps} steps</span>
-      <span>scale {pattern.trackScaleLabel}</span>
-      <span>{display16thsAsBars(pattern.effectiveLength16ths)}</span>
-    </div>
-  </div>
+  <h2 class="visually-hidden">
+    {track.label}, pattern {pattern.index + 1}
+  </h2>
+  <p class="visually-hidden">
+    Scene {scene.index + 1}, {pattern.totalSteps} steps, scale
+    {pattern.trackScaleLabel}, {display16thsAsBars(
+      pattern.effectiveLength16ths,
+    )}
+  </p>
 
   <div class="editor-layout">
     <aside class="side-rail">
@@ -855,9 +900,11 @@
               class:active={candidate.index === track.index}
               class:red={candidate.colorRole === "red"}
               type="button"
+              aria-label={`Track ${candidate.index + 1}`}
+              title={`Track ${candidate.index + 1}`}
               on:click={() => selectTrack(candidate.index)}
             >
-              {candidate.label}
+              <span class="pad-numeral">{candidate.index + 1}</span>
             </button>
           {/each}
         </div>
@@ -871,9 +918,11 @@
               class="pad-button"
               class:active={candidate.index === pattern.index}
               type="button"
+              aria-label={`Pattern ${candidate.index + 1}`}
+              title={`Pattern ${candidate.index + 1}`}
               on:click={() => selectPattern(candidate.index)}
             >
-              P{candidate.index + 1}
+              <span class="pad-numeral">{candidate.index + 1}</span>
             </button>
           {/each}
         </div>
@@ -881,17 +930,12 @@
     </aside>
 
     <div class="pattern-main">
-      <div class="step-panel">
-        <div class="section-title">
-          <span>OP-XY step view</span>
-          <span
-            >{pattern.bars} bar{pattern.bars === 1 ? "" : "s"} · final {pattern.finalBarSteps}</span
-          >
-        </div>
-        <div
-          class="bar-pages"
-          style={`grid-template-columns: repeat(${pattern.bars}, minmax(170px, 1fr));`}
-        >
+      <div
+        class="step-panel"
+        role="region"
+        aria-label={`${pattern.bars} bar pattern, final bar has ${pattern.finalBarSteps} steps`}
+      >
+        <div class="bar-pages">
           {#each Array(pattern.bars) as _, barIndex}
             <div
               class="bar-page"
@@ -903,18 +947,24 @@
                 {#each Array(16) as _, stepInBar}
                   {@const step = barIndex * 16 + stepInBar}
                   {@const active = step < pattern.totalSteps}
-                  {@const note = noteAtStep(step)}
+                  {@const stepNotes = notesByStep.get(step) ?? []}
+                  {@const note = stepNotes[0]}
+                  {@const noteSelected = stepNotes.some((candidate) =>
+                    selectedNoteIds.includes(candidate.id),
+                  )}
                   <button
                     type="button"
                     class="step-led"
                     class:on={Boolean(note)}
                     class:inactive={!active}
-                    class:selected={note && isNoteSelected(note.id)}
+                    class:selected={noteSelected}
+                    style={`--step-tone: ${20 + stepInBar * 3.6}%;`}
                     disabled={!active}
-                    on:click={() => note && selectNoteById(note.id)}
-                  >
-                    {stepInBar + 1}
-                  </button>
+                    aria-label={`Step ${step + 1}${!active ? ", outside pattern" : stepNotes.length > 1 ? `, ${stepNotes.length} notes` : note ? `, ${note.noteName}` : ", empty"}`}
+                    aria-pressed={note ? noteSelected : undefined}
+                    title={`Step ${step + 1}${stepNotes.length > 1 ? ` · ${stepNotes.length} notes` : note ? ` · ${note.noteName}` : ""}`}
+                    on:click={() => selectNotesAtStep(stepNotes)}
+                  ></button>
                 {/each}
               </div>
             </div>
@@ -967,18 +1017,33 @@
       </div>
 
       <div class="roll-toolbar">
-        <div class="pattern-icon-group" aria-label="Timeline scale">
+        <div class="roll-view-actions">
+          <div class="pattern-icon-group" aria-label="Timeline scale">
+            <EditorIconButton
+              icon="fit"
+              label="Fit pattern"
+              active={timelineMode === "fit"}
+              onClick={() => (timelineMode = "fit")}
+            />
+            <EditorIconButton
+              icon="global"
+              label="Global time"
+              active={timelineMode === "global"}
+              onClick={() => (timelineMode = "global")}
+            />
+          </div>
+          <span class="roll-action-divider" aria-hidden="true"></span>
           <EditorIconButton
-            icon="fit"
-            label="Fit pattern"
-            active={timelineMode === "fit"}
-            onClick={() => (timelineMode = "fit")}
-          />
-          <EditorIconButton
-            icon="global"
-            label="Global time"
-            active={timelineMode === "global"}
-            onClick={() => (timelineMode = "global")}
+            icon={compactActive ? "expand" : "compress"}
+            label={compactActive
+              ? "Expand piano roll"
+              : pattern.notes.length === 0
+                ? "Add a note to use compact view"
+                : "Show used notes only"}
+            active={compactActive}
+            pressed={compactActive}
+            disabled={pattern.notes.length === 0}
+            onClick={togglePitchMode}
           />
         </div>
         <div class="roll-edit-actions">
@@ -1036,7 +1101,8 @@
       <div class="piano-roll" bind:this={gridEl} on:scroll={handleScroll}>
         <div
           class="roll-canvas"
-          style={`width: ${rollWidth + KEY_COLUMN_WIDTH}px; height: ${visibleNotes.length * ROW_HEIGHT}px;`}
+          class:roll-animating={rollAnimating}
+          style={`width: ${rollWidth + KEY_COLUMN_WIDTH}px; height: ${rollHeight}px;`}
           role="grid"
           tabindex="0"
           aria-label="Piano roll note grid"
@@ -1044,14 +1110,30 @@
           on:keydown={handleGridKeydown}
         >
           <div class="key-column">
-            {#each visibleNotes as midi}
-              <div class="key-label">{noteName(midi)}</div>
+            {#each expandedNotes as midi (midi)}
+              <div
+                class="key-label roll-pitch-row"
+                class:collapsed={compactActive && !visibleNotes.includes(midi)}
+                style={`top: ${rowTop(midi, compactActive, visibleNotes, expandedNotes)}px;`}
+                aria-hidden={compactActive && !visibleNotes.includes(midi)}
+              >
+                {noteName(midi)}
+              </div>
             {/each}
           </div>
           <div
             class="roll-grid"
-            style={`left: ${KEY_COLUMN_WIDTH}px; width: ${rollWidth}px; height: ${visibleNotes.length * ROW_HEIGHT}px; background-size: ${pxPer16th * 4}px ${ROW_HEIGHT}px, ${pxPer16th}px ${ROW_HEIGHT}px;`}
-          ></div>
+            style={`left: ${KEY_COLUMN_WIDTH}px; width: ${rollWidth}px; height: ${rollHeight}px; background-size: ${pxPer16th * 4}px 100%, ${pxPer16th}px 100%;`}
+          >
+            {#each expandedNotes as midi (midi)}
+              <span
+                class="roll-pitch-line roll-pitch-row"
+                class:collapsed={compactActive && !visibleNotes.includes(midi)}
+                style={`top: ${rowTop(midi, compactActive, visibleNotes, expandedNotes)}px;`}
+                aria-hidden="true"
+              ></span>
+            {/each}
+          </div>
           {#each Array(Math.ceil(timelineLength / 16)) as _, bar}
             <div
               class="bar-marker"
@@ -1063,7 +1145,7 @@
           <div
             class="playhead"
             class:active={$isPlayingStore || $currentTickStore > 0}
-            style={`left: ${playheadLeft}px; height: ${visibleNotes.length * ROW_HEIGHT}px;`}
+            style={`left: ${playheadLeft}px; height: ${rollHeight}px;`}
           ></div>
           {#each pattern.notes as note}
             {@const rendered = dragDrafts[note.id] ?? {
@@ -1080,6 +1162,7 @@
                 class:selected={isNoteSelected(note.id)}
                 class:dragging={Boolean(dragDrafts[note.id])}
                 style={`left: ${KEY_COLUMN_WIDTH + rendered.start16ths * pxPer16th}px; top: ${row * ROW_HEIGHT + 2}px; width: ${Math.max(10, rendered.duration16ths * pxPer16th - 2)}px; height: ${NOTE_HEIGHT}px;`}
+                style:--note-tone={stepToneForTick(rendered.tick)}
                 type="button"
                 aria-label={`${noteName(rendered.note)} at step ${Math.floor(rendered.tick / STEP_TICKS) + 1}`}
                 title={`${noteName(rendered.note)} · step ${Math.floor(rendered.tick / STEP_TICKS) + 1}`}
