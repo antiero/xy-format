@@ -6,6 +6,11 @@
     | "cut"
     | "paste"
     | "delete"
+    | "audition"
+    | "fit"
+    | "global"
+    | "track"
+    | "scene"
     | "previous"
     | "next";
 
@@ -13,6 +18,7 @@
   export let label: string;
   export let disabled = false;
   export let danger = false;
+  export let active = false;
   export let onClick: () => void = () => {};
 </script>
 
@@ -20,6 +26,7 @@
   type="button"
   class="editor-icon-button"
   class:danger
+  class:active
   {disabled}
   aria-label={label}
   title={label}
@@ -49,6 +56,24 @@
       <path d="M11 11h5m0 0-2-2m2 2-2 2"></path>
     {:else if icon === "delete"}
       <path d="M4 6h12M8 3h4l1 3H7l1-3Zm-2 3 1 11h6l1-11M9 9v5m2-5v5"></path>
+    {:else if icon === "audition"}
+      <path
+        d="M3.5 8h3l4-3.25v10.5L6.5 12h-3zM13 7a4 4 0 0 1 0 6M14.5 4.75a7 7 0 0 1 0 10.5"
+      ></path>
+    {:else if icon === "fit"}
+      <path d="M3 7V3h4M13 3h4v4M17 13v4h-4M7 17H3v-4"></path>
+      <path d="M7 10h6"></path>
+    {:else if icon === "global"}
+      <circle cx="10" cy="10" r="7"></circle>
+      <path d="M3 10h14M10 3a11 11 0 0 1 0 14M10 3a11 11 0 0 0 0 14"></path>
+    {:else if icon === "track"}
+      <path d="M4 5h12M4 10h8M4 15h10"></path>
+      <circle cx="15" cy="10" r="1.5"></circle>
+    {:else if icon === "scene"}
+      <rect x="3" y="3" width="6" height="6" rx="1"></rect>
+      <rect x="11" y="3" width="6" height="6" rx="1"></rect>
+      <rect x="3" y="11" width="6" height="6" rx="1"></rect>
+      <rect x="11" y="11" width="6" height="6" rx="1"></rect>
     {:else if icon === "previous"}
       <path d="m12.5 4-6 6 6 6"></path>
     {:else}
@@ -80,5 +105,12 @@
 
   .danger:not(:disabled) {
     color: var(--xy-red-led);
+  }
+
+  .active,
+  .active:hover:not(:disabled) {
+    border-color: var(--xy-white-led);
+    background: var(--xy-white-led);
+    color: #050505;
   }
 </style>
