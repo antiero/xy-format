@@ -1140,13 +1140,18 @@ class ImageProject:
         self.image[s : s + 16] = b"\x00" * 16
         self.mark_pattern_edited(track, pattern)
 
-    # Automation requires more than the value cell: the firmware reads a
-    # per-step "this step has automation" flag (GLOBAL per step, not per
-    # param — confirmed across unnamed 35 param1 and plock_drum_t2 param2)
-    # and a per-track master flag, or the value lane is inert.
+    # Automation requires more than the value cell: the firmware reads an
+    # eight-byte per-step lane mask and a per-track master flag, or the value
+    # lane is inert. Value-table column 1 maps to mask bit 0, through column 41
+    # to bit 40; the volume lane in column 0 maps to bit 41.
     PLOCK_CURRENT = 0x024C     # +2*column, UI current-value cache
-    PLOCK_STEP_FLAG = 0x2C4E   # +8*(step-1), value 0x01
+    PLOCK_STEP_MASK = 0x2C4E   # +8*(step-1), 42-bit lane mask
+    PLOCK_STEP_FLAG = PLOCK_STEP_MASK  # compatibility alias
     PLOCK_MASTER = 0x304E      # 0x01 once per automated track
+
+    @staticmethod
+    def _plock_mask_bit(column: int) -> int:
+        return 41 if column == 0 else column - 1
 
     def set_plock(
         self,
@@ -1161,6 +1166,8 @@ class ImageProject:
         per-step + master automation flags so the lock actually plays."""
         s = self.pattern_start(track, pattern)
         off = self.PLOCK_PARAMS[param]
+        column = off // 2
+        mask_bit = self._plock_mask_bit(column)
         cell = s + self.TRK_PLOCK + (step - 1) * 84 + off
         active_steps = self.image[s + OFF_PATTERN_STEPS]
         if not 1 <= step <= active_steps:
@@ -1177,11 +1184,16 @@ class ImageProject:
         if step > 1:
             previous_step = step - 1
             previous_cell = s + self.TRK_PLOCK + (previous_step - 1) * 84 + off
-            previous_flag = self.image[
-                s + self.PLOCK_STEP_FLAG + (previous_step - 1) * 8
-            ]
+            previous_mask_start = (
+                s + self.PLOCK_STEP_MASK + (previous_step - 1) * 8
+            )
+            previous_mask = int.from_bytes(
+                self.image[previous_mask_start : previous_mask_start + 8],
+                "little",
+            )
             previous_value = self.image[previous_cell : previous_cell + 2]
-            if previous_flag == 0 and previous_value == b"\x00\x00":
+            previous_lane_armed = previous_mask & (1 << mask_bit)
+            if not previous_lane_armed and previous_value == b"\x00\x00":
                 carry = max(0, raw_value - 1)
                 self.image[previous_cell : previous_cell + 2] = carry.to_bytes(
                     2, "little"
@@ -1190,7 +1202,8 @@ class ImageProject:
         self.image[cell : cell + 2] = raw_value.to_bytes(2, "little")
         current = s + self.PLOCK_CURRENT + off
         self.image[current : current + 2] = raw_value.to_bytes(2, "little")
-        self.image[s + self.PLOCK_STEP_FLAG + (step - 1) * 8] = 0x01
+        mask_byte = s + self.PLOCK_STEP_MASK + (step - 1) * 8 + mask_bit // 8
+        self.image[mask_byte] |= 1 << (mask_bit % 8)
         self.image[s + self.PLOCK_MASTER] = 0x01
         self.mark_pattern_edited(track, pattern)
 
@@ -1203,7 +1216,7 @@ class ImageProject:
         pattern: int = 1,
     ) -> None:
         """Automate `param` across steps. `step_values` maps 1-based step ->
-        u16 value. Writes the value lane + per-step flags + master flag —
+        u16 value. Writes the value lane + per-step mask + master flag —
         the device automation structure (matches unnamed 35 / plock_drum_t2).
         Values are the device's internal fixed-point (e.g. 0..0x7FFF)."""
         for step, v in step_values.items():
@@ -1256,9 +1269,9 @@ class ImageProject:
         # P-lock values form a sparse carry/cache curve rather than ordinary
         # step rows.  A native OP-XY sequence shift copies each non-zero cell
         # to its shifted destination but does not clear the source cell.  The
-        # separately rotated activation rows decide which step is actually
-        # locked.  Circularly rotating zero rows erases the carry value and
-        # makes a valid lock display/play as the parameter minimum.
+        # separately rotated lane masks decide which cells are actual locks.
+        # An armed zero is a real value and must overwrite its destination;
+        # unarmed zero cells remain empty so they do not erase retained carry.
         plock_begin = s + self.TRK_PLOCK
         plock_rows = [
             bytes(
@@ -1268,26 +1281,30 @@ class ImageProject:
             )
             for index in range(active_steps)
         ]
-        active_columns: set[int] = set()
+        armed_columns: set[int] = set()
         for index, row in enumerate(plock_rows):
             destination = (index + shift) % active_steps
             destination_start = plock_begin + destination * 84
-            armed = self.image[s + self.PLOCK_STEP_FLAG + index * 8] != 0
+            mask_start = s + self.PLOCK_STEP_MASK + index * 8
+            lane_mask = int.from_bytes(
+                self.image[mask_start : mask_start + 8], "little"
+            )
             for column in range(42):
                 value = row[column * 2 : column * 2 + 2]
-                if value != b"\x00\x00":
+                armed = lane_mask & (1 << self._plock_mask_bit(column))
+                if value != b"\x00\x00" or armed:
                     target = destination_start + column * 2
                     self.image[target : target + 2] = value
                     if armed:
-                        active_columns.add(column)
+                        armed_columns.add(column)
 
         # Native sequence shift clears the per-lane UI current-value cache;
         # the shifted sparse curve remains authoritative.
-        for column in active_columns:
+        for column in armed_columns:
             current = s + self.PLOCK_CURRENT + column * 2
             self.image[current : current + 2] = b"\x00\x00"
 
-        rotate_rows(self.PLOCK_STEP_FLAG, 8)
+        rotate_rows(self.PLOCK_STEP_MASK, 8)
         rotate_rows(self.TRK_STEPCOMP, 16)
         self.mark_pattern_edited(track, pattern)
 

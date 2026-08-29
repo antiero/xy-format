@@ -375,6 +375,25 @@ def test_step_one_plock_uses_current_boundary_without_wrap_carry() -> None:
     assert p.image[shifted_current : shifted_current + 2] == b"\x00\x00"
 
 
+def test_rotate_pattern_preserves_armed_zero_over_retained_cell() -> None:
+    p = ImageProject.from_file(BASE)
+    p.set_pattern_steps(1, 4)
+    p.set_plock(1, 1, "param2", 0)
+
+    base = p.pattern_start(1)
+    destination_row = base + p.TRK_PLOCK + 84
+    param1 = destination_row + p.PLOCK_PARAMS["param1"]
+    param2 = destination_row + p.PLOCK_PARAMS["param2"]
+    p.image[param1 : param1 + 2] = (0x1110).to_bytes(2, "little")
+    p.image[param2 : param2 + 2] = (0x2221).to_bytes(2, "little")
+
+    p.rotate_pattern(1, 1)
+
+    assert p.image[param1 : param1 + 2] == b"\x10\x11"
+    assert p.image[param2 : param2 + 2] == b"\x00\x00"
+    assert p.image[base + p.PLOCK_STEP_MASK + 8] == 0x02
+
+
 def test_rotate_pattern_supports_clones_and_negative_steps():
     arranged = build_arrangement(
         BASE,
@@ -479,7 +498,7 @@ def test_set_plock_writes_u16_cell():
 
 def test_automate_param_reproduces_device_capture_structure():
     """automate_param writes the device automation structure (value lane +
-    per-step flags + master) matching unnamed 35's param1 automation."""
+    per-step masks + master) matching unnamed 35's param1 automation."""
     from xy.rle import decode_project
     T3 = 0xD79 + 2 * 17876
     _, cap = decode_project(real("unnamed 35.xy"))
@@ -488,7 +507,7 @@ def test_automate_param_reproduces_device_capture_structure():
     p = ImageProject.from_file(BASE)
     p.automate_param(3, "param1", vals)
     _, ours = decode_project(p.to_bytes())
-    # value lane, per-step flags, master flag must match the capture
+    # Value lane, per-step masks, and master flag must match the capture.
     for k in range(16):
         cell = T3 + 0x2A0 + k * 84 + 2
         assert ours[cell:cell + 2] == cap[cell:cell + 2]
@@ -496,12 +515,14 @@ def test_automate_param_reproduces_device_capture_structure():
     assert ours[T3 + 0x304E] == cap[T3 + 0x304E] == 1
 
 
-def test_set_plock_arms_flags():
+def test_set_plock_arms_lane_mask_and_master():
     from xy.rle import decode_project
     p = ImageProject.from_file(BASE)
     p.set_plock(3, 5, "cutoff", 20000)
     _, img = decode_project(p.to_bytes())
     T3 = 0xD79 + 2 * 17876
     assert img[T3 + 0x2A0 + 4 * 84 + 34:T3 + 0x2A0 + 4 * 84 + 36] == (20000).to_bytes(2, "little")
-    assert img[T3 + 0x2C4E + 4 * 8] == 1   # step 5 flag
+    assert img[T3 + 0x2C4E + 4 * 8 : T3 + 0x2C4E + 4 * 8 + 8] == (
+        1 << 16
+    ).to_bytes(8, "little")  # step 5 cutoff lane mask
     assert img[T3 + 0x304E] == 1            # master
