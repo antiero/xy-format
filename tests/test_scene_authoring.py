@@ -38,3 +38,8 @@ def test_build_arrangement_rejects_scene_and_mute_limits() -> None:
             scene_mutes=[[17]],
             force_scene_presence=True,
         )
+
+
+def test_build_arrangement_validates_zero_pattern_scene_entries() -> None:
+    with pytest.raises(ValueError, match="scene selection"):
+        build_arrangement(BASE, {}, scenes=[{17: 0}])

@@ -1533,17 +1533,19 @@ def build_arrangement(
         for k, row in enumerate(scenes):
             slot = SCENE_SLOT0 + k * SCENE_SLOT_SIZE
             mutes = scene_mutes[k] if scene_mutes and k < len(scene_mutes) else []
+            for t, pat in row.items():
+                if not 1 <= t <= 16 or not 0 <= pat < MAX_PATTERNS_PER_TRACK:
+                    raise ValueError(
+                        "scene selection must be track 1..16, "
+                        f"pattern 0..{MAX_PATTERNS_PER_TRACK - 1}"
+                    )
+            for t in mutes:
+                if not 1 <= t <= 16:
+                    raise ValueError("scene mute track must be 1..16")
             if force_scene_presence or any(row.values()) or mutes:
                 for t, pat in row.items():
-                    if not 1 <= t <= 16 or not 0 <= pat < MAX_PATTERNS_PER_TRACK:
-                        raise ValueError(
-                            "scene selection must be track 1..16, "
-                            f"pattern 0..{MAX_PATTERNS_PER_TRACK - 1}"
-                        )
                     g[slot + t - 1] = pat
                 for t in mutes:
-                    if not 1 <= t <= 16:
-                        raise ValueError("scene mute track must be 1..16")
                     g[slot + 16 + t - 1] = 2  # device mute value
                 g[slot + 32] = 1
 
