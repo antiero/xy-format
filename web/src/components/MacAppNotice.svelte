@@ -1,21 +1,21 @@
 <aside
   class="mac-app-notice web-only"
   data-web-only="true"
-  aria-label="XYBuddy for Mac"
+  aria-label="XYBuddy for iOS/macOS"
 >
   <div class="notice-content">
     <img class="notice-icon" src="/favicon.svg" alt="" aria-hidden="true" />
     <div>
       <p class="notice-kicker">xybuddy app</p>
-      <p class="notice-copy">Coming soon to macOS</p>
+      <p class="notice-copy">Coming soon to iOS, macOS!</p>
     </div>
   </div>
   <a
     href="https://testflight.apple.com/join/Hg8CwZNE"
     target="_blank"
     rel="noreferrer"
-    aria-label="Join the XYBuddy for Mac TestFlight"
-    title="Join the XYBuddy for Mac TestFlight"
+    aria-label="Join the xybuddy for TestFlight"
+    title="Join the xybuddy TestFlight"
   >
     <img src="/testflight.svg" alt="" aria-hidden="true" />
     <span>try now</span>

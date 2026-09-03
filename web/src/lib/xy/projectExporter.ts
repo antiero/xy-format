@@ -9,10 +9,12 @@ export function normalizeXYFileName(fileName: string): string {
       .replace(INVALID_FILENAME_CHARACTERS, "-")
       .replace(/\s+/g, " ") || "project";
 
-  if (cleaned.toLowerCase().endsWith(".xy")) {
-    return cleaned;
-  }
-  return `${cleaned}.xy`;
+  return `${xyProjectName(cleaned)}.xy`;
+}
+
+/** The editable part of an OP-XY project filename. */
+export function xyProjectName(fileName: string): string {
+  return fileName.replace(/\.xy$/i, "");
 }
 
 export async function exportXYProject(

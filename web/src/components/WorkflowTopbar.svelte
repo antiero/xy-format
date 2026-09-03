@@ -74,10 +74,12 @@
       <input
         type="text"
         bind:value={projectFileName}
-        aria-label="Project filename"
+        aria-label="Project name"
+        title="Project name. The .xy extension is kept for OP-XY compatibility."
         on:change={onProjectNameCommit}
         on:blur={onProjectNameCommit}
       />
+      <span aria-hidden="true">.xy</span>
     </label>
 
     {#if !projectCreated}

@@ -18,6 +18,7 @@
   import {
     exportXYProjectBytes,
     normalizeXYFileName,
+    xyProjectName,
   } from "./lib/xy/projectExporter";
   import { loadXYFile } from "./lib/xy/projectLoader";
   import {
@@ -115,7 +116,7 @@
     try {
       const project = await loadXYFile(file);
       projectStore.set(project);
-      projectFileName = normalizeXYFileName(project.fileName);
+      projectFileName = xyProjectName(project.fileName);
       projectCreated = true;
       importFileName = file.name;
       currentTickStore.set(0);
@@ -146,7 +147,7 @@
       importedMidiFile = file;
       midiImportOptions = optionsFromMidiSummary(result.summary);
       importFileName = file.name;
-      projectFileName = normalizeXYFileName(result.project.fileName);
+      projectFileName = xyProjectName(result.project.fileName);
       projectCreated = false;
       currentTickStore.set(0);
       isPlayingStore.set(false);
@@ -193,7 +194,7 @@
       projectStore.set(result.project);
       importSummary = result.summary;
       midiImportOptions = optionsFromMidiSummary(result.summary);
-      projectFileName = normalizeXYFileName(result.project.fileName);
+      projectFileName = xyProjectName(result.project.fileName);
       projectCreated = false;
       announceDisplayMessage(
         `MIDI ${result.summary.activeTracks.length} TRACKS`,
@@ -246,9 +247,9 @@
 
   function commitProjectFileName(publish = true): string {
     const filename = normalizeXYFileName(
-      projectFileName || $projectStore?.fileName || "",
+      projectFileName || xyProjectName($projectStore?.fileName ?? ""),
     );
-    projectFileName = filename;
+    projectFileName = xyProjectName(filename);
     setProjectFileName(filename);
     if (readyExport && readyExport.filename !== filename) {
       readyExport = { ...readyExport, filename };
