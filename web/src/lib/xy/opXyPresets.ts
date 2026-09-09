@@ -1,5 +1,6 @@
 import type { MidiImportRole } from "./midiImporter";
 import { trackStructTemplateFromBytes } from "./image_writer";
+import captureManifest from "./opXyFactoryPresetCaptureManifest.json";
 
 export type OpXyPresetCategory =
   | "bass"
@@ -55,6 +56,7 @@ const capturedFactoryPreset = (
   id: string,
   label: string,
   category: OpXyPresetCategory,
+  donorFile: string,
   donorTrack: number,
   fallbackPresetId: string,
 ): OpXyPresetChoice => ({
@@ -62,10 +64,65 @@ const capturedFactoryPreset = (
   label,
   category,
   source: "built-in",
-  donorUrl: `${import.meta.env.BASE_URL}opxy-presets/${id}.xy`,
+  donorUrl: `${import.meta.env.BASE_URL}opxy-presets/${donorFile}`,
   donorTrack,
   fallbackPresetId,
 });
+
+type FactoryPresetCaptureFile = {
+  asset: string;
+  tracks: Record<string, readonly [OpXyPresetCategory, string]>;
+};
+
+function isFactoryCategory(value: unknown): value is OpXyPresetCategory {
+  return (
+    typeof value === "string" &&
+    OP_XY_FACTORY_CATEGORIES.includes(value as OpXyPresetCategory)
+  );
+}
+
+function captureFilesFromManifest(): FactoryPresetCaptureFile[] {
+  return captureManifest.files.map((file) => {
+    const tracks: FactoryPresetCaptureFile["tracks"] = {};
+    for (const [track, identity] of Object.entries(file.tracks)) {
+      const [category, label] = identity;
+      if (
+        !/^[1-8]$/.test(track) ||
+        identity.length !== 2 ||
+        !isFactoryCategory(category) ||
+        typeof label !== "string"
+      ) {
+        throw new Error(
+          `Invalid factory preset capture: ${file.asset} T${track}`,
+        );
+      }
+      tracks[track] = [category, label];
+    }
+    return { asset: file.asset, tracks };
+  });
+}
+
+export const OP_XY_FACTORY_PRESET_CAPTURES = captureFilesFromManifest().flatMap(
+  (file) =>
+    Object.entries(file.tracks).map(([track, [category, label]]) => ({
+      id: factoryPresetId(category, label),
+      label,
+      category,
+      donorFile: file.asset,
+      donorTrack: Number(track),
+    })),
+);
+
+const FACTORY_FALLBACKS: Record<OpXyPresetCategory, string> = {
+  bass: "bass-shoulder",
+  drum: "drum-boop",
+  keys: "pluck-beach-bum",
+  lead: "lead-gaussian",
+  organ: "pad-bandpasser",
+  pad: "pad-bandpasser",
+  pluck: "pluck-dielectric",
+  strings: "strings-draemy",
+};
 
 export const OP_XY_PRESET_CHOICES: readonly OpXyPresetChoice[] = [
   {
@@ -117,48 +174,6 @@ export const OP_XY_PRESET_CHOICES: readonly OpXyPresetChoice[] = [
     source: "built-in",
     templateTrack: 7,
   },
-  capturedFactoryPreset(
-    "strings-ensemble",
-    "ensemble",
-    "strings",
-    8,
-    "strings-draemy",
-  ),
-  capturedFactoryPreset(
-    "strings-intimate-str",
-    "intimate str",
-    "strings",
-    8,
-    "strings-draemy",
-  ),
-  capturedFactoryPreset(
-    "strings-nachtmusik",
-    "nachtmusik",
-    "strings",
-    8,
-    "strings-draemy",
-  ),
-  capturedFactoryPreset(
-    "strings-pointe",
-    "pointe",
-    "strings",
-    8,
-    "strings-draemy",
-  ),
-  capturedFactoryPreset(
-    "strings-soutenu",
-    "soutenu",
-    "strings",
-    8,
-    "strings-draemy",
-  ),
-  capturedFactoryPreset(
-    "strings-whitness",
-    "whitness",
-    "strings",
-    8,
-    "strings-draemy",
-  ),
   {
     id: "pad-bandpasser",
     label: "bandpasser",
@@ -166,6 +181,16 @@ export const OP_XY_PRESET_CHOICES: readonly OpXyPresetChoice[] = [
     source: "built-in",
     templateTrack: 8,
   },
+  ...OP_XY_FACTORY_PRESET_CAPTURES.map((capture) =>
+    capturedFactoryPreset(
+      capture.id,
+      capture.label,
+      capture.category,
+      capture.donorFile,
+      capture.donorTrack,
+      FACTORY_FALLBACKS[capture.category],
+    ),
+  ),
 ] as const;
 
 /**
@@ -251,7 +276,7 @@ export const OP_XY_FACTORY_PRESET_NAMES = {
   ],
   lead: [
     "asinine",
-    "azimith",
+    "azimuth",
     "beam",
     "bowed",
     "burbie",
@@ -429,16 +454,28 @@ export function recommendedOpXyPresetId(
 let donorPromise: Promise<Record<string, Uint8Array>> | null = null;
 
 export function loadOpXyPresetDonors(): Promise<Record<string, Uint8Array>> {
-  donorPromise ??= Promise.all(
-    OP_XY_PRESET_CHOICES.filter(
-      (preset): preset is OpXyPresetChoice & { donorUrl: string } =>
-        typeof preset.donorUrl === "string",
-    ).map(async (preset) => {
-      const response = await fetch(preset.donorUrl);
-      if (!response.ok) return null;
-      return [preset.id, new Uint8Array(await response.arrayBuffer())] as const;
-    }),
-  ).then((entries) => {
+  const capturedPresets = OP_XY_PRESET_CHOICES.filter(
+    (preset): preset is OpXyPresetChoice & { donorUrl: string } =>
+      typeof preset.donorUrl === "string",
+  );
+  donorPromise ??= (() => {
+    const bytesByUrl = new Map<string, Promise<Uint8Array | null>>();
+    for (const preset of capturedPresets) {
+      if (bytesByUrl.has(preset.donorUrl)) continue;
+      bytesByUrl.set(
+        preset.donorUrl,
+        fetch(preset.donorUrl).then(async (response) =>
+          response.ok ? new Uint8Array(await response.arrayBuffer()) : null,
+        ),
+      );
+    }
+    return Promise.all(
+      capturedPresets.map(async (preset) => {
+        const bytes = await bytesByUrl.get(preset.donorUrl);
+        return bytes ? ([preset.id, bytes] as const) : null;
+      }),
+    );
+  })().then((entries) => {
     const donors: Record<string, Uint8Array> = {};
     for (const entry of entries) {
       if (entry) donors[entry[0]] = entry[1];

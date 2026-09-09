@@ -1,4 +1,4 @@
-import { copyFile, mkdir, rm } from "node:fs/promises";
+import { copyFile, mkdir, readFile, rm } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 
@@ -10,26 +10,24 @@ const sourceDirectory = path.join(
   "src",
   "factory-preset-captures",
   "firmware-1.1.21",
-  "strings",
 );
 const outputDirectory = path.join(webDirectory, "public", "opxy-presets");
-
-const presets = {
-  "strings-ensemble": "ensemble.xy",
-  "strings-intimate-str": "intimate str.xy",
-  "strings-nachtmusik": "nachtmusik.xy",
-  "strings-pointe": "pointe.xy",
-  "strings-soutenu": "soutenu.xy",
-  "strings-whitness": "whitness.xy",
-};
+const manifestPath = path.join(
+  webDirectory,
+  "src",
+  "lib",
+  "xy",
+  "opXyFactoryPresetCaptureManifest.json",
+);
+const manifest = JSON.parse(await readFile(manifestPath, "utf8"));
 
 await rm(outputDirectory, { recursive: true, force: true });
 await mkdir(outputDirectory, { recursive: true });
 await Promise.all(
-  Object.entries(presets).map(([id, filename]) =>
+  manifest.files.map(({ source, asset }) =>
     copyFile(
-      path.join(sourceDirectory, filename),
-      path.join(outputDirectory, `${id}.xy`),
+      path.join(sourceDirectory, source),
+      path.join(outputDirectory, asset),
     ),
   ),
 );
