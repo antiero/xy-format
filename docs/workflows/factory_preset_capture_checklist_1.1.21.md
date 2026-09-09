@@ -1,8 +1,10 @@
 # OP-XY factory preset capture checklist — firmware 1.1.21
 
-This checklist captures the 142 factory sound states that are not yet available
-to XYBuddy. Presets are ordered by the app's factory category order and then
-alphabetically within each category.
+This checklist records the completed capture of the 142 factory sound states
+that were not previously available to XYBuddy. Presets are ordered by the
+app's factory category order and then alphabetically within each category.
+
+Status: **completed and structurally validated on 2026-09-09**.
 
 The existing device-authored blank baseline already supplies `shoulder`,
 `boop`, `in phase`, `gaussian`, `bandpasser`, `beach bum`, `dielectric`, and
@@ -30,7 +32,7 @@ audition is safe provided recording is off and no sequencer notes are created.
 
 ## Capture projects
 
-### [ ] `fp01.xy`
+### [x] `fp01.xy`
 
 | Track | Category | Factory preset |
 | ----: | -------- | -------------- |
@@ -43,7 +45,7 @@ audition is safe provided recording is off and no sequencer notes are created.
 |     7 | Bass     | corduroy       |
 |     8 | Bass     | essex          |
 
-### [ ] `fp02.xy`
+### [x] `fp02.xy`
 
 | Track | Category | Factory preset |
 | ----: | -------- | -------------- |
@@ -56,7 +58,7 @@ audition is safe provided recording is off and no sequencer notes are created.
 |     7 | Bass     | loney bass     |
 |     8 | Bass     | mineral        |
 
-### [ ] `fp03.xy`
+### [x] `fp03.xy`
 
 | Track | Category | Factory preset |
 | ----: | -------- | -------------- |
@@ -69,7 +71,7 @@ audition is safe provided recording is off and no sequencer notes are created.
 |     7 | Bass     | sonorous       |
 |     8 | Bass     | trunk          |
 
-### [ ] `fp04.xy`
+### [x] `fp04.xy`
 
 | Track | Category | Factory preset |
 | ----: | -------- | -------------- |
@@ -82,7 +84,7 @@ audition is safe provided recording is off and no sequencer notes are created.
 |     7 | Drum     | kerf           |
 |     8 | Drum     | martini        |
 
-### [ ] `fp05.xy`
+### [x] `fp05.xy`
 
 | Track | Category | Factory preset |
 | ----: | -------- | -------------- |
@@ -95,7 +97,7 @@ audition is safe provided recording is off and no sequencer notes are created.
 |     7 | Keys     | ambi piano     |
 |     8 | Keys     | corporate      |
 
-### [ ] `fp06.xy`
+### [x] `fp06.xy`
 
 | Track | Category | Factory preset |
 | ----: | -------- | -------------- |
@@ -108,7 +110,7 @@ audition is safe provided recording is off and no sequencer notes are created.
 |     7 | Keys     | key keys       |
 |     8 | Keys     | man stage      |
 
-### [ ] `fp07.xy`
+### [x] `fp07.xy`
 
 | Track | Category | Factory preset |
 | ----: | -------- | -------------- |
@@ -121,7 +123,7 @@ audition is safe provided recording is off and no sequencer notes are created.
 |     7 | Keys     | refelt piano   |
 |     8 | Keys     | shine          |
 
-### [ ] `fp08.xy`
+### [x] `fp08.xy`
 
 | Track | Category | Factory preset |
 | ----: | -------- | -------------- |
@@ -134,11 +136,11 @@ audition is safe provided recording is off and no sequencer notes are created.
 |     7 | Keys     | whurl xy       |
 |     8 | Lead     | asinine        |
 
-### [ ] `fp09.xy`
+### [x] `fp09.xy`
 
 | Track | Category | Factory preset |
 | ----: | -------- | -------------- |
-|     1 | Lead     | azimith        |
+|     1 | Lead     | azimuth        |
 |     2 | Lead     | beam           |
 |     3 | Lead     | bowed          |
 |     4 | Lead     | burbie         |
@@ -147,7 +149,7 @@ audition is safe provided recording is off and no sequencer notes are created.
 |     7 | Lead     | gradient       |
 |     8 | Lead     | insomniac      |
 
-### [ ] `fp10.xy`
+### [x] `fp10.xy`
 
 | Track | Category | Factory preset |
 | ----: | -------- | -------------- |
@@ -160,7 +162,7 @@ audition is safe provided recording is off and no sequencer notes are created.
 |     7 | Lead     | sad triangle   |
 |     8 | Lead     | saw 101        |
 
-### [ ] `fp11.xy`
+### [x] `fp11.xy`
 
 | Track | Category | Factory preset |
 | ----: | -------- | -------------- |
@@ -173,7 +175,7 @@ audition is safe provided recording is off and no sequencer notes are created.
 |     7 | Lead     | wide saw       |
 |     8 | Lead     | wool           |
 
-### [ ] `fp12.xy`
+### [x] `fp12.xy`
 
 | Track | Category | Factory preset |
 | ----: | -------- | -------------- |
@@ -186,7 +188,7 @@ audition is safe provided recording is off and no sequencer notes are created.
 |     7 | Organ    | harmonium      |
 |     8 | Organ    | joker          |
 
-### [ ] `fp13.xy`
+### [x] `fp13.xy`
 
 | Track | Category | Factory preset |
 | ----: | -------- | -------------- |
@@ -199,7 +201,7 @@ audition is safe provided recording is off and no sequencer notes are created.
 |     7 | Pad      | confucius      |
 |     8 | Pad      | dark choir     |
 
-### [ ] `fp14.xy`
+### [x] `fp14.xy`
 
 | Track | Category | Factory preset |
 | ----: | -------- | -------------- |
@@ -212,7 +214,7 @@ audition is safe provided recording is off and no sequencer notes are created.
 |     7 | Pad      | padawan        |
 |     8 | Pad      | qiviut         |
 
-### [ ] `fp15.xy`
+### [x] `fp15.xy`
 
 | Track | Category | Factory preset |
 | ----: | -------- | -------------- |
@@ -225,7 +227,7 @@ audition is safe provided recording is off and no sequencer notes are created.
 |     7 | Pad      | unravel        |
 |     8 | Pad      | uranium        |
 
-### [ ] `fp16.xy`
+### [x] `fp16.xy`
 
 | Track | Category | Factory preset |
 | ----: | -------- | -------------- |
@@ -238,7 +240,7 @@ audition is safe provided recording is off and no sequencer notes are created.
 |     7 | Pluck    | dingus         |
 |     8 | Pluck    | endless        |
 
-### [ ] `fp17.xy`
+### [x] `fp17.xy`
 
 | Track | Category | Factory preset |
 | ----: | -------- | -------------- |
@@ -251,7 +253,7 @@ audition is safe provided recording is off and no sequencer notes are created.
 |     7 | Pluck    | on tape        |
 |     8 | Pluck    | pale crepe     |
 
-### [ ] `fp18.xy`
+### [x] `fp18.xy`
 
 | Track | Category          | Factory preset |
 | ----: | ----------------- | -------------- |

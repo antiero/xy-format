@@ -1,0 +1,297 @@
+{
+  "firmware": "1.1.21",
+  "files": [
+    {
+      "source": "strings/ensemble.xy",
+      "asset": "strings-ensemble.xy",
+      "tracks": {
+        "8": ["strings", "ensemble"]
+      }
+    },
+    {
+      "source": "strings/intimate str.xy",
+      "asset": "strings-intimate-str.xy",
+      "tracks": {
+        "8": ["strings", "intimate str"]
+      }
+    },
+    {
+      "source": "strings/nachtmusik.xy",
+      "asset": "strings-nachtmusik.xy",
+      "tracks": {
+        "8": ["strings", "nachtmusik"]
+      }
+    },
+    {
+      "source": "strings/pointe.xy",
+      "asset": "strings-pointe.xy",
+      "tracks": {
+        "8": ["strings", "pointe"]
+      }
+    },
+    {
+      "source": "strings/soutenu.xy",
+      "asset": "strings-soutenu.xy",
+      "tracks": {
+        "8": ["strings", "soutenu"]
+      }
+    },
+    {
+      "source": "strings/whitness.xy",
+      "asset": "strings-whitness.xy",
+      "tracks": {
+        "8": ["strings", "whitness"]
+      }
+    },
+    {
+      "source": "batches/fp01.xy",
+      "asset": "factory-1.1.21-fp01.xy",
+      "tracks": {
+        "1": ["bass", "alloy"],
+        "2": ["bass", "any time"],
+        "3": ["bass", "bark"],
+        "4": ["bass", "belch bass"],
+        "5": ["bass", "big square"],
+        "6": ["bass", "blank"],
+        "7": ["bass", "corduroy"],
+        "8": ["bass", "essex"]
+      }
+    },
+    {
+      "source": "batches/fp02.xy",
+      "asset": "factory-1.1.21-fp02.xy",
+      "tracks": {
+        "1": ["bass", "flyby"],
+        "2": ["bass", "guitar low"],
+        "3": ["bass", "haymaker"],
+        "4": ["bass", "iguana"],
+        "5": ["bass", "jacket"],
+        "6": ["bass", "line check"],
+        "7": ["bass", "loney bass"],
+        "8": ["bass", "mineral"]
+      }
+    },
+    {
+      "source": "batches/fp03.xy",
+      "asset": "factory-1.1.21-fp03.xy",
+      "tracks": {
+        "1": ["bass", "not fm"],
+        "2": ["bass", "off guard"],
+        "3": ["bass", "pocket"],
+        "4": ["bass", "pressure"],
+        "5": ["bass", "rear 424"],
+        "6": ["bass", "shark attack"],
+        "7": ["bass", "sonorous"],
+        "8": ["bass", "trunk"]
+      }
+    },
+    {
+      "source": "batches/fp04.xy",
+      "asset": "factory-1.1.21-fp04.xy",
+      "tracks": {
+        "1": ["bass", "under bron"],
+        "2": ["bass", "valves"],
+        "3": ["bass", "wobbler"],
+        "4": ["drum", "chamine"],
+        "5": ["drum", "dead spot"],
+        "6": ["drum", "fletcher"],
+        "7": ["drum", "kerf"],
+        "8": ["drum", "martini"]
+      }
+    },
+    {
+      "source": "batches/fp05.xy",
+      "asset": "factory-1.1.21-fp05.xy",
+      "tracks": {
+        "1": ["drum", "mushroom"],
+        "2": ["drum", "playwood"],
+        "3": ["drum", "sugar"],
+        "4": ["drum", "wood box"],
+        "5": ["drum", "zebra"],
+        "6": ["keys", "80s lover"],
+        "7": ["keys", "ambi piano"],
+        "8": ["keys", "corporate"]
+      }
+    },
+    {
+      "source": "batches/fp06.xy",
+      "asset": "factory-1.1.21-fp06.xy",
+      "tracks": {
+        "1": ["keys", "dark"],
+        "2": ["keys", "drodezzz"],
+        "3": ["keys", "elect piano"],
+        "4": ["keys", "electric"],
+        "5": ["keys", "foal"],
+        "6": ["keys", "jeans"],
+        "7": ["keys", "key keys"],
+        "8": ["keys", "man stage"]
+      }
+    },
+    {
+      "source": "batches/fp07.xy",
+      "asset": "factory-1.1.21-fp07.xy",
+      "tracks": {
+        "1": ["keys", "medieval"],
+        "2": ["keys", "missing you"],
+        "3": ["keys", "needs tuning"],
+        "4": ["keys", "newshour"],
+        "5": ["keys", "piano 1"],
+        "6": ["keys", "piano 2"],
+        "7": ["keys", "refelt piano"],
+        "8": ["keys", "shine"]
+      }
+    },
+    {
+      "source": "batches/fp08.xy",
+      "asset": "factory-1.1.21-fp08.xy",
+      "tracks": {
+        "1": ["keys", "slush"],
+        "2": ["keys", "spacious"],
+        "3": ["keys", "swelvet"],
+        "4": ["keys", "tonk 5"],
+        "5": ["keys", "vintage"],
+        "6": ["keys", "wakeup"],
+        "7": ["keys", "whurl xy"],
+        "8": ["lead", "asinine"]
+      }
+    },
+    {
+      "source": "batches/fp09.xy",
+      "asset": "factory-1.1.21-fp09.xy",
+      "tracks": {
+        "1": ["lead", "azimuth"],
+        "2": ["lead", "beam"],
+        "3": ["lead", "bowed"],
+        "4": ["lead", "burbie"],
+        "5": ["lead", "dustmite"],
+        "6": ["lead", "far field"],
+        "7": ["lead", "gradient"],
+        "8": ["lead", "insomniac"]
+      }
+    },
+    {
+      "source": "batches/fp10.xy",
+      "asset": "factory-1.1.21-fp10.xy",
+      "tracks": {
+        "1": ["lead", "low ride"],
+        "2": ["lead", "massage"],
+        "3": ["lead", "millinery"],
+        "4": ["lead", "modulus"],
+        "5": ["lead", "open cell"],
+        "6": ["lead", "runway"],
+        "7": ["lead", "sad triangle"],
+        "8": ["lead", "saw 101"]
+      }
+    },
+    {
+      "source": "batches/fp11.xy",
+      "asset": "factory-1.1.21-fp11.xy",
+      "tracks": {
+        "1": ["lead", "sonar"],
+        "2": ["lead", "spud mate"],
+        "3": ["lead", "swell"],
+        "4": ["lead", "top spin"],
+        "5": ["lead", "uknowaxel"],
+        "6": ["lead", "whirrs"],
+        "7": ["lead", "wide saw"],
+        "8": ["lead", "wool"]
+      }
+    },
+    {
+      "source": "batches/fp12.xy",
+      "asset": "factory-1.1.21-fp12.xy",
+      "tracks": {
+        "1": ["lead", "wub"],
+        "2": ["organ", "chorale"],
+        "3": ["organ", "chunk"],
+        "4": ["organ", "dusty org"],
+        "5": ["organ", "fm organ"],
+        "6": ["organ", "hammy xy3"],
+        "7": ["organ", "harmonium"],
+        "8": ["organ", "joker"]
+      }
+    },
+    {
+      "source": "batches/fp13.xy",
+      "asset": "factory-1.1.21-fp13.xy",
+      "tracks": {
+        "1": ["organ", "manual"],
+        "2": ["organ", "meat org"],
+        "3": ["organ", "post order"],
+        "4": ["organ", "vestigial"],
+        "5": ["pad", "chambre"],
+        "6": ["pad", "chuba"],
+        "7": ["pad", "confucius"],
+        "8": ["pad", "dark choir"]
+      }
+    },
+    {
+      "source": "batches/fp14.xy",
+      "asset": "factory-1.1.21-fp14.xy",
+      "tracks": {
+        "1": ["pad", "dream choir"],
+        "2": ["pad", "frontier"],
+        "3": ["pad", "kowalski"],
+        "4": ["pad", "murmel"],
+        "5": ["pad", "night sky"],
+        "6": ["pad", "op1 pad"],
+        "7": ["pad", "padawan"],
+        "8": ["pad", "qiviut"]
+      }
+    },
+    {
+      "source": "batches/fp15.xy",
+      "asset": "factory-1.1.21-fp15.xy",
+      "tracks": {
+        "1": ["pad", "rich pad"],
+        "2": ["pad", "separee"],
+        "3": ["pad", "spectre"],
+        "4": ["pad", "subsun"],
+        "5": ["pad", "there is hope"],
+        "6": ["pad", "ulysses"],
+        "7": ["pad", "unravel"],
+        "8": ["pad", "uranium"]
+      }
+    },
+    {
+      "source": "batches/fp16.xy",
+      "asset": "factory-1.1.21-fp16.xy",
+      "tracks": {
+        "1": ["pad", "zafu"],
+        "2": ["pluck", "avant garde"],
+        "3": ["pluck", "bellissimo"],
+        "4": ["pluck", "bellonboards"],
+        "5": ["pluck", "coin"],
+        "6": ["pluck", "deep luck"],
+        "7": ["pluck", "dingus"],
+        "8": ["pluck", "endless"]
+      }
+    },
+    {
+      "source": "batches/fp17.xy",
+      "asset": "factory-1.1.21-fp17.xy",
+      "tracks": {
+        "1": ["pluck", "guitar"],
+        "2": ["pluck", "kvarnofon"],
+        "3": ["pluck", "layered"],
+        "4": ["pluck", "leftovers"],
+        "5": ["pluck", "marimba"],
+        "6": ["pluck", "odorant"],
+        "7": ["pluck", "on tape"],
+        "8": ["pluck", "pale crepe"]
+      }
+    },
+    {
+      "source": "batches/fp18.xy",
+      "asset": "factory-1.1.21-fp18.xy",
+      "tracks": {
+        "1": ["pluck", "rally"],
+        "2": ["pluck", "resobubble"],
+        "3": ["pluck", "rift"],
+        "4": ["pluck", "soft tines"],
+        "5": ["pluck", "synth bell"],
+        "6": ["pluck", "whorl"]
+      }
+    }
+  ]
+}

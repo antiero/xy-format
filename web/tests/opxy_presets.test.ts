@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import {
   OP_XY_FACTORY_CATEGORIES,
+  OP_XY_FACTORY_PRESET_CAPTURES,
   OP_XY_FACTORY_PRESET_CATALOG,
   OP_XY_FACTORY_PRESET_NAMES,
   OP_XY_PRESET_CHOICES,
@@ -10,6 +11,7 @@ import {
   recommendedOpXyPresetId,
 } from "../src/lib/xy/opXyPresets";
 import { trackStructTemplateFromBytes } from "../src/lib/xy/image_writer";
+import captureManifest from "../src/lib/xy/opXyFactoryPresetCaptureManifest.json";
 
 function readString(bytes: Uint8Array, offset: number, capacity: number) {
   const field = bytes.subarray(offset, offset + capacity);
@@ -68,11 +70,13 @@ describe("OP-XY preset catalog", () => {
     expect(OP_XY_FACTORY_PRESET_NAMES.strings).toContain("nachtmusik");
   });
 
-  it("only marks byte-validated sound templates as selectable", () => {
+  it("makes the complete byte-validated factory catalogue selectable", () => {
+    expect(OP_XY_PRESET_CHOICES).toHaveLength(156);
     expect(
-      OP_XY_FACTORY_PRESET_CATALOG.filter((preset) => preset.available)
-        .map((preset) => preset.id)
-        .sort(),
+      OP_XY_FACTORY_PRESET_CATALOG.every((preset) => preset.available),
+    ).toBe(true);
+    expect(
+      OP_XY_FACTORY_PRESET_CATALOG.map((preset) => preset.id).sort(),
     ).toEqual(OP_XY_PRESET_CHOICES.map((preset) => preset.id).sort());
   });
 
@@ -123,5 +127,49 @@ describe("OP-XY preset catalog", () => {
     expect(track).toEqual(expected);
     expect(track).not.toEqual(trackStructTemplateFromBytes(donor, 1));
     expect(readString(track, 0x453f, 48)).toBe(`strings/${label}`);
+  });
+
+  it("maps all 148 captured factory sounds to pristine device donor tracks", () => {
+    expect(OP_XY_FACTORY_PRESET_CAPTURES).toHaveLength(148);
+    expect(
+      new Set(OP_XY_FACTORY_PRESET_CAPTURES.map(({ id }) => id)).size,
+    ).toBe(148);
+
+    for (const file of captureManifest.files) {
+      const donor = new Uint8Array(
+        readFileSync(
+          `../src/factory-preset-captures/firmware-1.1.21/${file.source}`,
+        ),
+      );
+      for (const [trackText, [category, label]] of Object.entries(
+        file.tracks,
+      )) {
+        const donorTrack = Number(trackText);
+        const capture = OP_XY_FACTORY_PRESET_CAPTURES.find(
+          (candidate) =>
+            candidate.donorFile === file.asset &&
+            candidate.donorTrack === donorTrack,
+        );
+        expect(capture).toMatchObject({ category, label, donorTrack });
+        const preset = opXyPresetById(capture!.id);
+        expect(preset).toBeDefined();
+        const track = opXyTrackStructFromDonor(preset!, donor);
+
+        expect(track).toEqual(trackStructTemplateFromBytes(donor, donorTrack));
+        expect(track[0]).toBe(1);
+        expect(track[0x456f]).toBe(0);
+        expect(readString(track, 0x453f, 48)).toBe(`${category}/${label}`);
+      }
+    }
+  });
+
+  it("shares the 24 donor projects instead of fetching one file per preset", () => {
+    const donorUrls = OP_XY_PRESET_CHOICES.flatMap((preset) =>
+      preset.donorUrl ? [preset.donorUrl] : [],
+    );
+
+    expect(donorUrls).toHaveLength(148);
+    expect(new Set(donorUrls).size).toBe(24);
+    expect(captureManifest.files).toHaveLength(24);
   });
 });
