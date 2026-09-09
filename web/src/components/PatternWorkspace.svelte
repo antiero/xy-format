@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onDestroy, tick } from "svelte";
+  import { onDestroy, onMount, tick } from "svelte";
   import {
     announceDisplayMessage,
     currentTickStore,
@@ -44,6 +44,13 @@
   import EditorIconButton from "./EditorIconButton.svelte";
   import PatternTimingControls from "./PatternTimingControls.svelte";
   import TransportControls from "./TransportControls.svelte";
+  import OpXyPresetPicker from "./OpXyPresetPicker.svelte";
+  import {
+    loadBaselineBytes,
+    loadOpXyPresetDonors,
+    loadPresetStruct,
+    opXyPresetById,
+  } from "../lib/xy/opXyPresets";
 
   export let project: XYProjectViewModel;
 
@@ -111,6 +118,38 @@
   let dragMoved = false;
   let rollAnimating = false;
   let rollTransitionTimer: ReturnType<typeof setTimeout> | undefined;
+  let presetLoading = false;
+
+  onMount(() => {
+    void loadOpXyPresetDonors();
+    void loadBaselineBytes();
+  });
+
+  async function handlePresetChange(presetId: string): Promise<void> {
+    if (presetLoading || presetId === pattern.presetId) return;
+    presetLoading = true;
+    try {
+      const donorStruct = await loadPresetStruct(presetId);
+      dispatchProjectEdit({
+        type: "set-pattern-preset",
+        trackIndex: track.index,
+        patternIndex: pattern.index,
+        presetId,
+        donorStruct,
+      });
+      const chosen = opXyPresetById(presetId);
+      const name = chosen?.label?.toUpperCase() ?? presetId.toUpperCase();
+      announceDisplayMessage(
+        `${track.label} P${pattern.index + 1} SOUND ${name}`,
+        "ok",
+      );
+    } catch (error) {
+      console.error(error);
+      announceDisplayMessage("PRESET LOAD FAILED", "error");
+    } finally {
+      presetLoading = false;
+    }
+  }
 
   $: track = project.tracks[project.activeTrackIndex];
   $: pattern = track.patterns[project.activePatternIndex] ?? track.patterns[0];
@@ -927,6 +966,18 @@
           {/each}
         </div>
       </div>
+
+      <div class="rail-section">
+        <span class="rail-label">sound</span>
+        <div class="pattern-preset-picker-box">
+          <OpXyPresetPicker
+            selectedId={pattern.presetId}
+            trackName={`${track.label} P${pattern.index + 1}`}
+            disabled={presetLoading}
+            onChange={handlePresetChange}
+          />
+        </div>
+      </div>
     </aside>
 
     <div class="pattern-main">
@@ -1193,6 +1244,21 @@
     </div>
 
     <aside class="inspector pattern-right-rail">
+      <div class="pattern-sound-section">
+        <div class="section-title">
+          <span>sound</span>
+          <span>{pattern.presetLabel}</span>
+        </div>
+        <div class="pattern-preset-picker-box">
+          <OpXyPresetPicker
+            selectedId={pattern.presetId}
+            trackName={`${track.label} P${pattern.index + 1}`}
+            disabled={presetLoading}
+            onChange={handlePresetChange}
+          />
+        </div>
+      </div>
+
       <PatternTimingControls
         totalSteps={pattern.totalSteps}
         trackScale={pattern.trackScale}

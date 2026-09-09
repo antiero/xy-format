@@ -551,6 +551,45 @@ button.primary {
   margin-bottom: 18px;
 }
 
+.pattern-sound-section {
+  padding-bottom: 14px;
+  margin-bottom: 14px;
+  border-bottom: 1px solid var(--xy-line);
+}
+
+.pattern-preset-picker-box {
+  display: flex;
+  align-items: center;
+  height: 32px;
+  padding: 0 10px;
+  background: #141414;
+  border: 1px solid var(--xy-line);
+  border-radius: 6px;
+  transition:
+    border-color 140ms ease,
+    background 140ms ease;
+}
+
+.pattern-preset-picker-box:hover {
+  border-color: #444;
+  background: #191919;
+}
+
+.pattern-preset-picker-box .picker-root {
+  width: 100%;
+}
+
+.pattern-preset-picker-box .preset-trigger {
+  color: #d0d0d0;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+.pattern-preset-picker-box .preset-trigger:hover {
+  color: #fff;
+}
+
 .rail-label {
   display: block;
   margin-bottom: 9px;

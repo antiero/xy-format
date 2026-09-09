@@ -21,6 +21,7 @@ import {
 } from "./timing";
 import { normalizeProjectTempoBpm } from "./tempo";
 import { validateProject } from "./validation";
+import { opXyPresetById, resolvePatternPresetId } from "./opXyPresets";
 
 export type XYTrackScale =
   | "1/2"
@@ -76,6 +77,8 @@ export type XYPatternViewModel = {
   trackScaleWriteSupported: boolean;
   timingMode: PatternTimingMode;
   effectiveLength16ths: number;
+  presetId: string;
+  presetLabel: string;
   notes: XYNoteViewModel[];
   plocks: XYPLockSummary[];
   stepComponents: XYStepComponentSummary[];
@@ -226,6 +229,13 @@ export type XYEdit =
       songIndex: number;
       sceneChain: number[];
       loop?: boolean;
+    }
+  | {
+      type: "set-pattern-preset";
+      trackIndex: number;
+      patternIndex: number;
+      presetId: string;
+      donorStruct: Uint8Array;
     };
 
 const NOTE_NAMES = [
@@ -328,6 +338,10 @@ function buildPattern(
   const decodedSteps = decodePatternSteps(meta.steps);
   const decodedScale = decodeTrackScale(meta.scaleRaw);
   const rawNotes = project.getNotes(track, patternIndex);
+  const rawPresetPath = project.getPresetPath(track, patternIndex);
+  const presetId = resolvePatternPresetId(rawPresetPath, track - 1);
+  const preset = opXyPresetById(presetId);
+  const presetLabel = preset?.label ?? (rawPresetPath || "choose sound");
   const basePattern: XYPatternViewModel = {
     index: patternIndex,
     bars: decodedSteps.bars,
@@ -341,6 +355,8 @@ function buildPattern(
     trackScaleWriteSupported: decodedScale.supportedForWrite,
     timingMode: patternTimingMode(rawNotes),
     effectiveLength16ths: 0,
+    presetId,
+    presetLabel,
     notes: [],
     plocks: [],
     stepComponents: [],
@@ -363,6 +379,7 @@ function buildTracks(project: ImageProject): XYTrackViewModel[] {
       kind: trackKind(index),
       colorRole: colorRole(index),
       patterns,
+      presetPath: patterns[0]?.presetLabel,
     };
   });
 }
@@ -693,6 +710,14 @@ export function applyEdit(
         edit.songIndex,
         edit.sceneChain.slice(0, SONG_MAX_CHAIN),
         edit.loop ?? project.songs[edit.songIndex]?.loop ?? true,
+      );
+      modified = true;
+      break;
+    case "set-pattern-preset":
+      imageProject.setPatternPresetStruct(
+        edit.trackIndex + 1,
+        edit.patternIndex,
+        edit.donorStruct,
       );
       modified = true;
       break;
