@@ -484,3 +484,101 @@ export function loadOpXyPresetDonors(): Promise<Record<string, Uint8Array>> {
   });
   return donorPromise;
 }
+
+export const DEFAULT_FACTORY_TRACK_PRESETS: readonly string[] = [
+  "drum-boop",
+  "drum-in-phase",
+  "bass-shoulder",
+  "pluck-beach-bum",
+  "lead-gaussian",
+  "pluck-dielectric",
+  "strings-draemy",
+  "pad-bandpasser",
+] as const;
+
+export function resolvePatternPresetId(
+  presetPath: string | undefined,
+  trackIndex: number,
+): string {
+  if (presetPath) {
+    const clean = presetPath.trim();
+    if (clean.includes("/")) {
+      const slashIndex = clean.indexOf("/");
+      const categoryPart = clean.slice(0, slashIndex).trim().toLowerCase();
+      const labelPart = clean.slice(slashIndex + 1).trim();
+      if (isFactoryCategory(categoryPart)) {
+        const id = factoryPresetId(categoryPart, labelPart);
+        if (PRESET_BY_ID.has(id)) {
+          return id;
+        }
+        const match = OP_XY_FACTORY_PRESET_CATALOG.find(
+          (entry) =>
+            entry.category === categoryPart &&
+            entry.label.toLowerCase() === labelPart.toLowerCase(),
+        );
+        if (match) return match.id;
+      }
+    }
+    const directMatch = OP_XY_FACTORY_PRESET_CATALOG.find(
+      (entry) => entry.label.toLowerCase() === clean.toLowerCase(),
+    );
+    if (directMatch) return directMatch.id;
+  }
+  return DEFAULT_FACTORY_TRACK_PRESETS[trackIndex] ?? "lead-gaussian";
+}
+
+let baselinePromise: Promise<Uint8Array> | null = null;
+
+export function loadBaselineBytes(): Promise<Uint8Array> {
+  baselinePromise ??= fetch(
+    `${import.meta.env.BASE_URL}baselines/blank.xy`,
+  ).then(async (response) => {
+    if (!response.ok) {
+      throw new Error("The built-in blank project could not be loaded.");
+    }
+    return new Uint8Array(await response.arrayBuffer());
+  });
+  return baselinePromise;
+}
+
+export function trackStructForPreset(
+  preset: OpXyPresetChoice,
+  donors: Record<string, Uint8Array>,
+  baselineBytes?: Uint8Array,
+): Uint8Array {
+  const donorBytes = donors[preset.id];
+  if (donorBytes) {
+    return opXyTrackStructFromDonor(preset, donorBytes);
+  }
+  if (preset.templateTrack && baselineBytes) {
+    return trackStructTemplateFromBytes(baselineBytes, preset.templateTrack);
+  }
+  if (preset.fallbackPresetId && donors[preset.fallbackPresetId]) {
+    const fallback = opXyPresetById(preset.fallbackPresetId);
+    if (fallback) {
+      return opXyTrackStructFromDonor(
+        fallback,
+        donors[preset.fallbackPresetId],
+      );
+    }
+  }
+  throw new Error(`could not resolve track struct for preset ${preset.id}`);
+}
+
+export async function loadPresetStruct(presetId: string): Promise<Uint8Array> {
+  const preset = opXyPresetById(presetId);
+  if (!preset) {
+    throw new Error(`unknown preset id ${presetId}`);
+  }
+  const [donors, baseline] = await Promise.all([
+    loadOpXyPresetDonors(),
+    preset.templateTrack
+      ? loadBaselineBytes()
+      : Promise.resolve(new Uint8Array()),
+  ]);
+  return trackStructForPreset(
+    preset,
+    donors,
+    baseline.length > 0 ? baseline : undefined,
+  );
+}

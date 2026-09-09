@@ -31,6 +31,9 @@ export const OFF_PLOCK_STEP_FLAGS = 0x2c4e;
 export const PLOCK_STEP_FLAG_ROW_SIZE = 8;
 export const OFF_STEP_COMPONENTS = 0x3057;
 export const STEP_COMPONENT_ROW_SIZE = 16;
+export const OFF_ENGINE = 0x14;
+export const OFF_PRESET_PATH = 0x453f;
+export const PRESET_PATH_MAX = 48;
 export const OFF_NOTE_COUNT = 0x456f;
 export const NOTE_SIZE = 12;
 export const STEP_TICKS = 480;
@@ -606,6 +609,41 @@ export class ImageProject {
     return this.image[
       this.trackPatternStart(track, patternIndex) + OFF_NOTE_COUNT
     ];
+  }
+
+  public getPresetPath(track: number, patternIndex: number = 0): string {
+    const s = this.trackPatternStart(track, patternIndex);
+    const raw = this.image.subarray(
+      s + OFF_PRESET_PATH,
+      s + OFF_PRESET_PATH + PRESET_PATH_MAX,
+    );
+    const end = raw.indexOf(0);
+    const len = end < 0 ? raw.length : end;
+    return new TextDecoder("latin1").decode(raw.subarray(0, len)).trim();
+  }
+
+  public getEngineId(track: number, patternIndex: number = 0): number {
+    const s = this.trackPatternStart(track, patternIndex);
+    return this.image[s + OFF_ENGINE];
+  }
+
+  public setPatternPresetStruct(
+    track: number,
+    patternIndex: number,
+    donorStruct: Uint8Array,
+  ): void {
+    if (donorStruct.length !== TRACK_STRIDE) {
+      throw new Error(`invalid donor struct length ${donorStruct.length}`);
+    }
+    const s = this.trackPatternStart(track, patternIndex);
+    // 0x13..0x02a0: engine ID + low preset parameters
+    this.image.set(donorStruct.subarray(0x13, 0x02a0), s + 0x13);
+    // 0x3457..0x456f: preset params, sample slots, preset path string at 0x453f
+    this.image.set(donorStruct.subarray(0x3457, 0x456f), s + 0x3457);
+    if (this.noteCount(track, patternIndex) === 0) {
+      this.image.set(donorStruct.subarray(0x4570, TRACK_STRIDE), s + 0x4570);
+    }
+    this.markPatternEdited(track, patternIndex);
   }
 
   public addNote(
