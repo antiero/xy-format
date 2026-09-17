@@ -141,9 +141,28 @@
       handleLinearImport,
     );
 
-    window.__xyBuddyNativeBridge?.setExportActiveSongDataHandler?.(() => {
+    const getActiveSongExportJSON = () => {
       return exportActiveSongData($projectStore);
+    };
+
+    (window as any).__xyBuddyExportActiveSong = getActiveSongExportJSON;
+
+    window.__xyBuddyNativeBridge?.setExportActiveSongDataHandler?.(() => {
+      return getActiveSongExportJSON();
     });
+
+    const handleRequestSongExport = () => {
+      const json = getActiveSongExportJSON();
+      (window as any).__xyBuddyExportActiveSong = () => json;
+      window.dispatchEvent(
+        new CustomEvent("xybuddy-active-song-response", { detail: json }),
+      );
+    };
+
+    window.addEventListener(
+      "xybuddy-request-song-export",
+      handleRequestSongExport,
+    );
 
     return () => {
       window.removeEventListener(
@@ -154,9 +173,21 @@
         "xybuddy-import-linear-sequence",
         handleLinearImport,
       );
+      window.removeEventListener(
+        "xybuddy-request-song-export",
+        handleRequestSongExport,
+      );
       window.__xyBuddyNativeBridge?.setExportActiveSongDataHandler?.(null);
+      if (typeof window !== "undefined") {
+        delete (window as any).__xyBuddyExportActiveSong;
+      }
     };
   });
+
+  $: if (typeof window !== "undefined") {
+    (window as any).__xyBuddyExportActiveSong = () =>
+      exportActiveSongData($projectStore);
+  }
 
   $: counts = $projectStore
     ? validationCounts($projectStore.validation)
