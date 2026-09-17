@@ -109,13 +109,20 @@
         if ($projectStore) {
           baseline = $projectStore.imageProject.exportBytes();
         } else {
-          const res = await fetch(`${import.meta.env.BASE_URL}baselines/blank.xy`);
+          const res = await fetch(
+            `${import.meta.env.BASE_URL}baselines/blank.xy`,
+          );
           if (!res.ok) throw new Error("Could not load blank.xy baseline");
           baseline = new Uint8Array(await res.arrayBuffer());
         }
 
-        const fileName = payload.filename || ($projectStore?.fileName ?? "PianoRoll.xy");
-        const nextProject = buildLinearSequenceProject(baseline, payload, fileName);
+        const fileName =
+          payload.filename || ($projectStore?.fileName ?? "PianoRoll.xy");
+        const nextProject = buildLinearSequenceProject(
+          baseline,
+          payload,
+          fileName,
+        );
         projectStore.set(nextProject);
         projectFileName = xyProjectName(nextProject.fileName);
         projectCreated = true;
@@ -129,7 +136,10 @@
       }
     };
 
-    window.addEventListener("xybuddy-import-linear-sequence", handleLinearImport);
+    window.addEventListener(
+      "xybuddy-import-linear-sequence",
+      handleLinearImport,
+    );
 
     window.__xyBuddyNativeBridge?.setExportActiveSongDataHandler?.(() => {
       return exportActiveSongData($projectStore);
