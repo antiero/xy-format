@@ -646,10 +646,7 @@ export class ImageProject {
     this.markPatternEdited(track, patternIndex);
   }
 
-  public setTrackPresetStruct(
-    track: number,
-    donorStruct: Uint8Array,
-  ): void {
+  public setTrackPresetStruct(track: number, donorStruct: Uint8Array): void {
     const count = this.getPatternCount(track);
     for (let p = 0; p < count; p++) {
       this.setPatternPresetStruct(track, p, donorStruct);
@@ -667,7 +664,11 @@ export class ImageProject {
       this.image[s + OFF_ENGINE] = isDrum ? 0x03 : 0x02;
       const encoded = new TextEncoder().encode(samplePath);
       const writeLen = Math.min(encoded.length, PRESET_PATH_MAX - 1);
-      this.image.fill(0, s + OFF_PRESET_PATH, s + OFF_PRESET_PATH + PRESET_PATH_MAX);
+      this.image.fill(
+        0,
+        s + OFF_PRESET_PATH,
+        s + OFF_PRESET_PATH + PRESET_PATH_MAX,
+      );
       this.image.set(encoded.subarray(0, writeLen), s + OFF_PRESET_PATH);
       this.markPatternEdited(track, p);
     }

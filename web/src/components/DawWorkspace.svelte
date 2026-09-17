@@ -121,7 +121,8 @@
     try {
       await audioService.ensureReady();
       for (const lane of lanes) {
-        const pattern = project.tracks[lane.trackIndex]?.patterns[lane.patternIndex];
+        const pattern =
+          project.tracks[lane.trackIndex]?.patterns[lane.patternIndex];
         if (pattern) {
           audioService.setProgram(
             lane.trackIndex,

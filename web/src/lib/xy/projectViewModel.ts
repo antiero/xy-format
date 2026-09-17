@@ -742,16 +742,10 @@ export function applyEdit(
       modified = true;
       break;
     case "set-track-preset":
-      imageProject.setTrackPresetStruct(
-        edit.trackIndex + 1,
-        edit.donorStruct,
-      );
+      imageProject.setTrackPresetStruct(edit.trackIndex + 1, edit.donorStruct);
       if (edit.linkedTrackIndices) {
         for (const linkedTrack of edit.linkedTrackIndices) {
-          imageProject.setTrackPresetStruct(
-            linkedTrack + 1,
-            edit.donorStruct,
-          );
+          imageProject.setTrackPresetStruct(linkedTrack + 1, edit.donorStruct);
         }
       }
       modified = true;

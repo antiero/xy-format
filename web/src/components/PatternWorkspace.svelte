@@ -990,7 +990,10 @@
             onChange={handlePresetChange}
           />
         </div>
-        <label class="track-scope-toggle" title="Apply sound to all scenes/patterns on this track">
+        <label
+          class="track-scope-toggle"
+          title="Apply sound to all scenes/patterns on this track"
+        >
           <input type="checkbox" bind:checked={applyToAllPatterns} />
           <span>all scenes in track</span>
         </label>
@@ -1274,7 +1277,10 @@
             onChange={handlePresetChange}
           />
         </div>
-        <label class="track-scope-toggle" title="Apply sound to all scenes/patterns on this track">
+        <label
+          class="track-scope-toggle"
+          title="Apply sound to all scenes/patterns on this track"
+        >
           <input type="checkbox" bind:checked={applyToAllPatterns} />
           <span>all scenes in track</span>
         </label>

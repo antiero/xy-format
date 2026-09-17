@@ -94,7 +94,10 @@
 
     window.addEventListener("xybuddy-apply-device-sample", handleDeviceSample);
     return () => {
-      window.removeEventListener("xybuddy-apply-device-sample", handleDeviceSample);
+      window.removeEventListener(
+        "xybuddy-apply-device-sample",
+        handleDeviceSample,
+      );
     };
   });
 
