@@ -14,11 +14,11 @@ import {
 export type LinearNotePayload = {
   scene: number;
   track: number;
-  step: number;     // 1..64
-  tick: number;     // microTick 0..119
-  note: number;     // MIDI note 0..127
+  step: number; // 1..64
+  tick: number; // microTick 0..119
+  note: number; // MIDI note 0..127
   velocity: number; // 1..127
-  length: number;   // duration in 16th steps
+  length: number; // duration in 16th steps
 };
 
 export type LinearSequencePayload = {
@@ -84,7 +84,11 @@ export function buildLinearSequenceProject(
 
   // For instrument tracks (1..8)
   for (let track = 1; track <= 8; track++) {
-    const patterns: Array<{ steps: number; bars: number; notes: PatternNoteInput[] }> = [];
+    const patterns: Array<{
+      steps: number;
+      bars: number;
+      notes: PatternNoteInput[];
+    }> = [];
     for (let s = 0; s < sceneCount; s++) {
       patterns.push({
         steps: 64,

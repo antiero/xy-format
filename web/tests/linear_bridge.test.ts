@@ -8,7 +8,9 @@ import {
 } from "../src/lib/xy/linearBridge";
 
 function loadBlankBytes(): Uint8Array {
-  const bytes = readFileSync(new URL("../public/baselines/blank.xy", import.meta.url));
+  const bytes = readFileSync(
+    new URL("../public/baselines/blank.xy", import.meta.url),
+  );
   return new Uint8Array(bytes);
 }
 
