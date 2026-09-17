@@ -656,6 +656,23 @@ export class ImageProject {
     }
   }
 
+  public setTrackSamplePath(
+    track: number,
+    samplePath: string,
+    isDrum: boolean = false,
+  ): void {
+    const count = this.getPatternCount(track);
+    for (let p = 0; p < count; p++) {
+      const s = this.trackPatternStart(track, p);
+      this.image[s + OFF_ENGINE] = isDrum ? 0x03 : 0x02;
+      const encoded = new TextEncoder().encode(samplePath);
+      const writeLen = Math.min(encoded.length, PRESET_PATH_MAX - 1);
+      this.image.fill(0, s + OFF_PRESET_PATH, s + OFF_PRESET_PATH + PRESET_PATH_MAX);
+      this.image.set(encoded.subarray(0, writeLen), s + OFF_PRESET_PATH);
+      this.markPatternEdited(track, p);
+    }
+  }
+
   public addNote(
     track: number,
     {

@@ -7,10 +7,12 @@
   import CreatedProjectWorkspace from "./components/CreatedProjectWorkspace.svelte";
   import SiteFooter from "./components/SiteFooter.svelte";
   import WorkflowTopbar from "./components/WorkflowTopbar.svelte";
+  import { onMount } from "svelte";
   import {
     announceDisplayMessage,
     currentTickStore,
     displayMessageStore,
+    dispatchProjectEdit,
     isPlayingStore,
     projectStore,
     setProjectFileName,
@@ -67,6 +69,34 @@
   const canShowMacCompanion = !isNativeEmbed && isAppleClient();
 
   const LAUNCH_IMPORT_THEATRE_MS = 920;
+
+  onMount(() => {
+    const handleDeviceSample = (event: Event) => {
+      const custom = event as CustomEvent<{
+        trackIndex: number;
+        sampleName: string;
+        samplePath: string;
+        isDrum: boolean;
+      }>;
+      const detail = custom?.detail;
+      if (!detail || !$projectStore) return;
+      dispatchProjectEdit({
+        type: "apply-device-sample",
+        trackIndex: detail.trackIndex,
+        sampleName: detail.sampleName,
+        samplePath: detail.samplePath,
+        isDrum: detail.isDrum,
+      });
+      announceDisplayMessage(
+        `T${detail.trackIndex + 1}: ${detail.sampleName.toUpperCase()}`,
+      );
+    };
+
+    window.addEventListener("xybuddy-apply-device-sample", handleDeviceSample);
+    return () => {
+      window.removeEventListener("xybuddy-apply-device-sample", handleDeviceSample);
+    };
+  });
 
   $: counts = $projectStore
     ? validationCounts($projectStore.validation)

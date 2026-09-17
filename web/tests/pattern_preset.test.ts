@@ -250,4 +250,23 @@ describe("pattern preset view model and edit bridge", () => {
     expect(reloaded.tracks[3].patterns[1].notes[0].note).toBe(64);
     expect(reloaded.tracks[3].patterns[2].notes[0].note).toBe(67);
   });
+
+  it("applies OP-XY device samples to a track and embeds the device path in the binary project", () => {
+    const project = loadBaseline();
+    const edited = applyEdit(project, {
+      type: "apply-device-sample",
+      trackIndex: 0,
+      sampleName: "808_Kick",
+      samplePath: "/samples/user/drums/808_Kick.wav",
+      isDrum: true,
+    });
+
+    const exportedBytes = exportXYProjectBytes(edited);
+    const reloaded = loadXYBytes(exportedBytes, "device-sample-exported.xy");
+
+    expect(reloaded.tracks[0].patterns[0].engineId).toBe(3);
+    expect(reloaded.tracks[0].patterns[0].presetPath).toBe(
+      "/samples/user/drums/808_Kick.wav",
+    );
+  });
 });

@@ -79,6 +79,8 @@ export type XYPatternViewModel = {
   effectiveLength16ths: number;
   presetId: string;
   presetLabel: string;
+  presetPath?: string;
+  engineId?: number;
   notes: XYNoteViewModel[];
   plocks: XYPLockSummary[];
   stepComponents: XYStepComponentSummary[];
@@ -243,6 +245,14 @@ export type XYEdit =
       presetId: string;
       donorStruct: Uint8Array;
       linkedTrackIndices?: number[];
+    }
+  | {
+      type: "apply-device-sample";
+      trackIndex: number;
+      sampleName: string;
+      samplePath: string;
+      isDrum: boolean;
+      linkedTrackIndices?: number[];
     };
 
 const NOTE_NAMES = [
@@ -346,6 +356,7 @@ function buildPattern(
   const decodedScale = decodeTrackScale(meta.scaleRaw);
   const rawNotes = project.getNotes(track, patternIndex);
   const rawPresetPath = project.getPresetPath(track, patternIndex);
+  const engineId = project.getEngineId(track, patternIndex);
   const presetId = resolvePatternPresetId(rawPresetPath, track - 1);
   const preset = opXyPresetById(presetId);
   const presetLabel = preset?.label ?? (rawPresetPath || "choose sound");
@@ -364,6 +375,8 @@ function buildPattern(
     effectiveLength16ths: 0,
     presetId,
     presetLabel,
+    presetPath: rawPresetPath,
+    engineId,
     notes: [],
     plocks: [],
     stepComponents: [],
@@ -738,6 +751,23 @@ export function applyEdit(
           imageProject.setTrackPresetStruct(
             linkedTrack + 1,
             edit.donorStruct,
+          );
+        }
+      }
+      modified = true;
+      break;
+    case "apply-device-sample":
+      imageProject.setTrackSamplePath(
+        edit.trackIndex + 1,
+        edit.samplePath,
+        edit.isDrum,
+      );
+      if (edit.linkedTrackIndices) {
+        for (const linkedTrack of edit.linkedTrackIndices) {
+          imageProject.setTrackSamplePath(
+            linkedTrack + 1,
+            edit.samplePath,
+            edit.isDrum,
           );
         }
       }
