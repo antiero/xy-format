@@ -29,6 +29,9 @@ type XYBuddyNativeBridge = {
   pushExport?: (payload: XYBuddyNativeExportPayload) => number;
   requestNativeMidiOutputs?: () => number;
   sendNativeMidi?: (message: XYBuddyNativeMidiMessage) => number;
+  exportActiveSongData?: () => string;
+  setExportActiveSongDataHandler?: (handler: (() => string) | null) => void;
+  importLinearSequence?: (payload: unknown) => boolean;
 };
 
 declare global {

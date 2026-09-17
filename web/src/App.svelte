@@ -24,6 +24,11 @@
   } from "./lib/xy/projectExporter";
   import { loadXYFile } from "./lib/xy/projectLoader";
   import {
+    exportActiveSongData,
+    buildLinearSequenceProject,
+    type LinearSequencePayload,
+  } from "./lib/xy/linearBridge";
+  import {
     loadMidiFileAsNewProject,
     type MidiImportOptions,
     type MidiImportSummary,
@@ -93,11 +98,53 @@
     };
 
     window.addEventListener("xybuddy-apply-device-sample", handleDeviceSample);
+
+    const handleLinearImport = async (event: Event) => {
+      const custom = event as CustomEvent<LinearSequencePayload>;
+      const payload = custom?.detail;
+      if (!payload) return;
+
+      try {
+        let baseline: Uint8Array;
+        if ($projectStore) {
+          baseline = $projectStore.imageProject.exportBytes();
+        } else {
+          const res = await fetch(`${import.meta.env.BASE_URL}baselines/blank.xy`);
+          if (!res.ok) throw new Error("Could not load blank.xy baseline");
+          baseline = new Uint8Array(await res.arrayBuffer());
+        }
+
+        const fileName = payload.filename || ($projectStore?.fileName ?? "PianoRoll.xy");
+        const nextProject = buildLinearSequenceProject(baseline, payload, fileName);
+        projectStore.set(nextProject);
+        projectFileName = xyProjectName(nextProject.fileName);
+        projectCreated = true;
+        currentTickStore.set(0);
+        readyExport = null;
+        void createReadyExport(false, true);
+        announceDisplayMessage("PORTED TO ARRANGER", "ok");
+      } catch (err) {
+        console.error("Failed to import linear sequence:", err);
+        announceDisplayMessage("IMPORT FAILED", "error");
+      }
+    };
+
+    window.addEventListener("xybuddy-import-linear-sequence", handleLinearImport);
+
+    window.__xyBuddyNativeBridge?.setExportActiveSongDataHandler?.(() => {
+      return exportActiveSongData($projectStore);
+    });
+
     return () => {
       window.removeEventListener(
         "xybuddy-apply-device-sample",
         handleDeviceSample,
       );
+      window.removeEventListener(
+        "xybuddy-import-linear-sequence",
+        handleLinearImport,
+      );
+      window.__xyBuddyNativeBridge?.setExportActiveSongDataHandler?.(null);
     };
   });
 
