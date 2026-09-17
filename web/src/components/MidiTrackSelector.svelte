@@ -19,6 +19,7 @@
     MidiTrackSelectionSummary,
   } from "../lib/xy/midiImporter";
   import type { XYProjectViewModel } from "../lib/xy/projectViewModel";
+  import { gmProgramForPresetId } from "../lib/xy/opXyPresets";
   import {
     announceDisplayMessage,
     currentTickStore,
@@ -255,8 +256,9 @@
         await audioService.ensureReady();
         for (const track of selection.tracks) {
           if (!selectedIds.has(track.id)) continue;
+          const program = gmProgramForPresetId(track.presetId, track.programNumber);
           for (const opXyTrackIndex of track.assignedOpXyTracks) {
-            audioService.setProgram(opXyTrackIndex, track.programNumber);
+            audioService.setProgram(opXyTrackIndex, program);
           }
         }
       }

@@ -646,6 +646,16 @@ export class ImageProject {
     this.markPatternEdited(track, patternIndex);
   }
 
+  public setTrackPresetStruct(
+    track: number,
+    donorStruct: Uint8Array,
+  ): void {
+    const count = this.getPatternCount(track);
+    for (let p = 0; p < count; p++) {
+      this.setPatternPresetStruct(track, p, donorStruct);
+    }
+  }
+
   public addNote(
     track: number,
     {

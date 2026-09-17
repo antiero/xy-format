@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onDestroy } from "svelte";
   import { audioService } from "../lib/audio";
+  import { gmProgramForPresetId } from "../lib/xy/opXyPresets";
   import {
     collectLanePlaybackEvents,
     collectScenePlaybackLanes,
@@ -119,6 +120,15 @@
     transportState = "loading";
     try {
       await audioService.ensureReady();
+      for (const lane of lanes) {
+        const pattern = project.tracks[lane.trackIndex]?.patterns[lane.patternIndex];
+        if (pattern) {
+          audioService.setProgram(
+            lane.trackIndex,
+            gmProgramForPresetId(pattern.presetId, 0),
+          );
+        }
+      }
       lastPlaybackPosition16ths =
         $currentTickStore >= loopLength16ths ? 0 : $currentTickStore;
       lastFrameMs = performance.now();

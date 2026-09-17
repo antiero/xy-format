@@ -151,14 +151,10 @@
       projectCreated = false;
       currentTickStore.set(0);
       isPlayingStore.set(false);
-      if (midiImportNeedsEditor(result.summary)) {
-        announceDisplayMessage(
-          `MIDI ${result.summary.importedNotes} NOTES`,
-          "ok",
-        );
-      } else {
-        await burnMidiToSong();
-      }
+      announceDisplayMessage(
+        `MIDI ${result.summary.importedNotes} NOTES`,
+        "ok",
+      );
     } catch (error) {
       console.error(error);
       loadError =

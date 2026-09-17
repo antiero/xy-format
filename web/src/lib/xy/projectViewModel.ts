@@ -236,6 +236,13 @@ export type XYEdit =
       patternIndex: number;
       presetId: string;
       donorStruct: Uint8Array;
+    }
+  | {
+      type: "set-track-preset";
+      trackIndex: number;
+      presetId: string;
+      donorStruct: Uint8Array;
+      linkedTrackIndices?: number[];
     };
 
 const NOTE_NAMES = [
@@ -719,6 +726,21 @@ export function applyEdit(
         edit.patternIndex,
         edit.donorStruct,
       );
+      modified = true;
+      break;
+    case "set-track-preset":
+      imageProject.setTrackPresetStruct(
+        edit.trackIndex + 1,
+        edit.donorStruct,
+      );
+      if (edit.linkedTrackIndices) {
+        for (const linkedTrack of edit.linkedTrackIndices) {
+          imageProject.setTrackPresetStruct(
+            linkedTrack + 1,
+            edit.donorStruct,
+          );
+        }
+      }
       modified = true;
       break;
     default:

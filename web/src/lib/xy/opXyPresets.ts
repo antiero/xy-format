@@ -451,6 +451,38 @@ export function recommendedOpXyPresetId(
   return "lead-gaussian";
 }
 
+export function gmProgramForPresetCategory(category: OpXyPresetCategory): number {
+  switch (category) {
+    case "keys":
+      return 0; // Acoustic Grand Piano
+    case "organ":
+      return 16; // Drawbar Organ
+    case "pluck":
+      return 24; // Acoustic Guitar (nylon)
+    case "bass":
+      return 33; // Electric Bass (finger)
+    case "strings":
+      return 48; // String Ensemble 1
+    case "lead":
+      return 80; // Lead 1 (square)
+    case "pad":
+      return 88; // Pad 1 (new age)
+    case "drum":
+      return 0;
+    default:
+      return 0;
+  }
+}
+
+export function gmProgramForPresetId(
+  presetId: string,
+  fallbackProgram: number = 0,
+): number {
+  const preset = opXyPresetById(presetId);
+  if (!preset) return fallbackProgram;
+  return gmProgramForPresetCategory(preset.category);
+}
+
 let donorPromise: Promise<Record<string, Uint8Array>> | null = null;
 
 export function loadOpXyPresetDonors(): Promise<Record<string, Uint8Array>> {
