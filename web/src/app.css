@@ -590,6 +590,30 @@ button.primary {
   color: #fff;
 }
 
+.track-scope-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 6px;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: lowercase;
+  letter-spacing: 0.04em;
+  color: #888;
+  cursor: pointer;
+  user-select: none;
+}
+
+.track-scope-toggle:hover {
+  color: #bbb;
+}
+
+.track-scope-toggle input[type="checkbox"] {
+  accent-color: #f75555;
+  margin: 0;
+  cursor: pointer;
+}
+
 .rail-label {
   display: block;
   margin-bottom: 9px;

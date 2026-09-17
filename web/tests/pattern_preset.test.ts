@@ -196,4 +196,77 @@ describe("pattern preset view model and edit bridge", () => {
     expect(reloaded.tracks[3].patterns[0].presetId).toBe("pluck-beach-bum");
     expect(reloaded.tracks[3].patterns[1].presetId).toBe("strings-whitness");
   });
+
+  it("applies a preset across all patterns on a track with set-track-preset and persists across scenes", () => {
+    const baselineBytes = new Uint8Array(readFileSync(BASELINE));
+    // Build a project where Track 4 has 3 patterns
+    const multiPatternBytes = buildArrangementFromBytes(baselineBytes, {
+      4: [
+        { notes: [{ step: 1, note: 60 }] },
+        { notes: [{ step: 5, note: 64 }] },
+        { notes: [{ step: 9, note: 67 }] },
+      ],
+    });
+
+    const project = loadXYBytes(multiPatternBytes, "multi.xy");
+    expect(project.tracks[3].patterns).toHaveLength(3);
+    expect(project.tracks[3].patterns[0].presetId).toBe("pluck-beach-bum");
+    expect(project.tracks[3].patterns[1].presetId).toBe("pluck-beach-bum");
+    expect(project.tracks[3].patterns[2].presetId).toBe("pluck-beach-bum");
+
+    const donorBytes = new Uint8Array(readFileSync(STRINGS_DONOR));
+    const stringsPreset = opXyPresetById("strings-whitness")!;
+    const donorStruct = opXyTrackStructFromDonor(stringsPreset, donorBytes);
+
+    // Apply strings preset to the ENTIRE track
+    const edited = applyEdit(project, {
+      type: "set-track-preset",
+      trackIndex: 3,
+      presetId: "strings-whitness",
+      donorStruct,
+    });
+
+    // Verify all 3 patterns received the strings preset
+    expect(edited.tracks[3].patterns[0].presetId).toBe("strings-whitness");
+    expect(edited.tracks[3].patterns[1].presetId).toBe("strings-whitness");
+    expect(edited.tracks[3].patterns[2].presetId).toBe("strings-whitness");
+
+    // Notes and timings preserved on all patterns
+    expect(edited.tracks[3].patterns[0].notes[0].note).toBe(60);
+    expect(edited.tracks[3].patterns[1].notes[0].note).toBe(64);
+    expect(edited.tracks[3].patterns[2].notes[0].note).toBe(67);
+
+    // Other tracks unaffected
+    expect(edited.tracks[0].patterns[0].presetId).toBe("drum-boop");
+    expect(edited.tracks[2].patterns[0].presetId).toBe("bass-shoulder");
+
+    // Roundtrip export and reload
+    const exportedBytes = exportXYProjectBytes(edited);
+    const reloaded = loadXYBytes(exportedBytes, "track-preset-exported.xy");
+    expect(reloaded.tracks[3].patterns[0].presetId).toBe("strings-whitness");
+    expect(reloaded.tracks[3].patterns[1].presetId).toBe("strings-whitness");
+    expect(reloaded.tracks[3].patterns[2].presetId).toBe("strings-whitness");
+    expect(reloaded.tracks[3].patterns[0].notes[0].note).toBe(60);
+    expect(reloaded.tracks[3].patterns[1].notes[0].note).toBe(64);
+    expect(reloaded.tracks[3].patterns[2].notes[0].note).toBe(67);
+  });
+
+  it("applies OP-XY device samples to a track and embeds the device path in the binary project", () => {
+    const project = loadBaseline();
+    const edited = applyEdit(project, {
+      type: "apply-device-sample",
+      trackIndex: 0,
+      sampleName: "808_Kick",
+      samplePath: "/samples/user/drums/808_Kick.wav",
+      isDrum: true,
+    });
+
+    const exportedBytes = exportXYProjectBytes(edited);
+    const reloaded = loadXYBytes(exportedBytes, "device-sample-exported.xy");
+
+    expect(reloaded.tracks[0].patterns[0].engineId).toBe(3);
+    expect(reloaded.tracks[0].patterns[0].presetPath).toBe(
+      "/samples/user/drums/808_Kick.wav",
+    );
+  });
 });

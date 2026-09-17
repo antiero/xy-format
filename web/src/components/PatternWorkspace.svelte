@@ -119,6 +119,7 @@
   let rollAnimating = false;
   let rollTransitionTimer: ReturnType<typeof setTimeout> | undefined;
   let presetLoading = false;
+  let applyToAllPatterns = true;
 
   onMount(() => {
     void loadOpXyPresetDonors();
@@ -126,21 +127,33 @@
   });
 
   async function handlePresetChange(presetId: string): Promise<void> {
-    if (presetLoading || presetId === pattern.presetId) return;
+    if (presetLoading) return;
+    if (!applyToAllPatterns && presetId === pattern.presetId) return;
     presetLoading = true;
     try {
       const donorStruct = await loadPresetStruct(presetId);
-      dispatchProjectEdit({
-        type: "set-pattern-preset",
-        trackIndex: track.index,
-        patternIndex: pattern.index,
-        presetId,
-        donorStruct,
-      });
+      if (applyToAllPatterns) {
+        dispatchProjectEdit({
+          type: "set-track-preset",
+          trackIndex: track.index,
+          presetId,
+          donorStruct,
+        });
+      } else {
+        dispatchProjectEdit({
+          type: "set-pattern-preset",
+          trackIndex: track.index,
+          patternIndex: pattern.index,
+          presetId,
+          donorStruct,
+        });
+      }
       const chosen = opXyPresetById(presetId);
       const name = chosen?.label?.toUpperCase() ?? presetId.toUpperCase();
       announceDisplayMessage(
-        `${track.label} P${pattern.index + 1} SOUND ${name}`,
+        applyToAllPatterns
+          ? `${track.label} SOUND ${name} (ALL SCENES)`
+          : `${track.label} P${pattern.index + 1} SOUND ${name}`,
         "ok",
       );
     } catch (error) {
@@ -977,6 +990,10 @@
             onChange={handlePresetChange}
           />
         </div>
+        <label class="track-scope-toggle" title="Apply sound to all scenes/patterns on this track">
+          <input type="checkbox" bind:checked={applyToAllPatterns} />
+          <span>all scenes in track</span>
+        </label>
       </div>
     </aside>
 
@@ -1257,6 +1274,10 @@
             onChange={handlePresetChange}
           />
         </div>
+        <label class="track-scope-toggle" title="Apply sound to all scenes/patterns on this track">
+          <input type="checkbox" bind:checked={applyToAllPatterns} />
+          <span>all scenes in track</span>
+        </label>
       </div>
 
       <PatternTimingControls
