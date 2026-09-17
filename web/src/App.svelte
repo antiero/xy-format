@@ -107,7 +107,7 @@
       try {
         let baseline: Uint8Array;
         if ($projectStore) {
-          baseline = $projectStore.imageProject.exportBytes();
+          baseline = $projectStore.imageProject.toBytes();
         } else {
           const res = await fetch(
             `${import.meta.env.BASE_URL}baselines/blank.xy`,
