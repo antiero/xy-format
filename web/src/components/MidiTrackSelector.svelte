@@ -256,7 +256,10 @@
         await audioService.ensureReady();
         for (const track of selection.tracks) {
           if (!selectedIds.has(track.id)) continue;
-          const program = gmProgramForPresetId(track.presetId, track.programNumber);
+          const program = gmProgramForPresetId(
+            track.presetId,
+            track.programNumber,
+          );
           for (const opXyTrackIndex of track.assignedOpXyTracks) {
             audioService.setProgram(opXyTrackIndex, program);
           }

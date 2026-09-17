@@ -451,7 +451,9 @@ export function recommendedOpXyPresetId(
   return "lead-gaussian";
 }
 
-export function gmProgramForPresetCategory(category: OpXyPresetCategory): number {
+export function gmProgramForPresetCategory(
+  category: OpXyPresetCategory,
+): number {
   switch (category) {
     case "keys":
       return 0; // Acoustic Grand Piano
