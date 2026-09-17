@@ -1264,28 +1264,6 @@
     </div>
 
     <aside class="inspector pattern-right-rail">
-      <div class="pattern-sound-section">
-        <div class="section-title">
-          <span>sound</span>
-          <span>{pattern.presetLabel}</span>
-        </div>
-        <div class="pattern-preset-picker-box">
-          <OpXyPresetPicker
-            selectedId={pattern.presetId}
-            trackName={`${track.label} P${pattern.index + 1}`}
-            disabled={presetLoading}
-            onChange={handlePresetChange}
-          />
-        </div>
-        <label
-          class="track-scope-toggle"
-          title="Apply sound to all scenes/patterns on this track"
-        >
-          <input type="checkbox" bind:checked={applyToAllPatterns} />
-          <span>all scenes in track</span>
-        </label>
-      </div>
-
       <PatternTimingControls
         totalSteps={pattern.totalSteps}
         trackScale={pattern.trackScale}
