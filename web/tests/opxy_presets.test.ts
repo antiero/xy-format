@@ -24,6 +24,7 @@ describe("OP-XY preset catalog", () => {
     expect(OP_XY_FACTORY_CATEGORIES).toEqual([
       "bass",
       "drum",
+      "drumline",
       "keys",
       "lead",
       "organ",
@@ -43,8 +44,8 @@ describe("OP-XY preset catalog", () => {
     }
   });
 
-  it("contains the complete firmware 1.1.21 factory-name catalogue", () => {
-    expect(OP_XY_FACTORY_PRESET_CATALOG).toHaveLength(156);
+  it("contains the proven catalogue plus the firmware 1.2.0 Drumline names", () => {
+    expect(OP_XY_FACTORY_PRESET_CATALOG).toHaveLength(165);
     expect(
       Object.fromEntries(
         OP_XY_FACTORY_CATEGORIES.map((category) => [
@@ -55,6 +56,7 @@ describe("OP-XY preset catalog", () => {
     ).toEqual({
       bass: 28,
       drum: 12,
+      drumline: 9,
       keys: 26,
       lead: 27,
       organ: 11,
@@ -68,16 +70,37 @@ describe("OP-XY preset catalog", () => {
     expect(OP_XY_FACTORY_PRESET_NAMES.keys).toContain("elect piano");
     expect(OP_XY_FACTORY_PRESET_NAMES.organ).toContain("dusty org");
     expect(OP_XY_FACTORY_PRESET_NAMES.strings).toContain("nachtmusik");
+    expect(OP_XY_FACTORY_PRESET_NAMES.drumline).toEqual([
+      "atom",
+      "beatnic",
+      "cinortcele",
+      "dote yet",
+      "helpline",
+      "macaroni",
+      "that tom tom tom",
+      "tyche",
+      "we will c",
+    ]);
   });
 
-  it("makes the complete byte-validated factory catalogue selectable", () => {
-    expect(OP_XY_PRESET_CHOICES).toHaveLength(156);
+  it("makes every byte-validated factory preset selectable", () => {
+    expect(OP_XY_PRESET_CHOICES).toHaveLength(165);
     expect(
       OP_XY_FACTORY_PRESET_CATALOG.every((preset) => preset.available),
     ).toBe(true);
     expect(
-      OP_XY_FACTORY_PRESET_CATALOG.map((preset) => preset.id).sort(),
+      OP_XY_FACTORY_PRESET_CATALOG.filter((preset) => preset.available)
+        .map((preset) => preset.id)
+        .sort(),
     ).toEqual(OP_XY_PRESET_CHOICES.map((preset) => preset.id).sort());
+  });
+
+  it("makes every device-authored Drumline preset selectable", () => {
+    expect(
+      OP_XY_FACTORY_PRESET_CATALOG.filter(
+        (preset) => preset.category === "drumline",
+      ).every((preset) => preset.available),
+    ).toBe(true);
   });
 
   it("makes every factory Strings preset selectable", () => {
@@ -129,16 +152,18 @@ describe("OP-XY preset catalog", () => {
     expect(readString(track, 0x453f, 48)).toBe(`strings/${label}`);
   });
 
-  it("maps all 148 captured factory sounds to pristine device donor tracks", () => {
-    expect(OP_XY_FACTORY_PRESET_CAPTURES).toHaveLength(148);
+  it("maps all 157 captured factory sounds to pristine device donor tracks", () => {
+    expect(OP_XY_FACTORY_PRESET_CAPTURES).toHaveLength(157);
     expect(
       new Set(OP_XY_FACTORY_PRESET_CAPTURES.map(({ id }) => id)).size,
-    ).toBe(148);
+    ).toBe(157);
 
     for (const file of captureManifest.files) {
+      const firmware =
+        "firmware" in file ? file.firmware : captureManifest.firmware;
       const donor = new Uint8Array(
         readFileSync(
-          `../src/factory-preset-captures/firmware-1.1.21/${file.source}`,
+          `../src/factory-preset-captures/firmware-${firmware}/${file.source}`,
         ),
       );
       for (const [trackText, [category, label]] of Object.entries(
@@ -161,15 +186,15 @@ describe("OP-XY preset catalog", () => {
         expect(readString(track, 0x453f, 48)).toBe(`${category}/${label}`);
       }
     }
-  });
+  }, 15_000);
 
-  it("shares the 24 donor projects instead of fetching one file per preset", () => {
+  it("shares 26 donor projects instead of fetching one file per preset", () => {
     const donorUrls = OP_XY_PRESET_CHOICES.flatMap((preset) =>
       preset.donorUrl ? [preset.donorUrl] : [],
     );
 
-    expect(donorUrls).toHaveLength(148);
-    expect(new Set(donorUrls).size).toBe(24);
-    expect(captureManifest.files).toHaveLength(24);
+    expect(donorUrls).toHaveLength(157);
+    expect(new Set(donorUrls).size).toBe(26);
+    expect(captureManifest.files).toHaveLength(26);
   });
 });

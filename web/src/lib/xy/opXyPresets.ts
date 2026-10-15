@@ -5,6 +5,7 @@ import captureManifest from "./opXyFactoryPresetCaptureManifest.json";
 export type OpXyPresetCategory =
   | "bass"
   | "drum"
+  | "drumline"
   | "keys"
   | "lead"
   | "organ"
@@ -15,6 +16,7 @@ export type OpXyPresetCategory =
 export const OP_XY_FACTORY_CATEGORIES: readonly OpXyPresetCategory[] = [
   "bass",
   "drum",
+  "drumline",
   "keys",
   "lead",
   "organ",
@@ -116,6 +118,7 @@ export const OP_XY_FACTORY_PRESET_CAPTURES = captureFilesFromManifest().flatMap(
 const FACTORY_FALLBACKS: Record<OpXyPresetCategory, string> = {
   bass: "bass-shoulder",
   drum: "drum-boop",
+  drumline: "drum-boop",
   keys: "pluck-beach-bum",
   lead: "lead-gaussian",
   organ: "pad-bandpasser",
@@ -245,6 +248,17 @@ export const OP_XY_FACTORY_PRESET_NAMES = {
     "sugar",
     "wood box",
     "zebra",
+  ],
+  drumline: [
+    "atom",
+    "beatnic",
+    "cinortcele",
+    "dote yet",
+    "helpline",
+    "macaroni",
+    "that tom tom tom",
+    "tyche",
+    "we will c",
   ],
   keys: [
     "80s lover",
@@ -470,6 +484,7 @@ export function gmProgramForPresetCategory(
     case "pad":
       return 88; // Pad 1 (new age)
     case "drum":
+    case "drumline":
       return 0;
     default:
       return 0;

@@ -3,11 +3,43 @@ import {
   buildProjectViewModel,
   type XYProjectViewModel,
 } from "./projectViewModel";
+import {
+  assessXYProject,
+  type XYProjectCompatibilityAssessment,
+} from "./projectCompatibility";
 
-export async function loadXYFile(file: File): Promise<XYProjectViewModel> {
+export type XYFileLoadResult =
+  | {
+      kind: "editable";
+      project: XYProjectViewModel;
+      assessment: XYProjectCompatibilityAssessment;
+    }
+  | {
+      kind: "diagnostic";
+      fileName: string;
+      originalBytes: Uint8Array;
+      assessment: XYProjectCompatibilityAssessment;
+    };
+
+export async function loadXYFile(file: File): Promise<XYFileLoadResult> {
   const buffer = await file.arrayBuffer();
-  const imageProject = ImageProject.fromBytes(new Uint8Array(buffer));
-  return buildProjectViewModel(imageProject, file.name, undefined, false);
+  const bytes = new Uint8Array(buffer);
+  const assessment = await assessXYProject(bytes);
+  if (assessment.status !== "knownCompatible") {
+    return {
+      kind: "diagnostic",
+      fileName: file.name,
+      originalBytes: bytes,
+      assessment,
+    };
+  }
+
+  const imageProject = ImageProject.fromBytes(bytes);
+  return {
+    kind: "editable",
+    project: buildProjectViewModel(imageProject, file.name, undefined, false),
+    assessment,
+  };
 }
 
 export function loadXYBytes(

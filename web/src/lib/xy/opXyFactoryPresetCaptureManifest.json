@@ -292,6 +292,29 @@
         "5": ["pluck", "synth bell"],
         "6": ["pluck", "whorl"]
       }
+    },
+    {
+      "firmware": "1.2.0",
+      "source": "batches/drumline01.xy",
+      "asset": "factory-1.2.0-drumline01.xy",
+      "tracks": {
+        "1": ["drumline", "atom"],
+        "2": ["drumline", "beatnic"],
+        "3": ["drumline", "cinortcele"],
+        "4": ["drumline", "dote yet"],
+        "5": ["drumline", "helpline"],
+        "6": ["drumline", "macaroni"],
+        "7": ["drumline", "that tom tom tom"],
+        "8": ["drumline", "tyche"]
+      }
+    },
+    {
+      "firmware": "1.2.0",
+      "source": "batches/drumline02.xy",
+      "asset": "factory-1.2.0-drumline02.xy",
+      "tracks": {
+        "1": ["drumline", "we will c"]
+      }
     }
   ]
 }
