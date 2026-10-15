@@ -7,7 +7,11 @@ export type XYBuddyNativeExportPayload = {
     generatorVersion: string;
     xyFormatVersion: string;
   };
-  compatibilityStatus: "unknownFirmware";
+  compatibilityStatus:
+    | "knownCompatible"
+    | "probablyCompatible"
+    | "unknownFirmware"
+    | "unsupported";
 };
 
 export type XYBuddyNativeMidiOutput = {
@@ -25,6 +29,11 @@ type XYBuddyNativeBridge = {
   version?: number;
   supportsExplicitExports?: boolean;
   supportsNativeMidiOutput?: boolean;
+  nativeCapabilities?: {
+    schemaVersion: 1;
+    audioDeviceDiscovery: boolean;
+    audioCapture: false;
+  };
   nativeMidiOutputs?: XYBuddyNativeMidiOutput[];
   pushExport?: (payload: XYBuddyNativeExportPayload) => number;
   requestNativeMidiOutputs?: () => number;

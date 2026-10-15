@@ -5,6 +5,7 @@
 export const HEADER_LEN = 8;
 export const MAGIC = new Uint8Array([0xdd, 0xcc, 0xbb, 0xaa]);
 export const MAX_RUN = 257; // 2 literal bytes + extension 255
+export const MAX_DECODED_PROJECT_BYTES = 2 * 1024 * 1024;
 
 export class RleError extends Error {
   constructor(message: string) {
@@ -17,6 +18,7 @@ export function decode(
   buf: Uint8Array,
   start: number = 0,
   end?: number,
+  maxOutputBytes: number = MAX_DECODED_PROJECT_BYTES,
 ): Uint8Array {
   const out: number[] = [];
   let i = start;
@@ -26,6 +28,11 @@ export function decode(
   while (i < stop) {
     const b = buf[i];
     i++;
+    if (out.length >= maxOutputBytes) {
+      throw new RleError(
+        `decoded data exceeds the ${maxOutputBytes}-byte safety limit`,
+      );
+    }
     out.push(b);
 
     if (b === prev) {
@@ -34,6 +41,11 @@ export function decode(
       }
       const ext = buf[i];
       i++;
+      if (out.length + ext > maxOutputBytes) {
+        throw new RleError(
+          `decoded data exceeds the ${maxOutputBytes}-byte safety limit`,
+        );
+      }
       for (let j = 0; j < ext; j++) {
         out.push(b);
       }

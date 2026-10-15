@@ -4,6 +4,7 @@
   import ConversionCounter from "./components/ConversionCounter.svelte";
   import MacAppNotice from "./components/MacAppNotice.svelte";
   import ProjectReadyPanel from "./components/ProjectReadyPanel.svelte";
+  import ReadOnlyProjectPanel from "./components/ReadOnlyProjectPanel.svelte";
   import CreatedProjectWorkspace from "./components/CreatedProjectWorkspace.svelte";
   import SiteFooter from "./components/SiteFooter.svelte";
   import WorkflowTopbar from "./components/WorkflowTopbar.svelte";
@@ -22,7 +23,7 @@
     normalizeXYFileName,
     xyProjectName,
   } from "./lib/xy/projectExporter";
-  import { loadXYFile } from "./lib/xy/projectLoader";
+  import { loadXYFile, type XYFileLoadResult } from "./lib/xy/projectLoader";
   import {
     exportActiveSongData,
     buildLinearSequenceProject,
@@ -70,6 +71,10 @@
   let midiSelectionUpdating = false;
   let launchImportState: LaunchImportState = "idle";
   let projectViewMode: "pattern" | "arrange" | "song" = "arrange";
+  let diagnosticProject: Extract<
+    XYFileLoadResult,
+    { kind: "diagnostic" }
+  > | null = null;
   const isNativeEmbed = isXYBuddyNativeEmbed();
   const canShowMacCompanion = !isNativeEmbed && isAppleClient();
 
@@ -235,7 +240,17 @@
     midiImportOptions = {};
     midiSelectionUpdating = false;
     try {
-      const project = await loadXYFile(file);
+      const result = await loadXYFile(file);
+      if (result.kind === "diagnostic") {
+        projectStore.set(null);
+        diagnosticProject = result;
+        importFileName = file.name;
+        announceDisplayMessage("READ ONLY", "warn");
+        return;
+      }
+
+      const project = result.project;
+      diagnosticProject = null;
       projectStore.set(project);
       projectFileName = xyProjectName(project.fileName);
       projectCreated = true;
@@ -260,6 +275,7 @@
     importedMidiFile = null;
     midiImportOptions = {};
     midiSelectionUpdating = false;
+    diagnosticProject = null;
     announceDisplayMessage(`IMPORT ${file.name}`, "neutral");
     try {
       const result = await loadMidiFileAsNewProject(file);
@@ -330,7 +346,7 @@
   }
 
   async function handleSelectedFile(file: File) {
-    const isLaunchImport = !$projectStore;
+    const isLaunchImport = !$projectStore && !diagnosticProject;
     if (isLaunchImport) {
       launchImportState = "processing";
       announceDisplayMessage("READING FILE", "neutral");
@@ -386,7 +402,7 @@
         generatorVersion: "xy-format web",
         xyFormatVersion: "live",
       },
-      compatibilityStatus: "unknownFirmware",
+      compatibilityStatus: "knownCompatible",
     };
   }
 
@@ -485,7 +501,7 @@
 
 <main
   class="app-shell"
-  class:launching={!$projectStore}
+  class:launching={!$projectStore && !diagnosticProject}
   class:dragging
   on:dragover|preventDefault={() => (dragging = true)}
   on:dragleave={() => (dragging = false)}
@@ -508,7 +524,14 @@
     class="visually-hidden"
   />
 
-  {#if $projectStore}
+  {#if diagnosticProject}
+    <ReadOnlyProjectPanel
+      fileName={diagnosticProject.fileName}
+      originalBytes={diagnosticProject.originalBytes}
+      assessment={diagnosticProject.assessment}
+      onClose={() => (diagnosticProject = null)}
+    />
+  {:else if $projectStore}
     <WorkflowTopbar
       project={$projectStore}
       {projectCreated}
