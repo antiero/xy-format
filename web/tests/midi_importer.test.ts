@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { readFileSync } from "fs";
 import { writeMidi, type MidiData, type MidiEvent } from "midi-file";
 import { buildMidiProjectFromBytes } from "../src/lib/xy/midiImporter";
+import { resolvePatternPresetId } from "../src/lib/xy/opXyPresets";
 
 const BASELINE = "../src/one-off-changes-from-default/unnamed 1.xy";
 
@@ -470,6 +471,55 @@ describe("MIDI new-project importer", () => {
     expect(
       trackString(result, (track?.assignedOpXyTracks[0] ?? 0) + 1, 0x453f, 48),
     ).toBe("strings/ensemble");
+  });
+
+  it("keeps OS 1.2.0 Drumline donors off older-firmware baselines", () => {
+    const drumline = new Uint8Array(
+      readFileSync(
+        "../src/factory-preset-captures/firmware-1.2.0/batches/drumline01.xy",
+      ),
+    );
+    const author = (baseline: Uint8Array) => {
+      const initial = buildMidiProjectFromBytes(
+        programmedHarpsichordMidi(),
+        "drumline.mid",
+        baseline,
+      );
+      const trackId = initial.summary.trackSelection?.tracks[0]?.id;
+      expect(trackId).toBeDefined();
+      const result = buildMidiProjectFromBytes(
+        programmedHarpsichordMidi(),
+        "drumline.mid",
+        baseline,
+        { presetIdsByTrack: { [trackId!]: "drumline-atom" } },
+        { "drumline-atom": drumline },
+      );
+      const track = result.summary.trackSelection?.tracks[0];
+      const path = trackString(
+        result,
+        (track?.assignedOpXyTracks[0] ?? 0) + 1,
+        0x453f,
+        48,
+      );
+      // The summary must name the sound that was actually written.
+      expect(track?.presetId).toBe(resolvePatternPresetId(path, 0));
+      return path;
+    };
+
+    // Old header (09130386): untested on hardware, so the donor is withheld.
+    expect(author(new Uint8Array(readFileSync(BASELINE)))).not.toBe(
+      "drumline/atom",
+    );
+    // Same firmware family (09140786): the donor is used.
+    expect(
+      author(
+        new Uint8Array(
+          readFileSync(
+            "../src/factory-preset-captures/firmware-1.2.0/batches/drumline02.xy",
+          ),
+        ),
+      ),
+    ).toBe("drumline/atom");
   });
 
   it("authors a one-bar MIDI as a 16-step pattern without trailing silence", () => {

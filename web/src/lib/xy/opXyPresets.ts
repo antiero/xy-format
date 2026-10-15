@@ -590,31 +590,96 @@ export function loadBaselineBytes(): Promise<Uint8Array> {
   return baselinePromise;
 }
 
+/** Container header byte 5: the firmware family that fixes the decoded layout. */
+export function xyFirmwareFamily(headerOrProject: Uint8Array): number {
+  if (headerOrProject.length < 6) {
+    throw new Error("OP-XY project header is too short");
+  }
+  return headerOrProject[5];
+}
+
+/**
+ * A donor captured on a newer firmware family may carry an engine the target
+ * firmware does not know (Drumline is family 0x14, OS 1.2.0). Splicing it into
+ * an older-family project is untested on hardware, so it stays blocked until
+ * device test `j_old_hdr_drumline.xy` passes
+ * (docs/logs/2026-10-16_os_1_2_0_layout_diff.md).
+ */
+export function donorFitsTarget(
+  donorBytes: Uint8Array,
+  targetHeader: Uint8Array,
+): boolean {
+  return xyFirmwareFamily(donorBytes) <= xyFirmwareFamily(targetHeader);
+}
+
+export function donorsForTarget(
+  donors: Record<string, Uint8Array>,
+  targetHeader: Uint8Array,
+): Record<string, Uint8Array> {
+  return Object.fromEntries(
+    Object.entries(donors).filter(([, bytes]) =>
+      donorFitsTarget(bytes, targetHeader),
+    ),
+  );
+}
+
+/** Preset ids whose donor is too new for the target (default: blank baseline). */
+export async function firmwareBlockedPresetIds(
+  targetHeader?: Uint8Array,
+): Promise<Set<string>> {
+  const [donors, target] = await Promise.all([
+    loadOpXyPresetDonors(),
+    targetHeader ? Promise.resolve(targetHeader) : loadBaselineBytes(),
+  ]);
+  return new Set(
+    Object.entries(donors)
+      .filter(([, bytes]) => !donorFitsTarget(bytes, target))
+      .map(([id]) => id),
+  );
+}
+
+export class PresetFirmwareError extends Error {
+  constructor(readonly presetId: string) {
+    super(`preset ${presetId} needs a newer OP-XY OS than this project`);
+    this.name = "PresetFirmwareError";
+  }
+}
+
 export function trackStructForPreset(
   preset: OpXyPresetChoice,
   donors: Record<string, Uint8Array>,
   baselineBytes?: Uint8Array,
+  targetHeader?: Uint8Array,
 ): Uint8Array {
   const donorBytes = donors[preset.id];
   if (donorBytes) {
+    if (targetHeader && !donorFitsTarget(donorBytes, targetHeader)) {
+      throw new PresetFirmwareError(preset.id);
+    }
     return opXyTrackStructFromDonor(preset, donorBytes);
   }
   if (preset.templateTrack && baselineBytes) {
     return trackStructTemplateFromBytes(baselineBytes, preset.templateTrack);
   }
-  if (preset.fallbackPresetId && donors[preset.fallbackPresetId]) {
-    const fallback = opXyPresetById(preset.fallbackPresetId);
+  const fallbackBytes = preset.fallbackPresetId
+    ? donors[preset.fallbackPresetId]
+    : undefined;
+  if (
+    fallbackBytes &&
+    (!targetHeader || donorFitsTarget(fallbackBytes, targetHeader))
+  ) {
+    const fallback = opXyPresetById(preset.fallbackPresetId!);
     if (fallback) {
-      return opXyTrackStructFromDonor(
-        fallback,
-        donors[preset.fallbackPresetId],
-      );
+      return opXyTrackStructFromDonor(fallback, fallbackBytes);
     }
   }
   throw new Error(`could not resolve track struct for preset ${preset.id}`);
 }
 
-export async function loadPresetStruct(presetId: string): Promise<Uint8Array> {
+export async function loadPresetStruct(
+  presetId: string,
+  targetHeader?: Uint8Array,
+): Promise<Uint8Array> {
   const preset = opXyPresetById(presetId);
   if (!preset) {
     throw new Error(`unknown preset id ${presetId}`);
@@ -629,5 +694,6 @@ export async function loadPresetStruct(presetId: string): Promise<Uint8Array> {
     preset,
     donors,
     baseline.length > 0 ? baseline : undefined,
+    targetHeader,
   );
 }

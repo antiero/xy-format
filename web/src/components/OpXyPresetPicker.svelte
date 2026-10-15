@@ -11,6 +11,8 @@
   export let selectedId: string;
   export let trackName: string;
   export let disabled = false;
+  /** Presets whose captured donor needs a newer OP-XY OS than the project. */
+  export let firmwareBlockedIds: ReadonlySet<string> = new Set();
   export let onChange: (presetId: string) => void = () => {};
 
   let triggerElement: HTMLButtonElement;
@@ -56,8 +58,12 @@
       ?.scrollIntoView({ block: "nearest" });
   }
 
+  function usable(preset: OpXyFactoryPresetCatalogEntry): boolean {
+    return preset.available && !firmwareBlockedIds.has(preset.id);
+  }
+
   function choosePreset(preset: OpXyFactoryPresetCatalogEntry): void {
-    if (!preset.available) return;
+    if (!usable(preset)) return;
     onChange(preset.id);
     dialogElement.close();
   }
@@ -113,15 +119,19 @@
           {#each activePresets as preset (preset.id)}
             <button
               type="button"
-              class:available={preset.available}
+              class:available={usable(preset)}
               aria-current={preset.id === selectedId ? "true" : undefined}
-              aria-disabled={!preset.available}
-              aria-label={preset.available
+              aria-disabled={!usable(preset)}
+              aria-label={usable(preset)
                 ? preset.label
-                : `${preset.label}, sound capture needed`}
-              title={preset.available
+                : firmwareBlockedIds.has(preset.id)
+                  ? `${preset.label}, needs newer OP-XY OS`
+                  : `${preset.label}, sound capture needed`}
+              title={usable(preset)
                 ? `Use ${preset.label}`
-                : `${preset.label} needs a device sound-state capture before export`}
+                : firmwareBlockedIds.has(preset.id)
+                  ? `${preset.label} needs a newer OP-XY OS than this project`
+                  : `${preset.label} needs a device sound-state capture before export`}
               on:click={() => choosePreset(preset)}
             >
               <span>{preset.label}</span>

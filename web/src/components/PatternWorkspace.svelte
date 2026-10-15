@@ -46,10 +46,12 @@
   import TransportControls from "./TransportControls.svelte";
   import OpXyPresetPicker from "./OpXyPresetPicker.svelte";
   import {
+    donorFitsTarget,
     loadBaselineBytes,
     loadOpXyPresetDonors,
     loadPresetStruct,
     opXyPresetById,
+    PresetFirmwareError,
   } from "../lib/xy/opXyPresets";
 
   export let project: XYProjectViewModel;
@@ -120,18 +122,30 @@
   let rollTransitionTimer: ReturnType<typeof setTimeout> | undefined;
   let presetLoading = false;
   let applyToAllPatterns = true;
+  let presetDonors: Record<string, Uint8Array> = {};
 
   onMount(() => {
-    void loadOpXyPresetDonors();
+    void loadOpXyPresetDonors().then((donors) => (presetDonors = donors));
     void loadBaselineBytes();
   });
+
+  $: firmwareBlockedPresetIds = new Set(
+    Object.entries(presetDonors)
+      .filter(
+        ([, bytes]) => !donorFitsTarget(bytes, project.imageProject.header),
+      )
+      .map(([id]) => id),
+  );
 
   async function handlePresetChange(presetId: string): Promise<void> {
     if (presetLoading) return;
     if (!applyToAllPatterns && presetId === pattern.presetId) return;
     presetLoading = true;
     try {
-      const donorStruct = await loadPresetStruct(presetId);
+      const donorStruct = await loadPresetStruct(
+        presetId,
+        project.imageProject.header,
+      );
       if (applyToAllPatterns) {
         dispatchProjectEdit({
           type: "set-track-preset",
@@ -158,7 +172,12 @@
       );
     } catch (error) {
       console.error(error);
-      announceDisplayMessage("PRESET LOAD FAILED", "error");
+      announceDisplayMessage(
+        error instanceof PresetFirmwareError
+          ? "SOUND NEEDS NEWER OP-XY OS"
+          : "PRESET LOAD FAILED",
+        "error",
+      );
     } finally {
       presetLoading = false;
     }
@@ -987,6 +1006,7 @@
             selectedId={pattern.presetId}
             trackName={`${track.label} P${pattern.index + 1}`}
             disabled={presetLoading}
+            firmwareBlockedIds={firmwareBlockedPresetIds}
             onChange={handlePresetChange}
           />
         </div>
