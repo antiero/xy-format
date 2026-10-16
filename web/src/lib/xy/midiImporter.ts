@@ -36,6 +36,7 @@ import {
 } from "./midiTimeline";
 import { collectMidiProgramTimeline, midiProgramAtTick } from "./gmPrograms";
 import {
+  donorsForTarget,
   loadOpXyPresetDonors,
   opXyPresetById,
   opXyTrackStructFromDonor,
@@ -1663,6 +1664,10 @@ export function buildMidiProjectFromBytes(
   options: MidiImportOptions = {},
   presetDonors: Record<string, Uint8Array> = {},
 ): MidiImportResult {
+  // Newer-firmware donors (Drumline) fall back like a missing capture.
+  const firmwareBlockedIds = new Set(Object.keys(presetDonors));
+  presetDonors = donorsForTarget(presetDonors, baselineBytes);
+  for (const id of Object.keys(presetDonors)) firmwareBlockedIds.delete(id);
   const midi = parseMidi(midiBytes);
   const mapGmDrums = shouldMapGmDrums(options);
 
@@ -1837,9 +1842,12 @@ export function buildMidiProjectFromBytes(
     const option = rangeSelection.optionsById.get(candidateId(candidate));
     let preset = option ? opXyPresetById(option.presetId) : undefined;
     if (preset?.donorUrl && !presetDonors[preset.id]) {
+      const blocked = firmwareBlockedIds.has(preset.id);
       preset = preset.fallbackPresetId
         ? opXyPresetById(preset.fallbackPresetId)
         : undefined;
+      // Report the sound actually written, not the one that was withheld.
+      if (blocked && option && preset) option.presetId = preset.id;
     }
     if (option) option.assignedOpXyTracks = hosts.map((host) => host - 1);
     for (const host of hosts) {

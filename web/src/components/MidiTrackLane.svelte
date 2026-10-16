@@ -3,7 +3,11 @@
     MidiPreviewNote,
     MidiTrackSelectionOption,
   } from "../lib/xy/midiImporter";
-  import { opXyFactoryTrackDescription } from "../lib/xy/opXyPresets";
+  import { onMount } from "svelte";
+  import {
+    firmwareBlockedPresetIds,
+    opXyFactoryTrackDescription,
+  } from "../lib/xy/opXyPresets";
   import OpXyPresetPicker from "./OpXyPresetPicker.svelte";
 
   export let track: MidiTrackSelectionOption;
@@ -20,6 +24,12 @@
     track: MidiTrackSelectionOption,
     presetId: string,
   ) => void = () => {};
+
+  // MIDI import authors on the built-in blank baseline.
+  let firmwareBlockedIds: ReadonlySet<string> = new Set();
+  onMount(() => {
+    void firmwareBlockedPresetIds().then((ids) => (firmwareBlockedIds = ids));
+  });
 
   $: compact = trackHeight < 42;
   $: assignedTrackNumbers = track.assignedOpXyTracks
@@ -108,6 +118,7 @@
         selectedId={track.presetId}
         trackName={track.name}
         disabled={selectionUpdating || !selected}
+        {firmwareBlockedIds}
         onChange={(presetId) => onPresetChange(track, presetId)}
       />
     </span>
