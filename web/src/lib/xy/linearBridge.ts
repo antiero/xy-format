@@ -7,9 +7,15 @@ import {
   type TrackPatternMap,
 } from "./image_writer";
 import {
+  applyEdit,
   buildProjectViewModel,
   type XYProjectViewModel,
 } from "./projectViewModel";
+import {
+  loadPresetStruct,
+  OP_XY_FACTORY_PRESET_CATALOG,
+  opXyPresetById,
+} from "./opXyPresets";
 
 export type LinearNotePayload = {
   scene: number;
@@ -27,6 +33,8 @@ export type LinearSequencePayload = {
   bars?: number;
   sceneCount?: number;
   notes: LinearNotePayload[];
+  /** OP-XY preset per track, keyed by 0-based track index (native Edit tab). */
+  presetIdsByTrack?: Record<string, string>;
 };
 
 export function exportActiveSongData(
@@ -59,6 +67,10 @@ export function exportActiveSongData(
         index: p.index,
         bars: p.bars,
         totalSteps: p.totalSteps,
+        // So the native Edit tab can name tracks and pick matching voices.
+        presetId: p.presetId,
+        presetLabel: p.presetLabel,
+        presetCategory: opXyPresetById(p.presetId)?.category ?? null,
         notes: p.notes.map((n) => ({
           note: n.note,
           velocity: n.velocity,
@@ -72,6 +84,50 @@ export function exportActiveSongData(
   };
 
   return JSON.stringify(payload);
+}
+
+/** The factory preset browser, for the native Edit tab's picker. */
+export function presetCatalogJSON(): string {
+  return JSON.stringify(OP_XY_FACTORY_PRESET_CATALOG);
+}
+
+/**
+ * Applies the presets the native Edit tab chose to every pattern of their
+ * tracks. Presets that can't be applied (unknown, or needing a newer OP-XY OS
+ * than the project) are skipped and reported, leaving that track as it was.
+ */
+export async function applyLinearSequencePresets(
+  project: XYProjectViewModel,
+  presetIdsByTrack: Record<string, string> | undefined,
+  loadStruct: (
+    presetId: string,
+    targetHeader?: Uint8Array,
+  ) => Promise<Uint8Array> = loadPresetStruct,
+): Promise<{ project: XYProjectViewModel; skipped: string[] }> {
+  const skipped: string[] = [];
+  let next = project;
+  for (const [key, presetId] of Object.entries(presetIdsByTrack ?? {})) {
+    const trackIndex = Number(key);
+    if (!Number.isInteger(trackIndex) || trackIndex < 0 || trackIndex >= 8) {
+      continue;
+    }
+    try {
+      const donorStruct = await loadStruct(
+        presetId,
+        next.imageProject.header,
+      );
+      next = applyEdit(next, {
+        type: "set-track-preset",
+        trackIndex,
+        presetId,
+        donorStruct,
+      });
+    } catch (error) {
+      console.warn(`Skipped preset ${presetId} on track ${trackIndex + 1}`, error);
+      skipped.push(presetId);
+    }
+  }
+  return { project: next, skipped };
 }
 
 export function buildLinearSequenceProject(

@@ -27,6 +27,8 @@
   import {
     exportActiveSongData,
     buildLinearSequenceProject,
+    applyLinearSequencePresets,
+    presetCatalogJSON,
     type LinearSequencePayload,
   } from "./lib/xy/linearBridge";
   import {
@@ -123,11 +125,14 @@
 
         const fileName =
           payload.filename || ($projectStore?.fileName ?? "PianoRoll.xy");
-        const nextProject = buildLinearSequenceProject(
-          baseline,
-          payload,
-          fileName,
-        );
+        const { project: nextProject, skipped } =
+          await applyLinearSequencePresets(
+            buildLinearSequenceProject(baseline, payload, fileName),
+            payload.presetIdsByTrack,
+          );
+        if (skipped.length > 0) {
+          console.warn("Presets not applied:", skipped);
+        }
         projectStore.set(nextProject);
         projectFileName = xyProjectName(nextProject.fileName);
         projectCreated = true;
@@ -151,6 +156,7 @@
     };
 
     (window as any).__xyBuddyExportActiveSong = getActiveSongExportJSON;
+    (window as any).__xyBuddyPresetCatalog = presetCatalogJSON;
 
     window.__xyBuddyNativeBridge?.setExportActiveSongDataHandler?.(() => {
       return getActiveSongExportJSON();
@@ -185,6 +191,7 @@
       window.__xyBuddyNativeBridge?.setExportActiveSongDataHandler?.(null);
       if (typeof window !== "undefined") {
         delete (window as any).__xyBuddyExportActiveSong;
+        delete (window as any).__xyBuddyPresetCatalog;
       }
     };
   });
