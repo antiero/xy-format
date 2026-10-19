@@ -16,7 +16,17 @@ const BLANK = new Uint8Array(
 function project() {
   return buildLinearSequenceProject(BLANK, {
     sceneCount: 1,
-    notes: [{ scene: 0, track: 2, step: 1, tick: 0, note: 48, velocity: 100, length: 1 }],
+    notes: [
+      {
+        scene: 0,
+        track: 2,
+        step: 1,
+        tick: 0,
+        note: 48,
+        velocity: 100,
+        length: 1,
+      },
+    ],
   });
 }
 
@@ -46,6 +56,8 @@ describe("linear bridge presets", () => {
   });
 
   it("serves the same catalogue as the web preset picker", () => {
-    expect(JSON.parse(presetCatalogJSON())).toEqual(OP_XY_FACTORY_PRESET_CATALOG);
+    expect(JSON.parse(presetCatalogJSON())).toEqual(
+      OP_XY_FACTORY_PRESET_CATALOG,
+    );
   });
 });
