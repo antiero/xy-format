@@ -112,10 +112,7 @@ export async function applyLinearSequencePresets(
       continue;
     }
     try {
-      const donorStruct = await loadStruct(
-        presetId,
-        next.imageProject.header,
-      );
+      const donorStruct = await loadStruct(presetId, next.imageProject.header);
       next = applyEdit(next, {
         type: "set-track-preset",
         trackIndex,
@@ -123,7 +120,10 @@ export async function applyLinearSequencePresets(
         donorStruct,
       });
     } catch (error) {
-      console.warn(`Skipped preset ${presetId} on track ${trackIndex + 1}`, error);
+      console.warn(
+        `Skipped preset ${presetId} on track ${trackIndex + 1}`,
+        error,
+      );
       skipped.push(presetId);
     }
   }
