@@ -66,8 +66,8 @@ header .wordmark,
 }
 .layout {
   display: grid;
-  grid-template-columns: 230px minmax(0, 1060px);
-  gap: 6vw;
+  grid-template-columns: 180px minmax(0, 1fr);
+  gap: 40px;
   margin: 0 auto;
   padding: 0 4vw;
   max-width: 1540px;
@@ -369,54 +369,6 @@ footer > a:last-child {
   to {
     opacity: 1;
     transform: none;
-  }
-}
-@media (max-width: 850px) {
-  header {
-    height: 64px;
-  }
-  .layout {
-    grid-template-columns: 1fr;
-    gap: 0;
-    padding: 0 6vw;
-  }
-  nav {
-    position: relative;
-    top: auto;
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    margin-top: 24px;
-    gap: 0 20px;
-  }
-  .index-label {
-    grid-column: 1/-1;
-    margin-bottom: 8px;
-  }
-  .external {
-    display: none;
-  }
-  .intro {
-    padding-top: 32px;
-  }
-  h1 {
-    margin-top: 25px;
-  }
-  section {
-    padding: 44px 0;
-  }
-  .mobile-shots {
-    padding: 18px;
-    gap: 16px;
-  }
-  footer {
-    flex-wrap: wrap;
-    gap: 16px;
-  }
-  footer > a:last-child {
-    margin-left: 0;
-  }
-  dl > div {
-    grid-template-columns: 75px 1fr;
   }
 }
 @media (prefers-reduced-motion: reduce) {

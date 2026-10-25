@@ -10,36 +10,66 @@
     />
     <link rel="icon" href="/favicon.svg" />
     <link rel="stylesheet" href="/docs/guide.css" />
+    <link rel="stylesheet" href="/docs/navigation.css" />
     <script src="/docs/guide.js" defer></script>
+    <script src="/docs/screenshots.js" defer></script>
+    <link rel="stylesheet" href="/docs/screenshots.css" />
   </head>
   <body>
     <a class="skip" href="#guide">Skip to guide</a>
     <header>
-      <a class="wordmark" href="/" aria-label="xybuddy home"
-        >xybuddy<span> / guide</span></a
-      ><a href="/">open web app ↗</a>
+      <div class="header-brand">
+        <button
+          id="contents-toggle"
+          type="button"
+          aria-controls="guide-contents"
+          aria-expanded="true"
+          aria-label="Hide contents"
+          title="Hide contents"
+        >
+          <svg
+            width="18"
+            height="18"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.5"
+            aria-hidden="true"
+          >
+            <rect x="3" y="4" width="18" height="16" rx="2" />
+            <path d="M9 4v16M13 9h4M13 13h4" />
+          </svg>
+        </button>
+        <a class="wordmark" href="/" aria-label="xybuddy home"
+          >xybuddy<span> / guide</span></a
+        >
+      </div>
+      <a class="open-app" href="/">open web app ↗</a>
     </header>
     <div class="layout">
-      <nav aria-label="Guide chapters">
-        <a class="index-label" href="#overview"
-          >user guide <span>01—08</span></a
-        >
-        <a href="#start"><span>01</span> get started</a
-        ><a href="#song"><span>02</span> song</a
-        ><a href="#edit"><span>03</span> edit</a
-        ><a href="#files"><span>04</span> files</a
-        ><a href="#backup"><span>05</span> backup</a
-        ><a href="#capture"><span>06</span> capture</a
-        ><a href="#platforms"><span>07</span> your platform</a
-        ><a href="#help"><span>08</span> troubleshooting</a>
-        <a
-          class="external"
-          href="https://teenage.engineering/guides/op-xy"
-          target="_blank"
-          rel="noreferrer"
-          >OP–XY hardware guide ↗</a
-        >
-      </nav>
+      <div class="contents-panel" id="guide-contents">
+        <nav aria-label="Guide chapters">
+          <a class="index-label" href="#overview"
+            >user guide <span>01—09</span></a
+          >
+          <a href="#start"><span>01</span> get started</a
+          ><a href="#song"><span>02</span> song</a
+          ><a href="#edit"><span>03</span> edit</a
+          ><a href="#files"><span>04</span> files</a
+          ><a href="#backup"><span>05</span> backup</a
+          ><a href="#capture"><span>06</span> capture</a
+          ><a href="#platforms"><span>07</span> your platform</a
+          ><a href="#help"><span>08</span> troubleshooting</a>
+          <a href="#firmware"><span>09</span> firmware updates</a>
+          <a
+            class="external"
+            href="https://teenage.engineering/guides/op-xy"
+            target="_blank"
+            rel="noreferrer"
+            >OP–XY hardware guide ↗</a
+          >
+        </nav>
+      </div>
       <main id="guide">
         <section class="intro" id="overview">
           <p class="eyebrow">iPhone · iPad · macOS</p>
@@ -106,6 +136,7 @@
             Turn MIDI into an OP–XY project, or continue working on an existing
             <code>.xy</code> file.
           </p>
+          <div class="screenshot-gallery" data-screenshots="song"></div>
           <dl>
             <div>
               <dt>Import</dt>
@@ -131,34 +162,6 @@
               </dd>
             </div>
           </dl>
-          <div class="mobile-shots">
-            <figure>
-              <a href="/docs/images/iphone-song.png"
-                ><img
-                  src="/docs/images/iphone-song.png"
-                  alt="xybuddy Song running in the iPhone simulator, with the four native tabs"
-                  width="1206"
-                  height="2622"
-                  loading="lazy"
-              /></a>
-              <figcaption>iPhone · Song</figcaption>
-            </figure>
-            <figure>
-              <a href="/docs/images/ipad-song.png"
-                ><img
-                  src="/docs/images/ipad-song.png"
-                  alt="xybuddy Song running in the iPad simulator, including the Edit tab"
-                  width="2420"
-                  height="1668"
-                  loading="lazy"
-              /></a>
-              <figcaption>iPad · Song</figcaption>
-            </figure>
-          </div>
-          <p class="note">
-            iPhone and iPad images are real Xcode Simulator captures. They show
-            the app without a USB instrument connected.
-          </p>
           <h3>previewing sound</h3>
           <p>
             Local preview is a guide to the notes and arrangement. For the
@@ -184,6 +187,7 @@
             your song in Edit, adjust the notes, then send the result back to
             Song.
           </p>
+          <div class="screenshot-gallery" data-screenshots="edit"></div>
           <h3>on iPad</h3>
           <p>
             Tap to add or select a note. Drag to move it, or use the handle
@@ -210,6 +214,7 @@
             Browse Projects, Templates, Presets and Samples on your connected
             OP–XY.
           </p>
+          <div class="screenshot-gallery" data-screenshots="files"></div>
           <ol>
             <li>Connect by USB and enable MTP mode.</li>
             <li>Open Files and choose an area or folder.</li>
@@ -246,6 +251,7 @@
             Keep timestamped snapshots of your OP–XY, locally or in iCloud
             Drive.
           </p>
+          <div class="screenshot-gallery" data-screenshots="backup"></div>
           <h3>make a snapshot</h3>
           <ol>
             <li>Connect OP–XY in MTP mode and open Backup.</li>
@@ -289,6 +295,7 @@
             Record the USB inputs as separate WAV stems on a shared timeline,
             ready for your DAW.
           </p>
+          <div class="screenshot-gallery" data-screenshots="capture"></div>
           <ol>
             <li>Finish file transfers and leave MTP mode.</li>
             <li>
@@ -430,6 +437,34 @@
             <a href="https://teenage.engineering/guides/op-xy"
               >official OP–XY guide ↗</a
             >.
+          </p>
+        </section>
+        <section id="firmware">
+          <div class="chapter">
+            <span>09</span>
+            <h2>firmware updates</h2>
+          </div>
+          <p>
+            Find the latest OP–XY OS, release notes and installation
+            instructions on Teenage Engineering’s official downloads page.
+          </p>
+          <p>
+            <a
+              href="https://teenage.engineering/downloads/op-xy"
+              target="_blank"
+              rel="noreferrer"
+              >Latest OP–XY firmware ↗</a
+            >
+          </p>
+          <p>
+            OS 1.2.0, released 15 October 2026, adds multichannel USB audio, the
+            Drumline engine and a dynamic track filter with drive. It also adds
+            a detune preset setting and improves bootloader security.
+          </p>
+          <p class="note">
+            Release information checked 25 October 2026. Visit the official page
+            for newer updates. Back up your OP–XY before updating and follow the
+            manufacturer’s instructions.
           </p>
         </section>
         <footer>
