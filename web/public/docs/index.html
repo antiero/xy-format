@@ -1,0 +1,446 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>xybuddy — user guide</title>
+    <meta
+      name="description"
+      content="The xybuddy guide for iPhone, iPad and Mac. Import MIDI, edit OP-XY projects, manage files, back up and record USB audio."
+    />
+    <link rel="icon" href="/favicon.svg" />
+    <link rel="stylesheet" href="/docs/guide.css" />
+    <script src="/docs/guide.js" defer></script>
+  </head>
+  <body>
+    <a class="skip" href="#guide">Skip to guide</a>
+    <header>
+      <a class="wordmark" href="/" aria-label="xybuddy home"
+        >xybuddy<span> / guide</span></a
+      ><a href="/">open web app ↗</a>
+    </header>
+    <div class="layout">
+      <nav aria-label="Guide chapters">
+        <a class="index-label" href="#overview"
+          >user guide <span>01—08</span></a
+        >
+        <a href="#start"><span>01</span> get started</a
+        ><a href="#song"><span>02</span> song</a
+        ><a href="#edit"><span>03</span> edit</a
+        ><a href="#files"><span>04</span> files</a
+        ><a href="#backup"><span>05</span> backup</a
+        ><a href="#capture"><span>06</span> capture</a
+        ><a href="#platforms"><span>07</span> your platform</a
+        ><a href="#help"><span>08</span> troubleshooting</a>
+        <a
+          class="external"
+          href="https://teenage.engineering/guides/op-xy"
+          target="_blank"
+          rel="noreferrer"
+          >OP–XY hardware guide ↗</a
+        >
+      </nav>
+      <main id="guide">
+        <section class="intro" id="overview">
+          <p class="eyebrow">iPhone · iPad · macOS</p>
+          <h1>xybuddy<br /><span>user guide.</span></h1>
+          <p class="lead">
+            From an idea to your OP–XY.<br />Make a song. Keep it safe. Capture
+            the take.
+          </p>
+          <figure class="hero-shot">
+            <a
+              href="/docs/images/mac-song.png"
+              aria-label="View full-size Mac app screenshot"
+              ><img
+                src="/docs/images/mac-song.png"
+                alt="The xybuddy macOS app with its Song workspace and native room toolbar"
+                width="2704"
+                height="1698"
+                fetchpriority="high"
+            /></a>
+            <figcaption>Song on macOS · actual app capture</figcaption>
+          </figure>
+        </section>
+        <section id="start">
+          <div class="chapter">
+            <span>01</span>
+            <h2>get started</h2>
+          </div>
+          <p>
+            Start with a MIDI file or an existing OP–XY project. Song works
+            without a connected instrument; Files and Backup need a USB
+            connection.
+          </p>
+          <h3>1. open xybuddy</h3>
+          <p>
+            Use the app on iPhone, iPad or Mac. You can also
+            <a href="/">open Song in your browser</a>. The native apps add
+            device file management, backup and USB audio capture.
+          </p>
+          <h3>2. bring in a song</h3>
+          <p>
+            In Song, import a MIDI file or open a <code>.xy</code> project. On
+            Mac, you can also drop a file into the Song workspace. Choose the
+            MIDI tracks you want to use, preview the result and name your
+            project.
+          </p>
+          <h3>3. connect when you’re ready</h3>
+          <p>
+            Connect OP–XY using a USB data cable. For files and backups, choose
+            <strong>Enable MTP Mode</strong> in the mobile app, use the OP–XY
+            button on Mac, or select <strong>COM › M4</strong> on the
+            instrument. Eject when finished to leave MTP mode.
+          </p>
+          <p class="note">
+            MTP file transfer and USB audio capture are separate modes. Finish
+            and eject file transfers before setting up Capture.
+          </p>
+        </section>
+        <section id="song">
+          <div class="chapter">
+            <span>02</span>
+            <h2>song</h2>
+          </div>
+          <p>
+            Turn MIDI into an OP–XY project, or continue working on an existing
+            <code>.xy</code> file.
+          </p>
+          <dl>
+            <div>
+              <dt>Import</dt>
+              <dd>
+                Open MIDI or an OP–XY project using the import control. Files on
+                a connected OP–XY can also be opened in Song from Files.
+              </dd>
+            </div>
+            <div>
+              <dt>Shape</dt>
+              <dd>
+                Use Pattern, Arrange and Song views to work with notes, patterns
+                and the song structure. Set tempo, select presets and preview
+                your arrangement.
+              </dd>
+            </div>
+            <div>
+              <dt>Export</dt>
+              <dd>
+                Export <code>.xy</code> for OP–XY or MIDI for your DAW. In the
+                native apps, send the generated project to the connected
+                instrument. Mac also offers Save as Template.
+              </dd>
+            </div>
+          </dl>
+          <div class="mobile-shots">
+            <figure>
+              <a href="/docs/images/iphone-song.png"
+                ><img
+                  src="/docs/images/iphone-song.png"
+                  alt="xybuddy Song running in the iPhone simulator, with the four native tabs"
+                  width="1206"
+                  height="2622"
+                  loading="lazy"
+              /></a>
+              <figcaption>iPhone · Song</figcaption>
+            </figure>
+            <figure>
+              <a href="/docs/images/ipad-song.png"
+                ><img
+                  src="/docs/images/ipad-song.png"
+                  alt="xybuddy Song running in the iPad simulator, including the Edit tab"
+                  width="2420"
+                  height="1668"
+                  loading="lazy"
+              /></a>
+              <figcaption>iPad · Song</figcaption>
+            </figure>
+          </div>
+          <p class="note">
+            iPhone and iPad images are real Xcode Simulator captures. They show
+            the app without a USB instrument connected.
+          </p>
+          <h3>previewing sound</h3>
+          <p>
+            Local preview is a guide to the notes and arrangement. For the
+            instrument’s own sound, choose an available OP–XY MIDI output and
+            listen to OP–XY. MIDI carries performance data; it does not carry
+            audio.
+          </p>
+          <h3>project compatibility</h3>
+          <p>
+            If a project opens in a read-only or diagnostic view, keep the
+            original file. Use only the export and editing actions offered for
+            that project.
+          </p>
+        </section>
+        <section id="edit">
+          <div class="chapter">
+            <span>03</span>
+            <h2>edit</h2>
+            <small>iPad + Mac</small>
+          </div>
+          <p>
+            A native piano roll for working across a linear arrangement. Open
+            your song in Edit, adjust the notes, then send the result back to
+            Song.
+          </p>
+          <h3>on iPad</h3>
+          <p>
+            Tap to add or select a note. Drag to move it, or use the handle
+            beyond its end to change its length. Hold, then drag to select a
+            group. Pan with one finger and pinch to zoom time.
+          </p>
+          <h3>with a keyboard</h3>
+          <p>
+            Use the arrow keys, Delete and <kbd>⌘ Z</kbd> while editing. On Mac,
+            use the pointer to select and move notes.
+          </p>
+          <p>
+            Returning edits to Song rebuilds the arrangement as four-bar scenes.
+            Review that arrangement before exporting. iPhone has the Song
+            workspace but does not include the separate native Edit room.
+          </p>
+        </section>
+        <section id="files">
+          <div class="chapter">
+            <span>04</span>
+            <h2>files</h2>
+          </div>
+          <p>
+            Browse Projects, Templates, Presets and Samples on your connected
+            OP–XY.
+          </p>
+          <ol>
+            <li>Connect by USB and enable MTP mode.</li>
+            <li>Open Files and choose an area or folder.</li>
+            <li>
+              Open a project in Song, transfer files, or use the available
+              rename, folder and delete actions.
+            </li>
+            <li>Wait for the current transfer to finish, then eject.</li>
+          </ol>
+          <h3>on Mac</h3>
+          <p>
+            Use <kbd>⇧ click</kbd> to select a range and <kbd>⌘ click</kbd> to
+            add or remove individual items. Drag files out to Finder to download
+            them. Drop <code>.xy</code> projects into the Files view to upload
+            them.
+          </p>
+          <h3>on iPhone and iPad</h3>
+          <p>
+            Use the import control to choose local files and the share sheet to
+            save or share downloaded items. If camera access is requested, allow
+            it: iOS uses that permission for the USB file connection.
+          </p>
+          <p class="note">
+            Back up before deleting or replacing device files. A name collision
+            may need to be resolved before a transfer can proceed.
+          </p>
+        </section>
+        <section id="backup">
+          <div class="chapter">
+            <span>05</span>
+            <h2>backup</h2>
+          </div>
+          <p>
+            Keep timestamped snapshots of your OP–XY, locally or in iCloud
+            Drive.
+          </p>
+          <h3>make a snapshot</h3>
+          <ol>
+            <li>Connect OP–XY in MTP mode and open Backup.</li>
+            <li>
+              Choose Full, or Custom to select projects, presets and samples.
+            </li>
+            <li>
+              Choose whether new backups use iCloud, then create the backup.
+            </li>
+            <li>
+              Keep OP–XY connected until verification finishes and the snapshot
+              appears in History.
+            </li>
+          </ol>
+          <h3>restore with a preview</h3>
+          <p>
+            Choose a backup and the categories to restore. Check the comparison
+            before confirming: it shows new, changed and unchanged files.
+            Restore keeps extra device files and creates a safety snapshot
+            before applying changes.
+          </p>
+          <h3>find your backups</h3>
+          <p>
+            On iPhone and iPad, local backups are in Files › On My iPhone/iPad ›
+            XYBuddy › Backups. On Mac, local snapshots are stored in the app’s
+            Application Support folder. iCloud snapshots use the shared XYBuddy
+            backup container, so both platforms can use the same backup format.
+          </p>
+          <p>
+            If an iOS restore is interrupted, reopen Backup and use the offered
+            Resume Restore or Restore Safety Backup action. Let iCloud finish
+            downloading a backup before restoring it.
+          </p>
+        </section>
+        <section id="capture">
+          <div class="chapter">
+            <span>06</span>
+            <h2>capture</h2>
+          </div>
+          <p>
+            Record the USB inputs as separate WAV stems on a shared timeline,
+            ready for your DAW.
+          </p>
+          <ol>
+            <li>Finish file transfers and leave MTP mode.</li>
+            <li>
+              On OP–XY, choose the USB audio mode you want. Its eight-channel
+              mode exposes Tracks 1–8 as mono inputs.
+            </li>
+            <li>
+              Open Capture, select the USB input and check the meters. Grant
+              audio recording permission when requested.
+            </li>
+            <li>
+              Choose a destination on Mac. On iPhone and iPad, takes are saved
+              under Files › XYBuddy › Studio Capture.
+            </li>
+            <li>
+              Record, perform on OP–XY, then stop. Play back the take or open
+              its stem files in your DAW.
+            </li>
+          </ol>
+          <h3>monitoring</h3>
+          <p>
+            Enable Monitor only when you need live input playback. On iOS, use
+            headphones or an external output; speaker monitoring is blocked to
+            prevent feedback.
+          </p>
+          <h3>your take</h3>
+          <p>
+            Each session contains one mono WAV per input plus a
+            <code>session.json</code> record. Keep the session folder together.
+            If a cable disconnects or the audio route changes, check the
+            interrupted take before recording again.
+          </p>
+        </section>
+        <section id="platforms">
+          <div class="chapter">
+            <span>07</span>
+            <h2>your platform</h2>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <caption>
+                Native app workspaces
+              </caption>
+              <thead>
+                <tr>
+                  <th scope="col">Workspace</th>
+                  <th scope="col">iPhone</th>
+                  <th scope="col">iPad</th>
+                  <th scope="col">Mac</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <th scope="row">Song</th>
+                  <td>Yes</td>
+                  <td>Yes</td>
+                  <td>Yes</td>
+                </tr>
+                <tr>
+                  <th scope="row">Native Edit</th>
+                  <td>—</td>
+                  <td>Yes</td>
+                  <td>Yes</td>
+                </tr>
+                <tr>
+                  <th scope="row">Files + Backup</th>
+                  <td>USB</td>
+                  <td>USB</td>
+                  <td>USB</td>
+                </tr>
+                <tr>
+                  <th scope="row">Capture</th>
+                  <td>USB audio</td>
+                  <td>USB audio</td>
+                  <td>USB audio</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <p>
+            The web app provides Song import, editing and export. Device Files,
+            Backup and Capture belong to the native apps.
+          </p>
+        </section>
+        <section id="help">
+          <div class="chapter">
+            <span>08</span>
+            <h2>troubleshooting</h2>
+          </div>
+          <details>
+            <summary>OP–XY isn’t appearing in Files</summary>
+            <p>
+              Check the USB data cable, enable MTP mode and scan again. Close
+              other applications using the instrument’s file connection. On
+              iPhone or iPad, check XYBuddy’s camera permission in Settings.
+            </p>
+          </details>
+          <details>
+            <summary>Capture has no input</summary>
+            <p>
+              Leave MTP mode, select OP–XY as the audio input and check its USB
+              audio configuration. Confirm recording permission and look for
+              meter activity before starting a take.
+            </p>
+          </details>
+          <details>
+            <summary>The preview sounds different from OP–XY</summary>
+            <p>
+              The local preview uses a general-purpose sound bank. Send MIDI to
+              OP–XY or export the project to hear it with the instrument’s
+              sounds.
+            </p>
+          </details>
+          <details>
+            <summary>A backup or restore stopped</summary>
+            <p>
+              Reconnect the instrument and reopen Backup. On iOS, follow the
+              recovery actions offered for an interrupted restore. Keep your
+              original snapshot and safety snapshot until you have checked the
+              restored device.
+            </p>
+          </details>
+          <details>
+            <summary>Where can I get help or report a problem?</summary>
+            <p>
+              <a href="https://github.com/antiero/TEBuddy/issues"
+                >Report a native app issue</a
+              >
+              or
+              <a href="https://github.com/antiero/xy-format/issues"
+                >report a Song editor issue</a
+              >. Include your platform, app version, OP–XY firmware and the
+              steps that reproduce it. Share a project only if you’re
+              comfortable making its contents public.
+            </p>
+          </details>
+          <p class="hardware-link">
+            For the instrument itself, see the
+            <a href="https://teenage.engineering/guides/op-xy"
+              >official OP–XY guide ↗</a
+            >.
+          </p>
+        </section>
+        <footer>
+          <a class="wordmark" href="/">xybuddy</a>
+          <p>
+            by antiero (5of12) · independent software.<br />Not affiliated with
+            teenage engineering.
+          </p>
+          <a href="#overview">back to top ↑</a>
+        </footer>
+      </main>
+    </div>
+  </body>
+</html>

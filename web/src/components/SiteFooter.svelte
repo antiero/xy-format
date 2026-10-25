@@ -1,6 +1,7 @@
 <footer class="disclaimer site-footer" aria-label="XYBuddy acknowledgements">
   <p>
-    xybuddy by <a
+    <a href="/docs/">user guide</a> · xybuddy by
+    <a
       href="https://github.com/antiero/xy-format"
       target="_blank"
       rel="noreferrer">antiero (5of12)</a
