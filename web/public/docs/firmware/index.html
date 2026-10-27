@@ -1,0 +1,232 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>xybuddy — OP-XY firmware updates</title>
+    <meta
+      name="description"
+      content="Update OP-XY from native xybuddy on Mac, iPhone or iPad. Preparation, risks, cancellation and manual recovery."
+    />
+    <link rel="icon" href="/favicon.svg" />
+    <link rel="stylesheet" href="/docs/guide.css" />
+    <link rel="stylesheet" href="/docs/navigation.css" />
+    <script src="/docs/guide.js" defer></script>
+  </head>
+  <body>
+    <a class="skip" href="#guide">Skip to update guide</a>
+    <header>
+      <div class="header-brand">
+        <button
+          id="contents-toggle"
+          type="button"
+          aria-controls="guide-contents"
+          aria-expanded="true"
+          aria-label="Hide contents"
+          title="Hide contents"
+        >
+          ☰
+        </button>
+        <a class="wordmark" href="/docs/">xybuddy<span> / guide</span></a>
+      </div>
+      <a class="open-app" href="/docs/#firmware">back to user guide ↗</a>
+    </header>
+    <div class="layout">
+      <div class="contents-panel" id="guide-contents">
+        <nav aria-label="Update guide chapters">
+          <a class="index-label" href="#overview">OS updates</a>
+          <a href="#prepare"><span>01</span> before updating</a>
+          <a href="#update"><span>02</span> native update</a>
+          <a href="#cancel"><span>03</span> cancellation</a>
+          <a href="#risks"><span>04</span> risks &amp; responsibility</a>
+          <a href="#manual"><span>05</span> manual update</a>
+        </nav>
+      </div>
+      <main id="guide">
+        <section class="intro" id="overview">
+          <p class="eyebrow">Mac · iPhone · iPad</p>
+          <h1>OP–XY<br /><span>OS updates.</span></h1>
+          <p class="lead">
+            Official firmware. Direct USB MIDI.<br />No separate browser app
+            needed.
+          </p>
+          <p class="note">
+            Tested on Mac, iPhone and iPad, updating OP–XY OS 1.2.0 to 1.2.1.
+            xybuddy offers native installation of a release only after it has
+            been tested on real hardware on that platform.
+          </p>
+        </section>
+        <section id="prepare">
+          <div class="chapter">
+            <span>01</span>
+            <h2>before updating</h2>
+          </div>
+          <p>
+            Save the current project on OP–XY and stop playback. Use
+            <strong>Back Up First</strong>, or confirm that you already have a
+            backup or choose to continue without a new one. Unsaved instrument
+            edits are not included in a backup.
+          </p>
+          <p>
+            Connect one OP–XY by a reliable USB data cable in normal MIDI mode.
+            Keep power stable and close other apps using the instrument. Finish
+            transfers, recording and playback first.
+          </p>
+          <p class="note">
+            <strong>Official firmware only!</strong> Custom or modified firmware
+            is not supported. Do not use automatic updating if your OP–XY runs
+            any of these, even if its OS version number looks supported. The
+            version number alone cannot prove firmware is unmodified.
+          </p>
+        </section>
+        <section id="update">
+          <div class="chapter">
+            <span>02</span>
+            <h2>native update</h2>
+          </div>
+          <p>
+            Open <strong>OS Update</strong> in the Mac toolbar or the mobile
+            Files toolbar. On Mac,
+            <strong>xybuddy › Check for OP-XY Update…</strong> in the menu bar
+            opens the same sheet and refreshes the release check.
+          </p>
+          <p>
+            Tap <strong>Check Device</strong> to read the installed OS and
+            serial number from OP–XY, then review the available release and
+            release notes. <strong>Update OP-XY</strong> is offered only for a reviewed
+            firmware image and eligible starting OS. A newly discovered release
+            does not automatically become eligible for installation.
+          </p>
+          <p class="note">
+            After <strong>Check Device</strong>, OP–XY can’t switch to MTP mode
+            until it restarts. If you check without updating, turn OP–XY off and
+            on again before using Files or Backup.
+          </p>
+          <p>
+            Accept the risk and responsibility notice and confirm that the
+            instrument runs official, unmodified teenage engineering firmware.
+            Acceptance is required again for each update attempt.
+          </p>
+          <p>
+            xybuddy downloads the complete image and verifies its hash, size,
+            version and model before preparing OP–XY. Device transfers,
+            recording and other xybuddy MIDI sends are paused during the update.
+          </p>
+          <p>
+            Follow the stages:
+            <strong
+              >Preparing → Transferring → Installing → Restarting →
+              Verified</strong
+            >. Keep xybuddy open and the USB connection and power stable. A
+            completed transfer is not yet a completed installation; success
+            requires the same OP–XY to reconnect and report the expected OS.
+          </p>
+          <p class="note">
+            Host sleep protection helps, but cannot guarantee uninterrupted
+            operation. iOS may interrupt background work, so keep xybuddy in the
+            foreground. A firmware update also does not remove independent
+            project-format compatibility restrictions.
+          </p>
+        </section>
+        <section id="cancel">
+          <div class="chapter">
+            <span>03</span>
+            <h2>cancellation</h2>
+          </div>
+          <p>
+            <strong>Cancel Download</strong> stops the download. During
+            preparation or transfer, <strong>Cancel Update</strong> asks for
+            confirmation before stopping further sends.
+          </p>
+          <p>
+            Stopping a transfer does not undo bytes already sent or guarantee
+            that OP–XY can continue normally. Keep it powered and connected,
+            follow its screen and use manual recovery if needed. Do not power
+            off the instrument as a way to cancel.
+          </p>
+          <p>
+            Once installation begins on OP–XY, cancellation is disabled because
+            xybuddy cannot safely undo that operation. Keep the instrument
+            powered until installation and verification finish.
+          </p>
+          <p>
+            If the session is interrupted, xybuddy retains its recovery record
+            and keeps device access paused. It does not automatically resume,
+            retry, reboot or reset the instrument. After OP–XY has finished and
+            returned to normal MIDI mode, use
+            <strong>Check Installed OS</strong> or
+            <strong>End Update Session</strong>; both perform a fresh device
+            check before access is released.
+          </p>
+        </section>
+        <section id="risks">
+          <div class="chapter">
+            <span>04</span>
+            <h2>risks &amp; responsibility</h2>
+          </div>
+          <h3>Official firmware only!</h3>
+          <p>
+            Do not use automatic updating with custom or modified firmware, even
+            if its version number matches.
+          </p>
+          <p>
+            Updates can leave OP–XY unresponsive or erase data. Back up first.
+            Keep power and USB connected.
+          </p>
+          <p>
+            This method is not approved by teenage engineering. Use it at your
+            own risk.
+          </p>
+          <p>
+            Where legally permitted, 5of12 is not liable for device failure or
+            data loss. Your statutory rights are unchanged.
+          </p>
+          <p class="note">
+            Tested on supported hardware and official firmware. Updates still
+            carry risk.
+          </p>
+        </section>
+        <section id="manual">
+          <div class="chapter">
+            <span>05</span>
+            <h2>manual update</h2>
+          </div>
+          <p>
+            Open <strong>Manual Update</strong> in the update sheet. Download
+            the official firmware and use
+            <strong>Save or Share Firmware</strong> to save the file or send it
+            to a computer. Downloading the file to an iPhone does not install it
+            on OP–XY.
+          </p>
+          <p>
+            TE’s documented manual procedure uses a computer: power off OP–XY,
+            hold COM while powering on, press track button 1, connect by USB,
+            copy the official firmware to the removable disk and safely eject
+            it. Then wait and follow the instrument’s screen. Never begin these
+            steps while an installation is still running.
+          </p>
+          <p>
+            <a
+              href="https://teenage.engineering/downloads/op-xy"
+              target="_blank"
+              rel="noreferrer"
+              >Official OP–XY OS downloads ↗</a
+            ><br /><a
+              href="https://teenage.engineering/guides/op-xy/te-boot"
+              target="_blank"
+              rel="noreferrer"
+              >Official TE boot instructions ↗</a
+            >
+          </p>
+        </section>
+        <footer>
+          <a class="wordmark" href="/docs/">xybuddy / guide</a>
+          <p>
+            by antiero (5of12) · independent software.<br />Not affiliated with
+            teenage engineering.
+          </p>
+        </footer>
+      </main>
+    </div>
+  </body>
+</html>
