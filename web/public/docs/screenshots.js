@@ -28,12 +28,6 @@ const galleries = {
       "macOS · USB MIDI connected",
     ],
     [
-      "Mac · Sample browser",
-      "mac-sample-browser",
-      "The sample drawer showing user samples from the connected OP–XY.",
-      "macOS · MTP connected",
-    ],
-    [
       "Mac · Import",
       "mac-song",
       "The Song import workspace and native room toolbar.",
@@ -181,8 +175,8 @@ for (const gallery of document.querySelectorAll("[data-screenshots]")) {
     picture.alt = description;
     const phone = file.startsWith("iphone-");
     const tablet = file.startsWith("ipad-");
-    picture.width = phone ? 1206 : tablet ? 2420 : 2704;
-    picture.height = phone ? 2622 : tablet ? 1668 : 1698;
+    picture.width = phone ? 1206 : tablet ? 2420 : 2880;
+    picture.height = phone ? 2622 : tablet ? 1668 : 1800;
     gallery.dataset.platform = phone ? "iphone" : tablet ? "ipad" : "mac";
     picture.src = link.href;
     caption.textContent = `${title} · ${source}`;

@@ -6,27 +6,30 @@ no generated or composited interfaces are used.
 
 ## Mac — connected OP–XY
 
-The native Debug app built earlier in this session was run with the user's
-USB-connected OP–XY, reporting firmware 1.2.0. Captures were cropped to the
-1352 × 849-point app window at 2× resolution.
+Captured on 28 October 2026 by `script/capture-mac-screenshots.sh` in the
+TEBuddy checkout, which drives a Debug build of the app through each view
+and captures its window without the shadow. Rerun it after UI changes; see
+the script's `--help`. The window is 1440 × 900 points, captured at 2× as
+2880 × 1800, which is also a Mac App Store screenshot size. The OP–XY was
+connected over USB on firmware 1.2.1.
 
-- `mac-song.png`: original import workspace, captured before connection.
-- `mac-arrange.png`, `mac-pattern.png`, `mac-song-mode.png`: the existing
-  `7nderground.xy` project opened read-only from the connected device into
-  Song. No edits were sent back to the instrument.
-- `mac-edit.png`: that arrangement opened in the native piano roll.
+- `mac-song.png`: the import workspace, before a project is opened.
 - `mac-files.png`, `mac-templates.png`, `mac-presets.png`, `mac-samples.png`:
   real MTP directory listings in all four Files areas.
 - `mac-backup.png`: MTP-connected device details, backup options and existing
-  snapshot history. No backup or restore was started for this capture.
-- `mac-sample-browser.png`: the Song sample drawer listing device samples.
-- `mac-live-remote.png`: OP–XY detected over USB MIDI after leaving MTP mode.
-  No transport or scene commands were triggered for the screenshot.
-- `mac-capture.png`: OP–XY USB audio selected, eight inputs and live meter
-  activity. No recording was started; this is input-meter evidence only.
+  snapshot history. No backup or restore was started.
+- `mac-arrange.png`, `mac-pattern.png`, `mac-song-mode.png`: `7nderground.xy`
+  opened read-only from the connected device into Song. No edits were sent
+  back to the instrument.
+- `mac-live-remote.png`: Live Remote with OP–XY over USB MIDI, after leaving
+  MTP mode. No transport or scene commands were sent.
+- `mac-edit.png`: that arrangement opened in the native piano roll.
+- `mac-capture.png`: OP–XY USB audio selected, eight inputs and live meters.
+  No recording was started.
 
-The file connection was ejected after capturing MTP views. The instrument
-was left in USB MIDI/audio mode. No files were uploaded, deleted or renamed.
+The script switches OP–XY into MTP mode for Files and Backup and ejects it
+back to USB MIDI/audio mode afterwards. No files were uploaded, deleted or
+renamed.
 
 ## iPhone and iPad — simulator
 
