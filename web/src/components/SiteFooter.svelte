@@ -1,6 +1,6 @@
 <footer class="disclaimer site-footer" aria-label="XYBuddy acknowledgements">
   <p>
-    <a href="/docs/">user guide</a> · xybuddy by
+    xybuddy by
     <a
       href="https://github.com/antiero/xy-format"
       target="_blank"
@@ -10,8 +10,8 @@
       href="https://github.com/kmorrill/xy-format"
       target="_blank"
       rel="noreferrer">xy-format by kmorrill</a
-    ><br />*privacy notice: step counter records number of converted steps only,
-    not your files.
+    >
+    · <a href="/docs/">user guide</a> · <a href="/privacy/">privacy policy</a>
   </p>
 </footer>
 
