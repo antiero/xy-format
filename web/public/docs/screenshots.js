@@ -175,8 +175,8 @@ for (const gallery of document.querySelectorAll("[data-screenshots]")) {
     picture.alt = description;
     const phone = file.startsWith("iphone-");
     const tablet = file.startsWith("ipad-");
-    picture.width = phone ? 1206 : tablet ? 2420 : 2880;
-    picture.height = phone ? 2622 : tablet ? 1668 : 1800;
+    picture.width = phone ? 1206 : tablet ? 2420 : 2560;
+    picture.height = phone ? 2622 : tablet ? 1668 : 1600;
     gallery.dataset.platform = phone ? "iphone" : tablet ? "ipad" : "mac";
     picture.src = link.href;
     caption.textContent = `${title} · ${source}`;
